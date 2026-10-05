@@ -1,17 +1,21 @@
-# dairy
+# Dairy Desk
 
-A new Flutter project.
+A Flutter customer-management UI for dairy operators. It includes email/password
+login and signup, a searchable customer list, and a create-customer form.
 
-## Getting Started
+## Backend connection
 
-This project is a starting point for a Flutter application.
+The app calls these JSON endpoints:
 
-A few resources to get you started if this is your first Flutter project:
+- `POST /auth/login` and `POST /auth/signup`
+- `GET /customers` and `POST /customers`
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+The default API URL is `http://10.0.2.2:3000/api` (Android emulator access to a
+local backend). Override it for another environment:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```shell
+flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api
+```
+
+Successful authentication stores the returned `token` (or `accessToken`) in
+`SharedPreferences` and sends it as a Bearer token on customer requests.
