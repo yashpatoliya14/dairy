@@ -91,10 +91,10 @@ class _AuthPageState extends State<AuthPage> {
       } else {
         await widget.api.login(email.text.trim(), password.text);
       }
-      if (mounted)
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => Dashboard(api: widget.api)),
-        );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => Dashboard(api: widget.api)),
+      );
     } catch (error) {
       if (mounted) _showMessage(error.toString());
     } finally {
@@ -167,9 +167,9 @@ class _AuthPageState extends State<AuthPage> {
                         labelText: 'Password',
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
-                      validator: (v) => v != null && v.length >= 6
+                      validator: (v) => v != null && v.length >= 8
                           ? null
-                          : 'Use at least 6 characters',
+                          : 'Use at least 8 characters',
                     ),
                     const SizedBox(height: 22),
                     FilledButton(
@@ -382,7 +382,6 @@ class CreateCustomerPage extends StatefulWidget {
 class _CreateCustomerPageState extends State<CreateCustomerPage> {
   final formKey = GlobalKey<FormState>();
   final name = TextEditingController(),
-      uniqueNumber = TextEditingController(),
       liters = TextEditingController(),
       price = TextEditingController();
   bool busy = false;
@@ -392,15 +391,14 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
     try {
       await widget.api.createCustomer({
         'name': name.text.trim(),
-        'uniqueNumber': uniqueNumber.text.trim(),
         'liters': double.parse(liters.text.trim()),
         'price': double.parse(price.text.trim()),
       });
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -425,15 +423,6 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
           TextFormField(
             controller: name,
             decoration: const InputDecoration(labelText: 'Full name'),
-            validator: _required,
-          ),
-          const SizedBox(height: 14),
-          TextFormField(
-            controller: uniqueNumber,
-            decoration: const InputDecoration(
-              labelText: 'Unique customer number',
-              prefixIcon: Icon(Icons.tag),
-            ),
             validator: _required,
           ),
           const SizedBox(height: 14),

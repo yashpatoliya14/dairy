@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Dairy Desk (Flutter)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "10BE1D15XD000GK",
+            "toolArgs": [
+                "--dart-define=API_BASE_URL=https://dairy-backend-eemp.onrender.com"
+            ],
+            "env": {
+                "JAVA_HOME": "C:\\Program Files\\Microsoft\\jdk-17.0.20.101-hotspot",
+                "ANDROID_HOME": "C:\\Users\\yashp\\Downloads\\android-sdk",
+                "ANDROID_SDK_ROOT": "C:\\Users\\yashp\\Downloads\\android-sdk",
+                "Path": "D:\\flutter\\bin;C:\\Program Files\\Microsoft\\jdk-17.0.20.101-hotspot\\bin;C:\\Users\\yashp\\Downloads\\android-sdk\\platform-tools;${env:Path}"
+            }
+        }
+    ]
+}
