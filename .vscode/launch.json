@@ -7,7 +7,7 @@
             "type": "dart",
             "deviceId": "10BE1D15XD000GK",
             "toolArgs": [
-                "--dart-define=API_BASE_URL=https://dairy-backend-eemp.onrender.com"
+                "--dart-define=API_BASE_URL=http://10.94.132.147:3000"
             ],
             "env": {
                 "JAVA_HOME": "C:\\Program Files\\Microsoft\\jdk-17.0.20.101-hotspot",
