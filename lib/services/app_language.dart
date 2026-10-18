@@ -67,6 +67,7 @@ class T {
       'Add your first customer to get started':
           'शुरू करने के लिए पहला ग्राहक जोड़ें',
       'Customer defaults': 'ग्राहक डिफ़ॉल्ट',
+      'Default milk & price': 'डिफ़ॉल्ट दूध और कीमत',
       'These values are filled automatically when you add a customer. You can change them for any individual customer.': 'ग्राहक जोड़ते समय ये मान अपने आप भरेंगे। आप इन्हें हर ग्राहक के लिए बदल सकते हैं।',
       'Default liters': 'डिफ़ॉल्ट लीटर',
       'Default price per liter': 'प्रति लीटर डिफ़ॉल्ट कीमत',
@@ -139,6 +140,7 @@ class T {
       'Add your first customer to get started':
           'શરૂ કરવા માટે પહેલો ગ્રાહક ઉમેરો',
       'Customer defaults': 'ગ્રાહક ડિફૉલ્ટ',
+      'Default milk & price': 'ડિફૉલ્ટ દૂધ અને કિંમત',
       'Default liters': 'ડિફૉલ્ટ લીટર',
       'Default price per liter': 'પ્રતિ લીટર ડિફૉલ્ટ કિંમત',
       'Save defaults': 'ડિફૉલ્ટ સંગ્રહો',

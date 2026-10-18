@@ -20,12 +20,19 @@ class ApiService {
   String? _token;
 
   static String _normalizeBaseUrl(String value) {
-    final normalized = value.trim().replaceAll('`', '').replaceAll(RegExp(r'/+$'), '');
+    final normalized = value
+        .trim()
+        .replaceAll('`', '')
+        .replaceAll(RegExp(r'/+$'), '');
     final uri = Uri.tryParse(normalized);
     if (uri == null ||
         (uri.scheme != 'http' && uri.scheme != 'https') ||
         uri.host.isEmpty) {
-      throw ArgumentError.value(value, 'baseUrl', 'Expected an HTTP or HTTPS URL');
+      throw ArgumentError.value(
+        value,
+        'baseUrl',
+        'Expected an HTTP or HTTPS URL',
+      );
     }
     return normalized;
   }
@@ -42,15 +49,51 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> signup(
+    String firstName,
+    String lastName,
     String email,
     String password,
     String dairyName,
   ) async {
     return _authenticate('/auth/signup', {
+      'firstName': firstName,
+      'lastName': lastName,
       'email': email,
       'password': password,
       'dairyName': dairyName,
     });
+  }
+
+  Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
+    return _postAuth('/auth/verify-email', {'email': email, 'code': code});
+  }
+
+  Future<void> resendVerification(String email) async {
+    await _postAuth('/auth/resend-verification', {'email': email});
+  }
+
+  Future<void> requestPasswordReset(String email) async {
+    await _postAuth('/auth/forgot-password', {'email': email});
+  }
+
+  Future<void> resetPassword(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    await _postAuth('/auth/reset-password', {
+      'email': email,
+      'code': code,
+      'newPassword': newPassword,
+    });
+  }
+
+  Future<Map<String, dynamic>> _postAuth(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _send('POST', path, body: body, includeAuth: false);
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
   Future<List<Map<String, dynamic>>> getCustomers() async {
@@ -70,6 +113,22 @@ class ApiService {
   Future<Map<String, dynamic>> getSettings() async {
     final response = await _send('GET', '/settings');
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> getProfile() async {
+    final response = await _send('GET', '/auth/profile');
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _send(
+      'PATCH',
+      '/auth/password',
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
   }
 
   Future<Map<String, dynamic>> updateSettings({

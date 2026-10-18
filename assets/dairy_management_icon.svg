@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Dairy Management</title>
+  <desc id="desc">Minimal milk jar icon in cream, green, and golden yellow, with subtle animation.</desc>
+  <rect width="1024" height="1024" rx="160" fill="#2E7D5B"/>
+  <g class="jar">
+    <path d="M405 236 L619 236 L650 318 L374 318 Z" fill="#F6C95D"/>
+    <path d="M405 210 H619 V237 H405 Z" fill="#E9B63E"/>
+    <rect x="398" y="197" width="228" height="14" rx="7" fill="#FFFDF6"/>
+    <rect x="327" y="314" width="370" height="435" rx="68" fill="#FFFDF6"/>
+    <path d="M413 465 C445 417 480 417 512 442 C545 467 578 417 610 417 C636 417 654 436 665 461 L665 572 C641 606 608 619 574 596 C542 574 520 578 493 597 C462 619 431 605 413 574 Z" fill="#2E7D5B"/>
+    <path d="M446 681 C489 709 549 709 602 681" fill="none" stroke="#D4E9DC" stroke-width="16" stroke-linecap="round"/>
+    <g class="leaf">
+      <path d="M516 398 C520 355 552 324 579 310 C592 348 568 382 516 398 Z" fill="#F6C95D"/>
+      <path d="M516 398 C529 363 552 336 579 310" fill="none" stroke="#2E7D5B" stroke-width="10" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

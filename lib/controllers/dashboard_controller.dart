@@ -9,6 +9,8 @@ class DashboardController extends GetxController {
   final customers = <Map<String, dynamic>>[].obs;
   final defaultLiters = 1.0.obs;
   final defaultPrice = 0.0.obs;
+  final dairyName = ''.obs;
+  final ownerName = ''.obs;
   final loading = true.obs;
   final error = ''.obs;
   final searchQuery = ''.obs;
@@ -22,8 +24,19 @@ class DashboardController extends GetxController {
   Future<void> load() async {
     loading.value = true;
     error.value = '';
-    await Future.wait([loadCustomers(), loadSettings()]);
+    await Future.wait([loadCustomers(), loadSettings(), loadProfile()]);
     loading.value = false;
+  }
+
+  Future<void> loadProfile() async {
+    try {
+      final profile = await api.getProfile();
+      dairyName.value = '${profile['dairyName'] ?? ''}'.trim();
+      ownerName.value = '${profile['name'] ?? profile['fullName'] ?? ''}'
+          .trim();
+    } catch (exception) {
+      error.value = error.value.isEmpty ? exception.toString() : error.value;
+    }
   }
 
   Future<void> loadCustomers() async {
