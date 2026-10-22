@@ -207,7 +207,6 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       _successMessage = null;
     });
 
-    final formattedMessage = _buildFormattedMessage();
     final rate = double.tryParse(_rateController.text) ?? 0.0;
     final note = _notesController.text.trim();
 
@@ -218,29 +217,33 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
         await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
+          'type': 'daily',
           'date': _formatDate(_selectedDate),
           'deliverySession': _session,
           'liters': liters,
           'ratePerLiter': rate,
           'totalAmount': total,
           'notes': note.isEmpty ? null : note,
-          'customMessage': formattedMessage,
+          'useTemplate': true,
         });
       } else {
         final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
         final monthlyAmount = totalLiters * rate;
         final prevDue = double.tryParse(_previousDueController.text) ?? 0.0;
-        final netPayable = monthlyAmount + prevDue;
         await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
+          'type': 'monthly',
+          'monthName': _monthNameController.text.trim(),
+          'totalDays': int.tryParse(_totalDaysController.text) ?? 30,
+          'totalLiters': totalLiters,
           'liters': totalLiters,
           'ratePerLiter': rate,
-          'totalAmount': netPayable,
-          'deliverySession': 'Monthly Billing',
+          'monthlyAmount': monthlyAmount,
+          'totalAmount': monthlyAmount,
           'previousDue': prevDue,
           'notes': note.isEmpty ? null : note,
-          'customMessage': formattedMessage,
+          'useTemplate': true,
         });
       }
 

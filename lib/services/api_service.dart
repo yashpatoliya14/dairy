@@ -200,20 +200,12 @@ class ApiService {
   Future<Map<String, dynamic>> sendWhatsAppBill(
     Map<String, dynamic> payload,
   ) async {
-    try {
-      final response = await _send('POST', '/whatsapp/send-bill', body: payload);
-      return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
-    } catch (e) {
-      if (payload.containsKey('customMessage') || payload.containsKey('message')) {
-        final message = (payload['customMessage'] ?? payload['message']) as String;
-        final response = await _send('POST', '/whatsapp/send-text', body: {
-          'to': payload['to'],
-          'message': message,
-        });
-        return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
-      }
-      rethrow;
-    }
+    final response = await _send(
+      'POST',
+      '/whatsapp/send-bill',
+      body: payload,
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
   Future<Map<String, dynamic>> sendWhatsAppText({
