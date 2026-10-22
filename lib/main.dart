@@ -13,6 +13,7 @@ import 'controllers/app_controller.dart';
 import 'controllers/dashboard_controller.dart';
 import 'services/app_language.dart';
 import 'services/api_service.dart';
+import 'widgets/send_whatsapp_bill_sheet.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -631,6 +632,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           ),
         ],
       ),
+    ),
   );
 }
 
@@ -998,6 +1000,18 @@ class _CustomerTile extends StatelessWidget {
           spacing: 0,
           children: [
             IconButton(
+              tooltip: T.t('Send WhatsApp Bill'),
+              onPressed: () => SendWhatsAppBillSheet.show(
+                context,
+                api: api,
+                customer: customer,
+              ),
+              icon: const Icon(
+                LucideIcons.messageCircle,
+                color: Color(0xff25D366),
+              ),
+            ),
+            IconButton(
               tooltip: T.t('Save entry'),
               onPressed: () => _addMilk(context),
               icon: const Icon(Icons.save_outlined),
@@ -1005,11 +1019,28 @@ class _CustomerTile extends StatelessWidget {
             PopupMenuButton<String>(
               tooltip: T.t('More options'),
               onSelected: (value) {
+                if (value == 'whatsapp') {
+                  SendWhatsAppBillSheet.show(
+                    context,
+                    api: api,
+                    customer: customer,
+                  );
+                }
                 if (value == 'edit') _edit(context);
                 if (value == 'details') _openDetails();
                 if (value == 'bill') _showBill(context);
               },
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'whatsapp',
+                  child: ListTile(
+                    leading: const Icon(
+                      LucideIcons.messageCircle,
+                      color: Color(0xff25D366),
+                    ),
+                    title: Text(T.t('Send WhatsApp Bill')),
+                  ),
+                ),
                 PopupMenuItem(
                   value: 'edit',
                   child: ListTile(
@@ -1119,6 +1150,18 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         title: Text(T.t('Customer details')),
         actions: [
           IconButton(
+            tooltip: T.t('Send WhatsApp Bill'),
+            onPressed: () => SendWhatsAppBillSheet.show(
+              context,
+              api: widget.api,
+              customer: widget.customer,
+            ),
+            icon: const Icon(
+              LucideIcons.messageCircle,
+              color: Color(0xff25D366),
+            ),
+          ),
+          IconButton(
             tooltip: T.t('Edit customer'),
             onPressed: () async {
               final updated = await Get.to<bool>(
@@ -1207,6 +1250,38 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   value: price.toStringAsFixed(2),
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            Card(
+              color: const Color(0xfff0fdf4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xffbbf7d0)),
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xff25D366),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(LucideIcons.messageCircle, color: Colors.white, size: 20),
+                ),
+                title: Text(
+                  T.t('Send WhatsApp Bill'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xff166534)),
+                ),
+                subtitle: Text(
+                  T.t('Send daily milk delivery update or monthly statement'),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xff166534)),
+                onTap: () => SendWhatsAppBillSheet.show(
+                  context,
+                  api: widget.api,
+                  customer: widget.customer,
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             Text(
@@ -1625,7 +1700,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
-    ),
   );
 }
 

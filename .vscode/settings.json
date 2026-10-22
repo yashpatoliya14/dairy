@@ -1,3 +1,4 @@
 {
-    "dart.flutterSdkPath": "D:\\flutter"
+  "dart.flutterSdkPath": "D:\\flutter",
+  "cmake.sourceDirectory": "D:/Recap_Milk_MAnagement/dairy/windows"
 }

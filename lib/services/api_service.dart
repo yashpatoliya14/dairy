@@ -12,7 +12,7 @@ class ApiService {
         baseUrl ??
             const String.fromEnvironment(
               'API_BASE_URL',
-              defaultValue: 'http://10.94.132.147:3000',
+              defaultValue: 'https://dairy-backend-eemp.onrender.com',
             ),
       );
 
@@ -195,6 +195,36 @@ class ApiService {
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+  }
+
+  Future<Map<String, dynamic>> sendWhatsAppBill(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await _send('POST', '/whatsapp/send-bill', body: payload);
+      return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+    } catch (e) {
+      if (payload.containsKey('customMessage') || payload.containsKey('message')) {
+        final message = (payload['customMessage'] ?? payload['message']) as String;
+        final response = await _send('POST', '/whatsapp/send-text', body: {
+          'to': payload['to'],
+          'message': message,
+        });
+        return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> sendWhatsAppText({
+    required String to,
+    required String message,
+  }) async {
+    final response = await _send('POST', '/whatsapp/send-text', body: {
+      'to': to,
+      'message': message,
+    });
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
   Future<void> logout() async {
