@@ -871,51 +871,29 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                 const SizedBox(height: 20),
 
                 // Actions
-                Row(
-                  children: [
-                    // Open in WhatsApp App button
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _openWhatsAppDirect,
-                        icon: const Icon(LucideIcons.messageSquare, size: 18),
-                        label: Text(T.t('Open in WhatsApp')),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xff128C7E),
-                          side: const BorderSide(color: Color(0xff128C7E)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _sending ? null : _sendViaBackend,
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(LucideIcons.send, size: 18),
+                    label: Text(_sending ? T.t('Sending...') : T.t('Send WhatsApp Bill')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xff2d7a55),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    const SizedBox(width: 12),
-
-                    // Send via API button
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _sending ? null : _sendViaBackend,
-                        icon: _sending
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(LucideIcons.send, size: 18),
-                        label: Text(_sending ? T.t('Sending...') : T.t('Send Bill')),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xff2d7a55),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
