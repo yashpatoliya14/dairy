@@ -37,9 +37,23 @@ class ApiService {
     return normalized;
   }
 
+  static const _tokenKey = 'dairy_jwt';
+  static const _expiryKey = 'dairy_jwt_expiry';
+  static const Duration _sessionLifetime = Duration(days: 30);
+
   Future<void> loadSession() async {
     final preferences = await SharedPreferences.getInstance();
-    _token = preferences.getString('dairy_jwt');
+    final token = preferences.getString(_tokenKey);
+    final expiry = preferences.getInt(_expiryKey);
+    if (token != null &&
+        expiry != null &&
+        DateTime.now().millisecondsSinceEpoch < expiry) {
+      _token = token;
+    } else {
+      _token = null;
+      await preferences.remove(_tokenKey);
+      await preferences.remove(_expiryKey);
+    }
   }
 
   bool get hasSession => _token != null;
@@ -222,7 +236,8 @@ class ApiService {
   Future<void> logout() async {
     _token = null;
     final preferences = await SharedPreferences.getInstance();
-    await preferences.remove('dairy_jwt');
+    await preferences.remove(_tokenKey);
+    await preferences.remove(_expiryKey);
   }
 
   Future<Map<String, dynamic>> _authenticate(
@@ -235,7 +250,11 @@ class ApiService {
     if (token is String) {
       _token = token;
       final preferences = await SharedPreferences.getInstance();
-      await preferences.setString('dairy_jwt', token);
+      await preferences.setString(_tokenKey, token);
+      await preferences.setInt(
+        _expiryKey,
+        DateTime.now().add(_sessionLifetime).millisecondsSinceEpoch,
+      );
     }
     return data;
   }

@@ -634,6 +634,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       ),
     ),
   );
+
 }
 
 class _CodePage extends StatelessWidget {
