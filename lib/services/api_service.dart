@@ -14,7 +14,7 @@ class ApiService {
         baseUrl ??
             const String.fromEnvironment(
               'API_BASE_URL',
-              defaultValue: 'http://10.248.67.9:3000',
+              defaultValue: 'https://dairy-backend-eemp.onrender.com',
             ),
       );
 
@@ -312,7 +312,7 @@ class ApiService {
       'POST',
       '/whatsapp/send-bill',
       body: payload,
-      timeout: const Duration(seconds: 45),
+      timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -325,7 +325,7 @@ class ApiService {
       'POST',
       '/whatsapp/send-text',
       body: {'to': to, 'message': message},
-      timeout: const Duration(seconds: 45),
+      timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -346,7 +346,7 @@ class ApiService {
       'POST',
       '/whatsapp/send-daily-entry',
       body: body,
-      timeout: const Duration(seconds: 45),
+      timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -362,7 +362,7 @@ class ApiService {
         'customerIds': customerIds,
         'date': date,
       },
-      timeout: const Duration(seconds: 45),
+      timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -498,7 +498,7 @@ class ApiService {
     bool includeAuth = true,
     bool showLoader = true,
     String? loaderMessage,
-    Duration timeout = const Duration(seconds: 35),
+    Duration timeout = const Duration(seconds: 60),
   }) async {
     if (includeAuth) {
       if (_token == null || isTokenExpired) {
