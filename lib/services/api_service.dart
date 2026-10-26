@@ -308,7 +308,12 @@ class ApiService {
   Future<Map<String, dynamic>> sendWhatsAppBill(
     Map<String, dynamic> payload,
   ) async {
-    final response = await _send('POST', '/whatsapp/send-bill', body: payload);
+    final response = await _send(
+      'POST',
+      '/whatsapp/send-bill',
+      body: payload,
+      timeout: const Duration(seconds: 45),
+    );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
@@ -320,6 +325,7 @@ class ApiService {
       'POST',
       '/whatsapp/send-text',
       body: {'to': to, 'message': message},
+      timeout: const Duration(seconds: 45),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -336,7 +342,12 @@ class ApiService {
     if (message != null && message.trim().isNotEmpty) {
       body['message'] = message.trim();
     }
-    final response = await _send('POST', '/whatsapp/send-daily-entry', body: body);
+    final response = await _send(
+      'POST',
+      '/whatsapp/send-daily-entry',
+      body: body,
+      timeout: const Duration(seconds: 45),
+    );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
@@ -351,6 +362,7 @@ class ApiService {
         'customerIds': customerIds,
         'date': date,
       },
+      timeout: const Duration(seconds: 45),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -486,6 +498,7 @@ class ApiService {
     bool includeAuth = true,
     bool showLoader = true,
     String? loaderMessage,
+    Duration timeout = const Duration(seconds: 35),
   }) async {
     if (includeAuth) {
       if (_token == null || isTokenExpired) {
@@ -517,19 +530,19 @@ class ApiService {
         'GET' =>
           await http
               .get(uri, headers: headers)
-              .timeout(const Duration(seconds: 10)),
+              .timeout(timeout),
         'POST' =>
           await http
               .post(uri, headers: headers, body: jsonEncode(body))
-              .timeout(const Duration(seconds: 10)),
+              .timeout(timeout),
         'PATCH' =>
           await http
               .patch(uri, headers: headers, body: jsonEncode(body))
-              .timeout(const Duration(seconds: 10)),
+              .timeout(timeout),
         'DELETE' =>
           await http
               .delete(uri, headers: headers)
-              .timeout(const Duration(seconds: 10)),
+              .timeout(timeout),
         _ => throw UnsupportedError('Unsupported HTTP method: $method'),
       };
     } on SocketException catch (error, stackTrace) {

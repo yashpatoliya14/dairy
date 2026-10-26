@@ -1341,7 +1341,10 @@ class _CustomerTile extends StatelessWidget {
                       const SizedBox(height: 5),
 
                       // Metrics row: Liters pill & Rate pill
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -1372,7 +1375,6 @@ class _CustomerTile extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 7,
@@ -1395,21 +1397,17 @@ class _CustomerTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (phone.isNotEmpty && phone != 'null') ...[
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                phone,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade500,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                          if (phone.isNotEmpty && phone != 'null')
+                            Text(
+                              phone,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Colors.grey.shade500,
+                                fontWeight: FontWeight.w500,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
                         ],
                       ),
                     ],
