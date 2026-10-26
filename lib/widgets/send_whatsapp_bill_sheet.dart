@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/app_language.dart';
+import 'dairy_milk_loader.dart';
 
 enum BillType { daily, monthly }
 
@@ -15,21 +16,48 @@ class SendWhatsAppBillSheet extends StatefulWidget {
     super.key,
     required this.api,
     required this.customer,
+    this.initialBillType = BillType.daily,
+    this.initialMonthName,
+    this.initialTotalDays,
+    this.initialMonthlyLiters,
+    this.initialRate,
+    this.initialPreviousDue,
   });
 
   final ApiService api;
   final Map<String, dynamic> customer;
+  final BillType initialBillType;
+  final String? initialMonthName;
+  final int? initialTotalDays;
+  final double? initialMonthlyLiters;
+  final double? initialRate;
+  final double? initialPreviousDue;
 
   static Future<void> show(
     BuildContext context, {
     required ApiService api,
     required Map<String, dynamic> customer,
+    BillType initialBillType = BillType.daily,
+    String? initialMonthName,
+    int? initialTotalDays,
+    double? initialMonthlyLiters,
+    double? initialRate,
+    double? initialPreviousDue,
   }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => SendWhatsAppBillSheet(api: api, customer: customer),
+      builder: (context) => SendWhatsAppBillSheet(
+        api: api,
+        customer: customer,
+        initialBillType: initialBillType,
+        initialMonthName: initialMonthName,
+        initialTotalDays: initialTotalDays,
+        initialMonthlyLiters: initialMonthlyLiters,
+        initialRate: initialRate,
+        initialPreviousDue: initialPreviousDue,
+      ),
     );
   }
 
@@ -62,6 +90,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
   @override
   void initState() {
     super.initState();
+    _billType = widget.initialBillType;
 
     final customer = widget.customer;
     final rawPhone = '${customer['phoneNumber'] ?? customer['phone'] ?? ''}'.trim();
@@ -76,7 +105,9 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       text: defaultLiters.toStringAsFixed(1),
     );
     _rateController = TextEditingController(
-      text: defaultPrice.toStringAsFixed(2),
+      text: widget.initialRate != null
+          ? widget.initialRate!.toStringAsFixed(2)
+          : defaultPrice.toStringAsFixed(2),
     );
     _notesController = TextEditingController();
 
@@ -87,13 +118,23 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
     _monthNameController = TextEditingController(
-      text: '${monthNames[now.month - 1]} ${now.year}',
+      text: widget.initialMonthName ?? '${monthNames[now.month - 1]} ${now.year}',
     );
-    _totalDaysController = TextEditingController(text: '30');
+    _totalDaysController = TextEditingController(
+      text: widget.initialTotalDays != null
+          ? '${widget.initialTotalDays}'
+          : '30',
+    );
     _monthlyLitersController = TextEditingController(
-      text: (defaultLiters * 30).toStringAsFixed(1),
+      text: widget.initialMonthlyLiters != null
+          ? widget.initialMonthlyLiters!.toStringAsFixed(1)
+          : (defaultLiters * 30).toStringAsFixed(1),
     );
-    _previousDueController = TextEditingController(text: '0');
+    _previousDueController = TextEditingController(
+      text: widget.initialPreviousDue != null
+          ? widget.initialPreviousDue!.toStringAsFixed(2)
+          : '0',
+    );
 
     _session = now.hour < 14 ? 'Morning' : 'Evening';
   }
@@ -877,14 +918,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                   child: FilledButton.icon(
                     onPressed: _sending ? null : _sendViaBackend,
                     icon: _sending
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                        ? DairyMilkLoader.mini(color: Colors.white, size: 18)
                         : const Icon(LucideIcons.send, size: 18),
                     label: Text(_sending ? T.t('Sending...') : T.t('Send WhatsApp Bill')),
                     style: FilledButton.styleFrom(

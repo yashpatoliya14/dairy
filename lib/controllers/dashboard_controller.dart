@@ -15,11 +15,39 @@ class DashboardController extends GetxController {
   final error = ''.obs;
   final searchQuery = ''.obs;
 
-  // Today's summary observables
+  // Selected date for dashboard view
+  final selectedDate = DateTime.now().obs;
+
+  // Summary observables
   final todaySummary = <String, dynamic>{}.obs;
   final todayLiters = 0.0.obs;
+  final todayTotalAmount = 0.0.obs;
   final todayEntriesDone = 0.obs;
+  final todayMissingCount = 0.obs;
   final todayTotalCustomers = 0.obs;
+  final todaySentCount = 0.obs;
+  final todayOpenedCount = 0.obs;
+  final todayPendingCount = 0.obs;
+  final todayFailedCount = 0.obs;
+  final todayNotSentCount = 0.obs;
+  final dailyCustomerItems = <Map<String, dynamic>>[].obs;
+
+  // Daily list filter: 'all', 'missing', 'completed'
+  final dailyFilter = 'all'.obs;
+
+  bool get isSelectedDateToday {
+    final now = DateTime.now();
+    final d = selectedDate.value;
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
+  String get formattedSelectedDate {
+    final d = selectedDate.value;
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
+  }
 
   @override
   void onInit() {
@@ -39,16 +67,50 @@ class DashboardController extends GetxController {
     loading.value = false;
   }
 
+  void setDailyFilter(String filter) {
+    dailyFilter.value = filter;
+  }
+
+  Future<void> setSelectedDate(DateTime date) async {
+    selectedDate.value = date;
+    await loadTodaySummary();
+  }
+
+  Future<void> previousDay() async {
+    await setSelectedDate(selectedDate.value.subtract(const Duration(days: 1)));
+  }
+
+  Future<void> nextDay() async {
+    await setSelectedDate(selectedDate.value.add(const Duration(days: 1)));
+  }
+
+  Future<void> goToToday() async {
+    await setSelectedDate(DateTime.now());
+  }
+
   Future<void> loadTodaySummary() async {
     try {
-      final summaryRes = await api.getDailySummary();
+      final summaryRes = await api.getDailySummary(date: formattedSelectedDate);
       todaySummary.assignAll(summaryRes);
       final summary = summaryRes['summary'] as Map? ?? {};
       todayLiters.value = _asDouble(summary['totalLiters'], 0.0);
+      todayTotalAmount.value = _asDouble(summary['totalAmount'], 0.0);
       todayEntriesDone.value =
           int.tryParse('${summary['completedEntriesCount']}') ?? 0;
+      todayMissingCount.value =
+          int.tryParse('${summary['missingEntriesCount']}') ?? 0;
       todayTotalCustomers.value =
           int.tryParse('${summary['totalCustomers']}') ?? customers.length;
+      todaySentCount.value = int.tryParse('${summary['sentCount']}') ?? 0;
+      todayOpenedCount.value = int.tryParse('${summary['openedCount']}') ?? 0;
+      todayPendingCount.value = int.tryParse('${summary['pendingCount']}') ?? 0;
+      todayFailedCount.value = int.tryParse('${summary['failedCount']}') ?? 0;
+      todayNotSentCount.value = int.tryParse('${summary['notSentCount']}') ?? 0;
+
+      final rawList = summaryRes['customers'] as List? ?? [];
+      dailyCustomerItems.assignAll(
+        rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+      );
     } catch (_) {
       // Non-blocking fallback
     }
@@ -80,6 +142,29 @@ class DashboardController extends GetxController {
       defaultPrice.value = _asDouble(settings['defaultPrice'], 0);
     } catch (exception) {
       error.value = exception.toString();
+    }
+  }
+
+  Future<bool> saveCustomerMilkEntry(
+    String customerId,
+    double liters,
+    double price, {
+    DateTime? date,
+  }) async {
+    try {
+      await api.addMilkEntry(
+        customerId,
+        date: date ?? selectedDate.value,
+        liters: liters,
+        price: price,
+      );
+      await Future.wait([
+        loadTodaySummary(),
+        loadCustomers(),
+      ]);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

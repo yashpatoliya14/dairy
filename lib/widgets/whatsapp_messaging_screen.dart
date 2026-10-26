@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/app_language.dart';
 import 'customer_message_details_screen.dart';
+import 'dairy_milk_loader.dart';
 
 class WhatsAppMessagingScreen extends StatefulWidget {
   const WhatsAppMessagingScreen({
@@ -34,6 +35,15 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
   // Multi-select for bulk workflow
   bool _selectionMode = false;
   final Set<String> _selectedCustomerIds = {};
+  String? _sendingCustomerId;
+  bool _bulkSending = false;
+
+  // Background bulk job tracking
+  Timer? _jobPollTimer;
+  int _activeJobTotal = 0;
+  int _activeJobSent = 0;
+  int _activeJobFailed = 0;
+  String? _activeJobStatus;
 
   @override
   void initState() {
@@ -42,28 +52,41 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _jobPollTimer?.cancel();
+    super.dispose();
+  }
+
   String get _formattedDate =>
       _selectedDate.toIso8601String().substring(0, 10);
 
-  Future<void> _loadData() async {
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
-      final res = await widget.api.getDailySummary(date: _formattedDate);
+      final res = await widget.api.getDailySummary(
+        date: _formattedDate,
+        showLoader: !silent,
+      );
       if (mounted) {
         setState(() {
           _dailyData = res;
-          _loading = false;
+          if (!silent) _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
-          _loading = false;
+          if (!silent) {
+            _errorMessage = e.toString();
+            _loading = false;
+          }
         });
       }
     }
@@ -163,11 +186,26 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     }
   }
 
-  Future<void> _quickSendWhatsApp(Map<String, dynamic> item) async {
+  Future<void> _sendSingleWhatsApp(Map<String, dynamic> item) async {
     final customer = item['customer'] as Map? ?? {};
+    final cid = '${customer['id']}';
+    final name = '${customer['name'] ?? 'Customer'}'.trim();
+    final hasEntry = item['hasEntry'] == true || item['entry'] != null;
+
+    if (!hasEntry) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            T.t('Customer has no milk entry for today. Please add today’s entry first.'),
+          ),
+          backgroundColor: Colors.amber.shade900,
+        ),
+      );
+      return;
+    }
+
     final phone = '${customer['phoneNumber'] ?? ''}'.trim();
     final cleanPhone = _cleanPhone(phone);
-
     if (cleanPhone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -179,62 +217,216 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     }
 
     final message = _buildQuickMessage(item);
-    final encodedMessage = Uri.encodeComponent(message);
 
-    final nativeUri = Uri.parse(
-      'whatsapp://send?phone=$cleanPhone&text=$encodedMessage',
-    );
-    final webUri = Uri.parse(
-      'https://wa.me/$cleanPhone?text=$encodedMessage',
-    );
+    setState(() => _sendingCustomerId = cid);
 
     try {
-      bool launched = false;
-      if (await canLaunchUrl(nativeUri)) {
-        launched = await launchUrl(
-          nativeUri,
-          mode: LaunchMode.externalApplication,
-        );
-      }
-      if (!launched && await canLaunchUrl(webUri)) {
-        launched = await launchUrl(
-          webUri,
-          mode: LaunchMode.externalApplication,
-        );
-      }
+      final res = await widget.api.sendDailyWhatsAppEntry(
+        customerId: cid,
+        date: _formattedDate,
+        message: message,
+      );
 
-      if (launched) {
-        await widget.api.updateDailyMessageStatus(
-          customerId: '${customer['id']}',
-          date: _formattedDate,
-          status: 'opened_in_whatsapp',
-          messageContent: message,
-        );
-        await _loadData();
-      }
-    } catch (e) {
       if (mounted) {
-        try {
-          await widget.api.updateDailyMessageStatus(
-            customerId: '${customer['id']}',
-            date: _formattedDate,
-            status: 'failed',
-            messageContent: message,
-            errorMessage: e.toString(),
-          );
-          await _loadData();
-        } catch (_) {}
-
-        if (mounted) {
+        if (res['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${T.t('Could not open WhatsApp')}: $e'),
+              content: Text('${T.t('WhatsApp message sent to')} $name via Business API!'),
+              backgroundColor: const Color(0xff2d7a55),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${T.t('Failed to send WhatsApp message')}: ${res['error'] ?? 'Unknown error'}',
+              ),
               backgroundColor: Colors.red.shade700,
             ),
           );
         }
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${T.t('Error sending WhatsApp message')}: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sendingCustomerId = null);
+        await _loadData();
+      }
     }
+  }
+
+  Future<void> _sendBulkToSelected(List<Map<String, dynamic>> eligibleList) async {
+    if (eligibleList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            T.t('No selected customers have today’s milk entry. Please record their entries first.'),
+          ),
+          backgroundColor: Colors.amber.shade900,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(T.t('Send WhatsApp Messages')),
+        content: Text(
+          '${T.t('Send milk delivery messages to')} ${eligibleList.length} ${T.t('customers with today’s entry via WhatsApp Business API?')}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(T.t('Cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            icon: const Icon(LucideIcons.send, size: 16),
+            label: Text(T.t('Send Now')),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xff2d7a55)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _bulkSending = true;
+    });
+
+    try {
+      final customerIds = eligibleList.map((c) => '${c['customer']['id']}').toList();
+      final res = await widget.api.sendBulkDailyWhatsAppEntries(
+        customerIds: customerIds,
+        date: _formattedDate,
+      );
+
+      if (mounted) {
+        final jobId = res['jobId'] as String?;
+        final eligibleCount =
+            (res['eligibleCount'] as num?)?.toInt() ?? eligibleList.length;
+        final ineligibleCount = (res['ineligibleCount'] as num?)?.toInt() ?? 0;
+
+        _selectedCustomerIds.clear();
+        _selectionMode = false;
+        _bulkSending = false;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              ineligibleCount > 0
+                  ? '${T.t('Background job started')}: sending to $eligibleCount customers ($ineligibleCount skipped).'
+                  : '${T.t('Background job started')}: sending to $eligibleCount customers.',
+            ),
+            backgroundColor: const Color(0xff2d7a55),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        if (jobId != null) {
+          _startJobPolling(jobId, eligibleCount);
+        } else {
+          await _loadData();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _bulkSending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${T.t('Error during bulk send')}: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _bulkSending = false);
+      }
+    }
+  }
+
+  void _startJobPolling(String jobId, int total) {
+    _jobPollTimer?.cancel();
+    setState(() {
+      _activeJobTotal = total;
+      _activeJobSent = 0;
+      _activeJobFailed = 0;
+      _activeJobStatus = 'processing';
+    });
+
+    // Refresh immediately to show initial pending status
+    _loadData(silent: true);
+
+    int polls = 0;
+    _jobPollTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      polls++;
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      try {
+        final job = await widget.api.getBulkJobStatus(jobId);
+        if (!mounted) return;
+
+        final status = job['status'] as String? ?? 'processing';
+        final sent = (job['sentCount'] as num?)?.toInt() ?? 0;
+        final failed = (job['failedCount'] as num?)?.toInt() ?? 0;
+        final jobTotal = (job['eligibleCount'] as num?)?.toInt() ?? total;
+
+        setState(() {
+          _activeJobSent = sent;
+          _activeJobFailed = failed;
+          _activeJobTotal = jobTotal;
+          _activeJobStatus = status;
+        });
+
+        // Silently update list so newly sent items turn green
+        await _loadData(silent: true);
+
+        if (status == 'completed' || status == 'failed' || polls >= 60) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _activeJobStatus = null;
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  status == 'completed'
+                      ? '${T.t('Bulk messages finished')}: $sent ${T.t('sent')}, $failed ${T.t('failed')}'
+                      : '${T.t('Bulk job finished with status')}: $status ($sent ${T.t('sent')}, $failed ${T.t('failed')})',
+                ),
+                backgroundColor:
+                    failed == 0 ? const Color(0xff2d7a55) : Colors.orange.shade800,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (polls >= 30) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _activeJobStatus = null;
+            });
+          }
+        }
+      }
+    });
   }
 
   Color _getStatusColor(String status) {
@@ -310,6 +502,10 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     final summary = _dailyData?['summary'] as Map? ?? {};
     final dairyName = '${_dailyData?['dairyName'] ?? ''}'.trim();
     final customers = _filteredCustomers();
+    final eligibleSelected = customers.where((c) {
+      final cid = '${c['customer']['id']}';
+      return _selectedCustomerIds.contains(cid) && c['hasEntry'] == true;
+    }).toList();
 
     final isToday = _formattedDate ==
         DateTime.now().toIso8601String().substring(0, 10);
@@ -478,25 +674,33 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _SummaryBadge(
-                          label: T.t('Entries Done'),
-                          count: '${summary['completedEntriesCount'] ?? 0}/${summary['totalCustomers'] ?? 0}',
-                          color: const Color(0xff2d7a55),
+                        Expanded(
+                          child: _SummaryBadge(
+                            label: T.t('Entries Done'),
+                            count: '${summary['completedEntriesCount'] ?? 0}/${summary['totalCustomers'] ?? 0}',
+                            color: const Color(0xff2d7a55),
+                          ),
                         ),
-                        _SummaryBadge(
-                          label: T.t('Entries Missing'),
-                          count: '${summary['missingEntriesCount'] ?? 0}',
-                          color: Colors.amber.shade900,
+                        Expanded(
+                          child: _SummaryBadge(
+                            label: T.t('Entries Missing'),
+                            count: '${summary['missingEntriesCount'] ?? 0}',
+                            color: Colors.amber.shade900,
+                          ),
                         ),
-                        _SummaryBadge(
-                          label: T.t('Sent'),
-                          count: '${(summary['sentCount'] ?? 0) + (summary['openedCount'] ?? 0)}',
-                          color: Colors.teal.shade800,
+                        Expanded(
+                          child: _SummaryBadge(
+                            label: T.t('Sent'),
+                            count: '${(summary['sentCount'] ?? 0) + (summary['openedCount'] ?? 0)}',
+                            color: Colors.teal.shade800,
+                          ),
                         ),
-                        _SummaryBadge(
-                          label: T.t('Pending'),
-                          count: '${(summary['pendingCount'] ?? 0) + (summary['notSentCount'] ?? 0)}',
-                          color: Colors.blueGrey,
+                        Expanded(
+                          child: _SummaryBadge(
+                            label: T.t('Pending'),
+                            count: '${(summary['pendingCount'] ?? 0) + (summary['notSentCount'] ?? 0)}',
+                            color: Colors.blueGrey,
+                          ),
                         ),
                       ],
                     ),
@@ -565,43 +769,193 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
 
             const SizedBox(height: 12),
 
+            // Background Job Progress Banner (if active)
+            if (_activeJobStatus == 'processing')
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xff2d7a55).withValues(alpha: 0.12),
+                      const Color(0xff2d7a55).withValues(alpha: 0.05),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xff2d7a55).withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Color(0xff2d7a55),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                T.t('Sending messages in background...'),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff2d7a55),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$_activeJobSent / $_activeJobTotal ${T.t('sent')}'
+                                '${_activeJobFailed > 0 ? " • $_activeJobFailed ${T.t('failed')}" : ""}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: _activeJobTotal > 0
+                            ? (_activeJobSent + _activeJobFailed) / _activeJobTotal
+                            : null,
+                        backgroundColor:
+                            const Color(0xff2d7a55).withValues(alpha: 0.15),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xff2d7a55),
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      T.t('You can continue using the app. The server is delivering messages asynchronously.'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant
+                            .withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Bulk Mode Action Banner (if active)
             if (_selectionMode)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: const Color(0xffdcefe3),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xffbbf7d0)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      '${_selectedCustomerIds.length} ${T.t('Selected')}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xff2d7a55),
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          '${_selectedCustomerIds.length} ${T.t('Selected')} • ${eligibleSelected.length} ${T.t('Eligible')}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xff2d7a55),
+                            fontSize: 14,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              final eligibleCustomers =
+                                  customers.where((c) => c['hasEntry'] == true).toList();
+                              final eligibleIds = eligibleCustomers
+                                  .map((c) => '${c['customer']['id']}')
+                                  .toSet();
+                              final allEligibleSelected = eligibleIds.isNotEmpty &&
+                                  eligibleIds.every(
+                                    (id) => _selectedCustomerIds.contains(id),
+                                  );
+
+                              if (allEligibleSelected) {
+                                _selectedCustomerIds.clear();
+                              } else {
+                                _selectedCustomerIds.addAll(eligibleIds);
+                              }
+                            });
+                          },
+                          child: Text(
+                            customers.where((c) => c['hasEntry'] == true).isNotEmpty &&
+                                    customers
+                                        .where((c) => c['hasEntry'] == true)
+                                        .every(
+                                          (c) => _selectedCustomerIds.contains(
+                                            '${c['customer']['id']}',
+                                          ),
+                                        )
+                                ? T.t('Deselect All')
+                                : T.t('Select All Eligible'),
+                          ),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          if (_selectedCustomerIds.length == customers.length) {
-                            _selectedCustomerIds.clear();
-                          } else {
-                            _selectedCustomerIds.addAll(
-                              customers.map(
-                                (c) => '${c['customer']['id']}',
-                              ),
-                            );
-                          }
-                        });
-                      },
-                      child: Text(
-                        _selectedCustomerIds.length == customers.length
-                            ? T.t('Deselect All')
-                            : T.t('Select All'),
+                    if (_selectedCustomerIds.length > eligibleSelected.length)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2, bottom: 8),
+                        child: Text(
+                          '⚠️ ${_selectedCustomerIds.length - eligibleSelected.length} ${T.t('customer(s) have no entry for today and are not eligible to receive entry SMS.')}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.amber.shade900,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    FilledButton.icon(
+                      onPressed: eligibleSelected.isEmpty || _bulkSending
+                          ? null
+                          : () => _sendBulkToSelected(eligibleSelected),
+                      icon: _bulkSending
+                          ? DairyMilkLoader.mini(color: Colors.white, size: 20)
+                          : const Icon(LucideIcons.send, size: 18),
+                      label: Text(
+                        _bulkSending
+                            ? T.t('Sending WhatsApp SMS...')
+                            : '${T.t('Send WhatsApp SMS')} (${eligibleSelected.length} ${T.t('eligible')})',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xff2d7a55),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ],
@@ -613,7 +967,10 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator(),
+                  child: DairyMilkLoader(
+                    size: 48,
+                    message: 'Loading messages...',
+                  ),
                 ),
               )
             else if (_errorMessage != null)
@@ -879,13 +1236,24 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                 IconButton(
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
-                                  tooltip: T.t('Open in WhatsApp'),
-                                  icon: const Icon(
-                                    LucideIcons.messageCircle,
-                                    color: Color(0xff25D366),
-                                    size: 22,
-                                  ),
-                                  onPressed: () => _quickSendWhatsApp(item),
+                                  tooltip: hasEntry
+                                      ? T.t('Send WhatsApp message')
+                                      : T.t('No milk entry for today'),
+                                  icon: _sendingCustomerId == cid
+                                      ? DairyMilkLoader.mini(
+                                          color: const Color(0xff2d7a55),
+                                          size: 20,
+                                        )
+                                      : Icon(
+                                          LucideIcons.send,
+                                          color: hasEntry
+                                              ? const Color(0xff2d7a55)
+                                              : Colors.grey.shade400,
+                                          size: 20,
+                                        ),
+                                  onPressed: _sendingCustomerId != null || _bulkSending
+                                      ? null
+                                      : () => _sendSingleWhatsApp(item),
                                 ),
                               ],
                             ),
@@ -899,6 +1267,22 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
           ],
         ),
       ),
+      floatingActionButton: _selectionMode && eligibleSelected.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: _bulkSending ? null : () => _sendBulkToSelected(eligibleSelected),
+              backgroundColor: const Color(0xff2d7a55),
+              icon: _bulkSending
+                  ? DairyMilkLoader.mini(color: Colors.white, size: 20)
+                  : const Icon(LucideIcons.send, color: Colors.white),
+              label: Text(
+                '${T.t('Send to')} ${eligibleSelected.length} ${T.t('eligible')}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            )
+          : null,
     );
   }
 }
@@ -920,6 +1304,9 @@ class _SummaryBadge extends StatelessWidget {
       children: [
         Text(
           count,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
@@ -929,6 +1316,9 @@ class _SummaryBadge extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(context).colorScheme.onSurfaceVariant,

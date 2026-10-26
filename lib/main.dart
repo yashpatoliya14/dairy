@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -13,6 +12,9 @@ import 'controllers/app_controller.dart';
 import 'controllers/dashboard_controller.dart';
 import 'services/app_language.dart';
 import 'services/api_service.dart';
+import 'widgets/dairy_milk_loader.dart';
+import 'widgets/dashboard_screen.dart';
+import 'widgets/monthly_entries_screen.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
 import 'widgets/whatsapp_messaging_screen.dart';
 
@@ -136,7 +138,10 @@ class DairyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appController = Get.put(AppController(api), permanent: true);
+    final appController = Get.put(
+      AppController(api, authPageBuilder: (api) => AuthPage(api: api)),
+      permanent: true,
+    );
     final languageController = Get.put(
       AppLanguageController(),
       permanent: true,
@@ -189,6 +194,9 @@ class DairyApp extends StatelessWidget {
           useMaterial3: true,
         ),
         defaultTransition: Transition.cupertino,
+        builder: (context, child) => DairyMilkOverlay(
+          child: child ?? const SizedBox.shrink(),
+        ),
         getPages: [
           GetPage(
             name: '/auth',
@@ -211,51 +219,18 @@ class DairyApp extends StatelessWidget {
   }
 }
 
-class _Loading extends StatefulWidget {
+class _Loading extends StatelessWidget {
   const _Loading();
 
   @override
-  State<_Loading> createState() => _LoadingState();
-}
-
-class _LoadingState extends State<_Loading>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
+      backgroundColor: Color(0xfff7faf8),
       body: Center(
-        child: FadeTransition(
-          opacity: Tween<double>(begin: .72, end: 1).animate(
-            CurvedAnimation(
-              parent: _animationController,
-              curve: Curves.easeInOut,
-            ),
-          ),
-          child: ScaleTransition(
-            scale: Tween<double>(begin: .94, end: 1).animate(
-              CurvedAnimation(
-                parent: _animationController,
-                curve: Curves.easeInOut,
-              ),
-            ),
-            child: SvgPicture.asset(
-              'assets/dairy_management_icon.svg',
-              width: 132,
-              height: 132,
-              semanticsLabel: 'Dairy Management',
-            ),
-          ),
+        child: DairyMilkLoader(
+          size: 54,
+          message: 'Starting Dairy Desk...',
+          subtitle: 'Pure & Fresh Dairy Management',
         ),
       ),
     );
@@ -476,13 +451,7 @@ class _AuthPageState extends State<AuthPage> {
                       child: Padding(
                         padding: const EdgeInsets.all(13),
                         child: busy
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
+                            ? DairyMilkLoader.mini(color: Colors.white, size: 22)
                             : Text(T.t(signup ? 'Create account' : 'Log in')),
                       ),
                     ),
@@ -620,7 +589,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           FilledButton(
             onPressed: busy ? null : submit,
             child: busy
-                ? const CircularProgressIndicator(strokeWidth: 2)
+                ? DairyMilkLoader.mini(color: Colors.white, size: 22)
                 : Text(T.t('Send reset code')),
           ),
         ],
@@ -734,7 +703,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           FilledButton(
             onPressed: busy ? null : reset,
             child: busy
-                ? const CircularProgressIndicator(strokeWidth: 2)
+                ? DairyMilkLoader.mini(color: Colors.white, size: 22)
                 : Text(T.t('Reset password')),
           ),
         ],
@@ -803,27 +772,42 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   int _currentTab = 0;
-  bool _openingWhatsApp = false;
+  late final DashboardController controller;
 
-  void _goToWhatsApp() {
-    if (_openingWhatsApp) return;
-    setState(() {
-      _openingWhatsApp = true;
-      _currentTab = 1;
-    });
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) setState(() => _openingWhatsApp = false);
-    });
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(DashboardController(widget.api));
+  }
+
+  Future<void> _openAddCustomer(
+      BuildContext context, DashboardController controller) async {
+    await controller.loadSettings();
+    final added = await Get.to<bool>(
+      () => CreateCustomerPage(
+        api: widget.api,
+        defaultLiters: controller.defaultLiters.value,
+        defaultPrice: controller.defaultPrice.value,
+      ),
+    );
+    if (added == true) {
+      await controller.loadCustomers();
+      await controller.loadTodaySummary();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(DashboardController(widget.api));
-
     return Scaffold(
       body: IndexedStack(
         index: _currentTab,
         children: [
+          DashboardScreen(
+            api: widget.api,
+            controller: controller,
+            onNavigateTab: (tabIndex) => setState(() => _currentTab = tabIndex),
+            onOpenAddCustomer: () => _openAddCustomer(context, controller),
+          ),
           _buildCustomersView(context, controller),
           WhatsAppMessagingScreen(api: widget.api),
           SettingsPage(
@@ -837,9 +821,15 @@ class _DashboardState extends State<Dashboard> {
         selectedIndex: _currentTab,
         onDestinationSelected: (index) {
           setState(() => _currentTab = index);
-          if (index == 0) controller.load();
+          controller.load();
         },
         destinations: [
+          NavigationDestination(
+            icon: const Icon(LucideIcons.layoutDashboard),
+            selectedIcon:
+                const Icon(LucideIcons.layoutDashboard, color: Color(0xff2d7a55)),
+            label: T.t('Dashboard'),
+          ),
           NavigationDestination(
             icon: const Icon(LucideIcons.users),
             selectedIcon:
@@ -875,13 +865,6 @@ class _DashboardState extends State<Dashboard> {
                 .toLowerCase();
         return name.contains(query) || number.contains(query);
       }).toList();
-
-      final totalCustomersCount = controller.todayTotalCustomers.value > 0
-          ? controller.todayTotalCustomers.value
-          : controller.customers.length;
-      final missingCount = totalCustomersCount > controller.todayEntriesDone.value
-          ? totalCustomersCount - controller.todayEntriesDone.value
-          : 0;
 
       return Scaffold(
         appBar: AppBar(
@@ -923,141 +906,34 @@ class _DashboardState extends State<Dashboard> {
             ),
           ],
         ),
-        body: Stack(
-          children: [
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 230,
-              child: IgnorePointer(
-                child: Opacity(
-                  opacity: 0.5,
-                  child: Image(
-                    image: AssetImage('assets/india_dairy_background.png'),
-                    fit: BoxFit.cover,
-                  ),
+        body: RefreshIndicator(
+          onRefresh: controller.load,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              _pagePadding(context).horizontal / 2,
+              10,
+              _pagePadding(context).horizontal / 2,
+              100,
+            ),
+            children: [
+              Text(
+                T.t('Customer Directory'),
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.2,
                 ),
               ),
-            ),
-            RefreshIndicator(
-              onRefresh: controller.load,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  _pagePadding(context).horizontal / 2,
-                  10,
-                  _pagePadding(context).horizontal / 2,
-                  250,
+              const SizedBox(height: 4),
+              Text(
+                '${visible.length} ${T.t('Customers')}',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
-                children: [
-                  // Today's Entries Done Action Card
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: Color(0xffe3ebe6)),
-                    ),
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xffdcefe3),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(
-                                      LucideIcons.milk,
-                                      size: 20,
-                                      color: Color(0xff2d7a55),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    T.t("Today's Milk"),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                '${controller.todayLiters.value.toStringAsFixed(1)} L',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xff2d7a55),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '${T.t("Entries Done")}: ${controller.todayEntriesDone.value} / $totalCustomersCount ${T.t('Customers')}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ),
-                              if (missingCount > 0)
-                                Text(
-                                  '${T.t("Entries Missing")}: $missingCount',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.amber.shade900,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          FilledButton.icon(
-                            onPressed: _goToWhatsApp,
-                            icon: const Icon(
-                              LucideIcons.messageCircle,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            label: Text(
-                              T.t("Today's Entries Done"),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                              ),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xff2d7a55),
-                              minimumSize: const Size.fromHeight(48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  Text(
-                    T.t('Your dairy at a glance'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+              ),
                   const SizedBox(height: 12),
                   TextField(
                     onChanged: controller.setSearch,
@@ -1071,7 +947,10 @@ class _DashboardState extends State<Dashboard> {
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(30),
-                        child: CircularProgressIndicator(),
+                        child: DairyMilkLoader(
+                          size: 48,
+                          message: 'Loading customers...',
+                        ),
                       ),
                     )
                   else if (controller.error.isNotEmpty &&
@@ -1096,23 +975,11 @@ class _DashboardState extends State<Dashboard> {
                 ],
               ),
             ),
-          ],
-        ),
         floatingActionButton: FloatingActionButton(
           tooltip: T.t('Add customer'),
           onPressed: controller.loading.value
               ? null
-              : () async {
-                  await controller.loadSettings();
-                  final added = await Get.to<bool>(
-                    () => CreateCustomerPage(
-                      api: widget.api,
-                      defaultLiters: controller.defaultLiters.value,
-                      defaultPrice: controller.defaultPrice.value,
-                    ),
-                  );
-                  if (added == true) await controller.loadCustomers();
-                },
+              : () => _openAddCustomer(context, controller),
           child: const Icon(Icons.person_add_alt_1),
         ),
       );
@@ -1136,55 +1003,133 @@ class _CustomerTile extends StatelessWidget {
     final formKey = GlobalKey<FormState>();
     final result = await showDialog<Map<String, double>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${T.t('Add today’s milk')} - ${customer['name']}'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: liters,
-                autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(labelText: T.t('Liters')),
-                validator: _number,
+      builder: (dialogContext) {
+        double currentLiters = double.tryParse(liters.text.trim()) ?? 0;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text('${T.t('Add today’s milk')} - ${customer['name']}'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Plus/Minus row for liters
+                  Row(
+                    children: [
+                      Material(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: currentLiters > 0
+                              ? () {
+                                  setDialogState(() {
+                                    currentLiters = double.parse(
+                                      (currentLiters - 0.5).clamp(0, double.infinity).toStringAsFixed(2),
+                                    );
+                                    liters.text = currentLiters == currentLiters.truncateToDouble()
+                                        ? currentLiters.toStringAsFixed(0)
+                                        : currentLiters.toStringAsFixed(2);
+                                  });
+                                }
+                              : null,
+                          child: SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: Icon(Icons.remove, color: Colors.red.shade400),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: liters,
+                          autofocus: false,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: T.t('Liters'),
+                            suffixText: 'L',
+                          ),
+                          onChanged: (value) {
+                            final parsed = double.tryParse(value.trim());
+                            if (parsed != null && parsed >= 0) {
+                              setDialogState(() => currentLiters = parsed);
+                            }
+                          },
+                          validator: _number,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Material(
+                        color: const Color(0xffdcefe3),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () {
+                            setDialogState(() {
+                              currentLiters = double.parse(
+                                (currentLiters + 0.5).toStringAsFixed(2),
+                              );
+                              liters.text = currentLiters == currentLiters.truncateToDouble()
+                                  ? currentLiters.toStringAsFixed(0)
+                                  : currentLiters.toStringAsFixed(2);
+                            });
+                          },
+                          child: const SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: Icon(Icons.add, color: Color(0xff2d7a55)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: price,
+                    autofocus: false,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(labelText: T.t('Price per liter')),
+                    validator: _number,
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: price,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(labelText: T.t('Price per liter')),
-                validator: _number,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(T.t('Cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  developer.log(
+                    'Save entry button pressed for customer ${customer['id']}',
+                    name: 'MilkEntry',
+                  );
+                  if (!formKey.currentState!.validate()) return;
+                  final litersValue = double.parse(liters.text.trim());
+                  final priceValue = double.parse(price.text.trim());
+                  developer.log(
+                    'Entry form valid: liters=$litersValue price=$priceValue',
+                    name: 'MilkEntry',
+                  );
+                  Navigator.of(dialogContext).pop({'liters': litersValue, 'price': priceValue});
+                },
+                child: Text(T.t('Save entry')),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(onPressed: Get.back, child: Text(T.t('Cancel'))),
-          FilledButton(
-            onPressed: () {
-              developer.log(
-                'Save entry button pressed for customer ${customer['id']}',
-                name: 'MilkEntry',
-              );
-              if (!formKey.currentState!.validate()) return;
-              final litersValue = double.parse(liters.text.trim());
-              final priceValue = double.parse(price.text.trim());
-              developer.log(
-                'Entry form valid: liters=$litersValue price=$priceValue',
-                name: 'MilkEntry',
-              );
-              Get.back(result: {'liters': litersValue, 'price': priceValue});
-            },
-            child: Text(T.t('Save entry')),
-          ),
-        ],
-      ),
+        );
+      },
     );
     liters.dispose();
     price.dispose();
@@ -1192,9 +1137,17 @@ class _CustomerTile extends StatelessWidget {
       developer.log('Entry dialog closed without saving', name: 'MilkEntry');
       return;
     }
-    final customerId = '${customer['id']}'.trim();
-    final litersValue = result['liters'];
-    final priceValue = result['price'];
+    final customerId = '${customer['id'] ?? customer['cid'] ?? ''}'.trim();
+    if (customerId.isEmpty || customerId == 'null') {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(T.t('Cannot save entry: customer ID is missing.'))),
+        );
+      }
+      return;
+    }
+    final litersValue = result['liters'] ?? 0.0;
+    final priceValue = result['price'] ?? 0.0;
     developer.log(
       'Starting entry API call: customerId=$customerId '
       'liters=$litersValue price=$priceValue '
@@ -1205,8 +1158,8 @@ class _CustomerTile extends StatelessWidget {
       await api.addMilkEntry(
         customerId,
         date: DateTime.now(),
-        liters: litersValue as double,
-        price: priceValue as double,
+        liters: litersValue,
+        price: priceValue,
       );
       developer.log('Entry API call succeeded', name: 'MilkEntry');
       if (!context.mounted) return;
@@ -1250,114 +1203,358 @@ class _CustomerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name =
-        '${customer['name'] ?? customer['fullName'] ?? 'Unnamed customer'}';
+        '${customer['name'] ?? customer['fullName'] ?? 'Unnamed customer'}'.trim();
     final number =
-        '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? '—'}';
-    return Card(
+        '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'.trim();
+    final phone =
+        '${customer['phoneNumber'] ?? customer['mobileNumber'] ?? customer['phone'] ?? ''}'.trim();
+    final liters = (customer['liters'] ?? customer['defaultLiters'] ?? 0);
+    final price = (customer['price'] ?? customer['defaultPrice'] ?? 0);
+    final channel =
+        '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
+    final isWhatsApp = channel == 'whatsapp';
+
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xffdcefe3),
-          child: Text(name.isEmpty ? '?' : name[0].toUpperCase()),
-        ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        onTap: _openDetails,
-        subtitle: Text(
-          'No. $number  •  ${customer['liters']} L  •  '
-          '${customer['notificationChannel'] ?? 'whatsapp'}',
-        ),
-        trailing: Wrap(
-          spacing: 0,
-          children: [
-            IconButton(
-              tooltip: T.t('Save entry'),
-              onPressed: () => _addMilk(context),
-              icon: const Icon(Icons.save_outlined),
-            ),
-            PopupMenuButton<String>(
-              tooltip: T.t('More options'),
-              onSelected: (value) {
-                if (value == 'whatsapp') {
-                  SendWhatsAppBillSheet.show(
-                    context,
-                    api: api,
-                    customer: customer,
-                  );
-                }
-                if (value == 'edit') _edit(context);
-                if (value == 'details') _openDetails();
-                if (value == 'bill') _showBill(context);
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'whatsapp',
-                  child: ListTile(
-                    leading: const Icon(
-                      LucideIcons.messageCircle,
-                      color: Color(0xff25D366),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xffe2e8f0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xff1e293b).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: _openDetails,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Avatar with initials & optional WhatsApp badge
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xffdcefe3), Color(0xffc2e7cf)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xff2d7a55),
+                        ),
+                      ),
                     ),
-                    title: Text(T.t('Send WhatsApp Bill')),
+                    if (isWhatsApp)
+                      Positioned(
+                        right: -3,
+                        bottom: -3,
+                        child: Container(
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Color(0xff25D366),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              LucideIcons.messageCircle,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+
+                // Customer info & metrics
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xff111827),
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (number.isNotEmpty && number != '—')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfff1f5f9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xffe2e8f0),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                '#$number',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff475569),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+
+                      // Metrics row: Liters pill & Rate pill
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xffdcefe3),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  LucideIcons.droplets,
+                                  size: 11,
+                                  color: Color(0xff2d7a55),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$liters L',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff2d7a55),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xfff0fdf4),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xffbbf7d0),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              '₹$price/L',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xff166534),
+                              ),
+                            ),
+                          ),
+                          if (phone.isNotEmpty && phone != 'null') ...[
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                phone,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade500,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: const Icon(Icons.edit_outlined),
-                    title: Text(T.t('Edit customer')),
+
+                const SizedBox(width: 8),
+
+                // Save Milk Entry Button
+                Tooltip(
+                  message: T.t('Save entry'),
+                  child: Material(
+                    color: const Color(0xff2d7a55),
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      onTap: () => _addMilk(context),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              LucideIcons.circlePlus,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              T.t('Entry'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'details',
-                  child: ListTile(
-                    leading: const Icon(Icons.person_outline),
-                    title: Text(T.t('View customer details')),
+                const SizedBox(width: 2),
+
+                // Three-dot popup menu
+                PopupMenuButton<String>(
+                  tooltip: T.t('More options'),
+                  icon: Icon(
+                    LucideIcons.moreVertical,
+                    size: 19,
+                    color: Colors.grey.shade600,
                   ),
-                ),
-                PopupMenuItem(
-                  value: 'bill',
-                  child: ListTile(
-                    leading: const Icon(LucideIcons.receiptText),
-                    title: Text(T.t('View bill')),
-                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 170),
+                  onSelected: (value) {
+                    if (value == 'monthly') {
+                      Get.to(
+                        () => MonthlyEntriesScreen(
+                          api: api,
+                          customer: customer,
+                        ),
+                      );
+                    }
+                    if (value == 'whatsapp') {
+                      SendWhatsAppBillSheet.show(
+                        context,
+                        api: api,
+                        customer: customer,
+                      );
+                    }
+                    if (value == 'edit') _edit(context);
+                    if (value == 'details') _openDetails();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'monthly',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.receiptText,
+                          color: Color(0xff2d7a55),
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('View bill & entries'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'whatsapp',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.messageCircle,
+                          color: Color(0xff25D366),
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('Send WhatsApp Bill'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('Edit customer'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'details',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.person_outline,
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('View customer details'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showBill(BuildContext context) async {
-    late final List<Map<String, dynamic>> entries;
-    try {
-      entries = await api.getMilkEntries('${customer['id']}');
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-      return;
-    }
-    if (!context.mounted) return;
-    final total = entries.fold<double>(
-      0,
-      (sum, entry) =>
-          sum +
-          _asDouble(
-            entry['total'],
-            fallback: _asDouble(entry['liters']) * _asDouble(entry['price']),
           ),
-    );
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${T.t('Bill')} - ${customer['name']}'),
-        content: Text(
-          '${T.t('Total entries')}: ${entries.length}\n'
-          '${T.t('Total amount')}: ${total.toStringAsFixed(2)}',
         ),
-        actions: [TextButton(onPressed: Get.back, child: Text(T.t('Close')))],
       ),
     );
   }
@@ -1377,42 +1574,62 @@ class CustomerDetailsPage extends StatefulWidget {
 }
 
 class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
-  late Future<List<Map<String, dynamic>>> entries;
-  String selectedMonth = 'all';
+  late Map<String, dynamic> _customer;
 
   @override
   void initState() {
     super.initState();
-    entries = widget.api.getMilkEntries('${widget.customer['id']}');
+    _customer = Map<String, dynamic>.from(widget.customer);
   }
 
-  void reload() {
-    setState(() {
-      entries = widget.api.getMilkEntries('${widget.customer['id']}');
-    });
+  Future<void> _editCustomer() async {
+    final updated = await Get.to<bool>(
+      () => EditCustomerPage(api: widget.api, customer: _customer),
+    );
+    if (updated == true && mounted) {
+      Get.back(result: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final customer = widget.customer;
+    final customer = _customer;
     final name = '${customer['name'] ?? customer['fullName'] ?? 'Customer'}';
     final number =
         '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? '—'}';
     final liters = _asDouble(customer['liters']);
     final price = _asDouble(customer['price']);
-    final phone = '${customer['phoneNumber'] ?? 'Not provided'}';
-    final channel = '${customer['notificationChannel'] ?? 'whatsapp'}';
+    final dailyTotal = liters * price;
+    final phone = '${customer['phoneNumber'] ?? ''}'.trim();
+    final hasPhone =
+        phone.isNotEmpty && phone != 'null' && phone != 'Not provided';
+    final channel =
+        '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
+    final isSms = channel == 'sms';
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(T.t('Customer details')),
         actions: [
           IconButton(
+            tooltip: T.t('View bill & entries'),
+            onPressed: () => Get.to(
+              () => MonthlyEntriesScreen(
+                api: widget.api,
+                customer: _customer,
+              ),
+            ),
+            icon: const Icon(LucideIcons.receiptText),
+          ),
+          IconButton(
             tooltip: T.t('Send WhatsApp Bill'),
             onPressed: () => SendWhatsAppBillSheet.show(
               context,
               api: widget.api,
-              customer: widget.customer,
+              customer: _customer,
             ),
             icon: const Icon(
               LucideIcons.messageCircle,
@@ -1421,247 +1638,479 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
           ),
           IconButton(
             tooltip: T.t('Edit customer'),
-            onPressed: () async {
-              final updated = await Get.to<bool>(
-                () => EditCustomerPage(api: widget.api, customer: customer),
-              );
-              if (updated == true && mounted) {
-                Get.back(result: true);
-              }
-            },
+            onPressed: _editCustomer,
             icon: const Icon(Icons.edit_outlined),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async => reload(),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            _pagePadding(context).horizontal / 2,
-            8,
-            _pagePadding(context).horizontal / 2,
-            32,
-          ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.symmetric(
+          horizontal: _pagePadding(context).horizontal / 2,
+          vertical: 12,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // FIRST TILE: COMPACT CUSTOMER PROFILE & CONTACT
             Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color:
+                      isDark ? Colors.grey.shade800 : const Color(0xffE2E8F0),
+                ),
+              ),
               child: Padding(
-                padding: _pagePadding(context),
-                child: Column(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 34,
+                      radius: 24,
                       backgroundColor: const Color(0xffdcefe3),
                       child: Text(
                         name.isEmpty ? '?' : name[0].toUpperCase(),
                         style: const TextStyle(
-                          fontSize: 28,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Color(0xff2d7a55),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      name,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xffe8f5e9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xffc8e6c9),
+                                  ),
+                                ),
+                                child: Text(
+                                  '#$number',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xff2d7a55),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              InkWell(
+                                onTap: hasPhone
+                                    ? () => launchUrl(Uri.parse('tel:$phone'))
+                                    : null,
+                                borderRadius: BorderRadius.circular(4),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.phone_outlined,
+                                      size: 13.5,
+                                      color: hasPhone
+                                          ? const Color(0xff2d7a55)
+                                          : Colors.grey.shade500,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      hasPhone ? phone : T.t('Not provided'),
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: hasPhone
+                                            ? (isDark
+                                                ? Colors.grey.shade300
+                                                : const Color(0xff334155))
+                                            : Colors.grey.shade500,
+                                        decoration: hasPhone
+                                            ? TextDecoration.underline
+                                            : TextDecoration.none,
+                                        decorationColor:
+                                            const Color(0xff2d7a55),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSms
+                                      ? const Color(0xffeff6ff)
+                                      : const Color(0xfff0fdf4),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                    color: isSms
+                                        ? const Color(0xffbfdbfe)
+                                        : const Color(0xffbbf7d0),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isSms
+                                          ? LucideIcons.messageSquare
+                                          : LucideIcons.messageCircle,
+                                      size: 11.5,
+                                      color: isSms
+                                          ? const Color(0xff2563eb)
+                                          : const Color(0xff16a34a),
+                                    ),
+                                    const SizedBox(width: 3.5),
+                                    Text(
+                                      isSms ? 'SMS' : 'WhatsApp',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSms
+                                            ? const Color(0xff1e40af)
+                                            : const Color(0xff15803d),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text('${T.t('Customer no.')} $number'),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: 20,
+                        color: Color(0xff2d7a55),
+                      ),
+                      tooltip: T.t('Edit customer'),
+                      onPressed: _editCustomer,
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            _DetailsSection(
-              title: T.t('Contact'),
-              children: [
-                _DetailRow(
-                  icon: Icons.phone_outlined,
-                  label: T.t('Phone number'),
-                  value: phone,
+            const SizedBox(height: 12),
+
+            // SECOND TILE: COMPACT & PROFESSIONAL MILK DEFAULTS
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color:
+                      isDark ? Colors.grey.shade800 : const Color(0xffE2E8F0),
                 ),
-                _DetailRow(
-                  icon: channel == 'sms'
-                      ? Icons.sms_outlined
-                      : Icons.chat_outlined,
-                  label: T.t('Notification channel'),
-                  value: channel == 'sms'
-                      ? T.t('SMS / Messages')
-                      : T.t('WhatsApp'),
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.milk,
+                          size: 16,
+                          color: Color(0xff2d7a55),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          T.t('Milk defaults'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? Colors.grey.shade300
+                                : const Color(0xff334155),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : const Color(0xfff8fafc),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.grey.shade800
+                                    : const Color(0xffe2e8f0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Daily liters'),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${liters.toStringAsFixed(2)} L',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : const Color(0xfff8fafc),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.grey.shade800
+                                    : const Color(0xffe2e8f0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Price per liter'),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '₹${price.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xfff0fdf4),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xffbbf7d0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Daily amount'),
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xff166534),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '₹${dailyTotal.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xff15803d),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 14),
-            _DetailsSection(
-              title: T.t('Milk defaults'),
-              children: [
-                _DetailRow(
-                  icon: Icons.local_drink_outlined,
-                  label: T.t('Daily liters'),
-                  value: '${liters.toStringAsFixed(2)} L',
-                ),
-                _DetailRow(
-                  icon: Icons.payments_outlined,
-                  label: T.t('Price per liter'),
-                  value: price.toStringAsFixed(2),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+
+            // QUICK ACTION: MONTHLY MILK ENTRY TABLE
             Card(
               color: const Color(0xfff0fdf4),
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 side: const BorderSide(color: Color(0xffbbf7d0)),
               ),
               child: ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xff2d7a55),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    LucideIcons.calendarDays,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+                title: Text(
+                  T.t('Monthly Milk Entry Table'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xff166534),
+                    fontSize: 13.5,
+                  ),
+                ),
+                subtitle: Text(
+                  T.t('View and edit daily milk deliveries for any month'),
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 11.5,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 13,
+                  color: Color(0xff166534),
+                ),
+                onTap: () => Get.to(
+                  () => MonthlyEntriesScreen(
+                    api: widget.api,
+                    customer: _customer,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // QUICK ACTION: SEND WHATSAPP BILL
+            Card(
+              color: const Color(0xfff0fdf4),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Color(0xffbbf7d0)),
+              ),
+              child: ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                leading: Container(
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: const Color(0xff25D366),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(LucideIcons.messageCircle, color: Colors.white, size: 20),
+                  child: const Icon(
+                    LucideIcons.messageCircle,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 title: Text(
                   T.t('Send WhatsApp Bill'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xff166534)),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xff166534),
+                    fontSize: 13.5,
+                  ),
                 ),
                 subtitle: Text(
                   T.t('Send daily milk delivery update or monthly statement'),
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 11.5,
+                  ),
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xff166534)),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 13,
+                  color: Color(0xff166534),
+                ),
                 onTap: () => SendWhatsAppBillSheet.show(
                   context,
                   api: widget.api,
-                  customer: widget.customer,
+                  customer: _customer,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              T.t('Recent milk entries'),
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: entries,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return _EntryMessage(
-                    icon: Icons.cloud_off_outlined,
-                    message: T.t('Could not load milk history.'),
-                    action: TextButton(
-                      onPressed: reload,
-                      child: Text(T.t('Try again')),
-                    ),
-                  );
-                }
-                final history = snapshot.data ?? [];
-                if (history.isEmpty) {
-                  return _EntryMessage(
-                    icon: Icons.receipt_long_outlined,
-                    message: T.t('No milk entries yet.'),
-                  );
-                }
-                final months =
-                    history
-                        .map((entry) => '${entry['entryDate'] ?? ''}')
-                        .where((date) => date.length >= 7)
-                        .map((date) => date.substring(0, 7))
-                        .toSet()
-                        .toList()
-                      ..sort((a, b) => b.compareTo(a));
-                final filtered = selectedMonth == 'all'
-                    ? history
-                    : history
-                          .where(
-                            (entry) => '${entry['entryDate'] ?? ''}'.startsWith(
-                              selectedMonth,
-                            ),
-                          )
-                          .toList();
-                final total = filtered.fold<double>(
-                  0,
-                  (sum, entry) =>
-                      sum +
-                      _asDouble(
-                        entry['total'],
-                        fallback:
-                            _asDouble(entry['liters']) *
-                            _asDouble(entry['price']),
-                      ),
-                );
-                return Column(
-                  children: [
-                    _ChoiceSelector<String>(
-                      label: T.t('Filter by month'),
-                      value: selectedMonth,
-                      options: {
-                        'all': T.t('All months'),
-                        for (final month in months) month: month,
-                      },
-                      onChanged: (value) =>
-                          setState(() => selectedMonth = value),
-                    ),
-                    const SizedBox(height: 10),
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.receipt_long_outlined),
-                        title: Text(T.t('Bill total')),
-                        subtitle: Text('${filtered.length} ${T.t('entries')}'),
-                        trailing: Text(
-                          total.toStringAsFixed(2),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...filtered.map((entry) => _MilkEntryTile(entry: entry)),
-                  ],
-                );
-              },
             ),
           ],
         ),
       ),
     );
   }
-}
-
-class _DetailsSection extends StatelessWidget {
-  const _DetailsSection({required this.title, required this.children});
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
-          ...children,
-        ],
-      ),
-    ),
-  );
 }
 
 class _DetailRow extends StatelessWidget {
@@ -1680,58 +2129,6 @@ class _DetailRow extends StatelessWidget {
     leading: Icon(icon, color: const Color(0xff2d7a55)),
     title: Text(label),
     subtitle: Text(value),
-  );
-}
-
-class _MilkEntryTile extends StatelessWidget {
-  const _MilkEntryTile({required this.entry});
-  final Map<String, dynamic> entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final liters = _asDouble(entry['liters']);
-    final price = _asDouble(entry['price']);
-    final total = _asDouble(entry['total'], fallback: liters * price);
-    final date = '${entry['entryDate'] ?? 'Unknown date'}';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xffdcefe3),
-          child: Icon(LucideIcons.milk, color: Color(0xff2d7a55)),
-        ),
-        title: Text(date),
-        subtitle: Text(
-          '${liters.toStringAsFixed(2)} L × ${price.toStringAsFixed(2)}',
-        ),
-        trailing: Text(
-          total.toStringAsFixed(2),
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-}
-
-class _EntryMessage extends StatelessWidget {
-  const _EntryMessage({required this.icon, required this.message, this.action});
-  final IconData icon;
-  final String message;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey),
-          const SizedBox(width: 12),
-          Expanded(child: Text(message)),
-          ?action,
-        ],
-      ),
-    ),
   );
 }
 
@@ -1870,94 +2267,163 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(T.t('Settings'))),
-    body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _SettingsSectionTitle(title: T.t('Dairy')),
-          _SettingsAction(
-            icon: LucideIcons.glassWater,
-            title: T.t('Default milk & price'),
-            onTap: () async {
-              final updated = await Get.to<bool>(
-                () => DefaultMilkPricePage(
-                  api: widget.api,
-                  defaultLiters: widget.defaultLiters,
-                  defaultPrice: widget.defaultPrice,
-                ),
-              );
-              if (updated == true && mounted) {
-                Get.back(result: true);
-              }
-            },
-          ),
-          const SizedBox(height: 32),
-          Text(
-            T.t('App language'),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          _ChoiceSelector<String>(
-            label: T.t('Language'),
-            value: language,
-            options: {
-              'en': T.t('English'),
-              'hi': T.t('Hindi'),
-              'gu': T.t('Gujarati'),
-            },
-            enabled: true,
-            onChanged: (value) async {
-              setState(() => language = value);
-              await Get.find<AppLanguageController>().setLanguage(value);
-            },
-          ),
-          const SizedBox(height: 28),
-          _SettingsSectionTitle(title: T.t('Preferences')),
-          Card(
-            child: SwitchListTile.adaptive(
-              secondary: const Icon(LucideIcons.bell),
-              title: Text(T.t('Notifications')),
-              subtitle: Text(
-                notificationsEnabled
-                    ? T.t('Daily reminders are enabled')
-                    : T.t('Daily reminders are disabled'),
-              ),
-              value: notificationsEnabled,
-              onChanged: _setNotifications,
+    backgroundColor: const Color(0xfff5f8f6),
+    appBar: AppBar(
+      title: Text(
+        T.t('Settings'),
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        // 1. Soft sky gradient background matching the artwork
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xfff7faf8),
+                Color(0xffeef5f0),
+                Color(0xffe4f0e8),
+              ],
             ),
           ),
-          const SizedBox(height: 20),
-          _SettingsSectionTitle(title: T.t('Account')),
-          _SettingsAction(
-            icon: LucideIcons.circleUser,
-            title: T.t('View profile'),
-            onTap: () => Get.to(() => ProfilePage(api: widget.api)),
+        ),
+        // 2. Full artwork in the background properly anchored and fitted
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: IgnorePointer(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 840),
+                child: Opacity(
+                  opacity: 0.3,
+                  child: ShaderMask(
+                    shaderCallback: (rect) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black,
+                      ],
+                      stops: [0.0, 0.15],
+                    ).createShader(rect),
+                    blendMode: BlendMode.dstIn,
+                    child: Image.asset(
+                      'assets/india_dairy_background.png',
+                      fit: BoxFit.fitWidth,
+                      alignment: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-          _SettingsAction(
-            icon: LucideIcons.keyRound,
-            title: T.t('Change password'),
-            onTap: () => Get.to(() => ChangePasswordPage(api: widget.api)),
-          ),
-          const SizedBox(height: 20),
-          _SettingsSectionTitle(title: T.t('Help & feedback')),
-          _SettingsAction(
-            icon: LucideIcons.headphones,
-            title: T.t('Contact support'),
-            onTap: () => _openSupportEmail(context),
-          ),
-          _SettingsAction(
-            icon: LucideIcons.messageSquareText,
-            title: T.t('Send feedback'),
-            onTap: () => _showFeedbackDialog(context),
-          ),
-          const SizedBox(height: 20),
-          _SettingsAction(
-            icon: LucideIcons.logOut,
-            title: T.t('Log out'),
-            onTap: _confirmLogout,
-          ),
-        ],
-      ),
+        ),
+        // 3. Settings list with glassmorphic cards scrolling smoothly over background
+        ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 220),
+          children: [
+            _SettingsSectionTitle(title: T.t('Dairy')),
+            _SettingsAction(
+              icon: LucideIcons.glassWater,
+              title: T.t('Default milk & price'),
+              onTap: () async {
+                final updated = await Get.to<bool>(
+                  () => DefaultMilkPricePage(
+                    api: widget.api,
+                    defaultLiters: widget.defaultLiters,
+                    defaultPrice: widget.defaultPrice,
+                  ),
+                );
+                if (updated == true && mounted) {
+                  Get.back(result: true);
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+            _SettingsSectionTitle(title: T.t('App language')),
+            Card(
+              color: Colors.white.withValues(alpha: 0.90),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: _ChoiceSelector<String>(
+                  label: T.t('Language'),
+                  value: language,
+                  options: {
+                    'en': T.t('English'),
+                    'hi': T.t('Hindi'),
+                    'gu': T.t('Gujarati'),
+                  },
+                  enabled: true,
+                  onChanged: (value) async {
+                    setState(() => language = value);
+                    await Get.find<AppLanguageController>().setLanguage(value);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _SettingsSectionTitle(title: T.t('Preferences')),
+            Card(
+              color: Colors.white.withValues(alpha: 0.90),
+              child: SwitchListTile.adaptive(
+                secondary: const Icon(LucideIcons.bell, color: Color(0xff2d7a55)),
+                title: Text(
+                  T.t('Notifications'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  notificationsEnabled
+                      ? T.t('Daily reminders are enabled')
+                      : T.t('Daily reminders are disabled'),
+                ),
+                value: notificationsEnabled,
+                onChanged: _setNotifications,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _SettingsSectionTitle(title: T.t('Account')),
+            _SettingsAction(
+              icon: LucideIcons.circleUser,
+              title: T.t('View profile'),
+              onTap: () => Get.to(() => ProfilePage(api: widget.api)),
+            ),
+            _SettingsAction(
+              icon: LucideIcons.keyRound,
+              title: T.t('Change password'),
+              onTap: () => Get.to(() => ChangePasswordPage(api: widget.api)),
+            ),
+            const SizedBox(height: 24),
+            _SettingsSectionTitle(title: T.t('Help & feedback')),
+            _SettingsAction(
+              icon: LucideIcons.headphones,
+              title: T.t('Contact support'),
+              onTap: () => _openSupportEmail(context),
+            ),
+            _SettingsAction(
+              icon: LucideIcons.messageSquareText,
+              title: T.t('Send feedback'),
+              onTap: () => _showFeedbackDialog(context),
+            ),
+            const SizedBox(height: 24),
+            _SettingsAction(
+              icon: LucideIcons.logOut,
+              title: T.t('Log out'),
+              color: Colors.red.shade700,
+              onTap: _confirmLogout,
+            ),
+          ],
+        ),
+      ],
+    ),
   );
 }
 
@@ -2061,7 +2527,7 @@ class _DefaultMilkPricePageState extends State<DefaultMilkPricePage> {
             child: Padding(
               padding: const EdgeInsets.all(13),
               child: busy
-                  ? const CircularProgressIndicator(strokeWidth: 2)
+                  ? DairyMilkLoader.mini(color: Colors.white, size: 22)
                   : Text(T.t('Save defaults')),
             ),
           ),
@@ -2076,16 +2542,25 @@ class _SettingsAction extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
+    this.color,
   });
   final IconData icon;
   final String title;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => Card(
+    color: Colors.white.withValues(alpha: 0.90),
     child: ListTile(
-      leading: Icon(icon, color: const Color(0xff2d7a55)),
-      title: Text(title),
+      leading: Icon(icon, color: color ?? const Color(0xff2d7a55)),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
+      ),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
     ),
@@ -2155,7 +2630,12 @@ class ProfilePage extends StatelessWidget {
       future: api.getProfile(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: DairyMilkLoader(
+              size: 48,
+              message: 'Loading profile...',
+            ),
+          );
         }
 
         if (snapshot.hasError) {
@@ -2532,7 +3012,7 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
             child: Padding(
               padding: const EdgeInsets.all(13),
               child: busy
-                  ? const CircularProgressIndicator(strokeWidth: 2)
+                  ? DairyMilkLoader.mini(color: Colors.white, size: 22)
                   : Text(T.t('Save customer')),
             ),
           ),
@@ -2651,7 +3131,7 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
           FilledButton(
             onPressed: busy ? null : save,
             child: busy
-                ? const CircularProgressIndicator(strokeWidth: 2)
+                ? DairyMilkLoader.mini(color: Colors.white, size: 22)
                 : Text(T.t('Save changes')),
           ),
         ],
@@ -2665,8 +3145,10 @@ String? _required(String? value) =>
 
 EdgeInsets _pagePadding(BuildContext context) {
   final width = MediaQuery.sizeOf(context).width;
-  final horizontal = width >= 600 ? 32.0 : 20.0;
-  return EdgeInsets.symmetric(horizontal: horizontal, vertical: 20);
+  final horizontal = width >= 600
+      ? 32.0
+      : (width < 360 ? 12.0 : 16.0);
+  return EdgeInsets.symmetric(horizontal: horizontal, vertical: 16);
 }
 
 String? _strongPasswordError(String? value) {

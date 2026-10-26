@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/app_language.dart';
+import 'dairy_milk_loader.dart';
 
 class CustomerMessageDetailsScreen extends StatefulWidget {
   const CustomerMessageDetailsScreen({
@@ -158,7 +158,7 @@ class _CustomerMessageDetailsScreenState
     return digits;
   }
 
-  Future<void> _openWhatsApp() async {
+  Future<void> _sendWhatsAppMessage() async {
     final customer = widget.customerItem['customer'] as Map? ?? {};
     final phone = _phoneController.text.trim();
     final cleanPhone = _cleanPhoneNumber(phone);
@@ -173,78 +173,62 @@ class _CustomerMessageDetailsScreenState
       return;
     }
 
+    final hasEntry = widget.customerItem['hasEntry'] == true ||
+        widget.customerItem['entry'] != null;
+    if (!hasEntry) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(T.t('Customer has no milk entry for this date. Please add entry first.')),
+          backgroundColor: Colors.amber.shade900,
+        ),
+      );
+      return;
+    }
+
     final message = _messageController.text;
-    final encodedMessage = Uri.encodeComponent(message);
-
-    final nativeUri = Uri.parse(
-      'whatsapp://send?phone=$cleanPhone&text=$encodedMessage',
-    );
-    final webUri = Uri.parse(
-      'https://wa.me/$cleanPhone?text=$encodedMessage',
-    );
-
     setState(() => _saving = true);
 
     try {
-      bool launched = false;
-      if (await canLaunchUrl(nativeUri)) {
-        launched = await launchUrl(
-          nativeUri,
-          mode: LaunchMode.externalApplication,
-        );
-      }
-      if (!launched && await canLaunchUrl(webUri)) {
-        launched = await launchUrl(
-          webUri,
-          mode: LaunchMode.externalApplication,
-        );
-      }
+      final res = await widget.api.sendDailyWhatsAppEntry(
+        customerId: '${customer['id']}',
+        date: widget.date,
+        message: message,
+      );
 
-      if (launched) {
-        // Record 'opened_in_whatsapp' status accurately
-        final res = await widget.api.updateDailyMessageStatus(
-          customerId: '${customer['id']}',
-          date: widget.date,
-          status: 'opened_in_whatsapp',
-          messageContent: message,
-        );
-
-        if (mounted) {
-          setState(() {
-            _messageLog = res;
-          });
-          await widget.onStatusUpdated();
-          await _loadHistory();
-        }
-      } else {
-        throw Exception('Could not open WhatsApp');
-      }
-    } catch (e) {
       if (mounted) {
-        // Record failed attempt
-        try {
-          final res = await widget.api.updateDailyMessageStatus(
-            customerId: '${customer['id']}',
-            date: widget.date,
-            status: 'failed',
-            messageContent: message,
-            errorMessage: e.toString(),
-          );
-          setState(() => _messageLog = res);
-          await widget.onStatusUpdated();
-        } catch (_) {}
-
-        if (mounted) {
+        setState(() => _saving = false);
+        if (res['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${T.t('Could not open WhatsApp')}: $e'),
+              content: Text(T.t('WhatsApp message sent successfully via Business API!')),
+              backgroundColor: const Color(0xff2d7a55),
+            ),
+          );
+          await widget.onStatusUpdated();
+          await _loadHistory();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${T.t('Failed to send WhatsApp message')}: ${res['error'] ?? 'Unknown error'}'),
               backgroundColor: Colors.red.shade700,
             ),
           );
+          await widget.onStatusUpdated();
+          await _loadHistory();
         }
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${T.t('Error sending WhatsApp message')}: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        await widget.onStatusUpdated();
+        await _loadHistory();
+      }
     }
   }
 
@@ -547,7 +531,7 @@ class _CustomerMessageDetailsScreenState
                         Expanded(
                           child: Text(
                             T.t(
-                              'Note: Opening WhatsApp in click-to-chat indicates the message was opened in WhatsApp, but delivery confirmation requires recipient receipt.',
+                              'Note: Messages are sent directly through the WhatsApp Business API to the customer’s phone number without opening the WhatsApp application.',
                             ),
                             style: const TextStyle(
                               fontSize: 11,
@@ -645,29 +629,22 @@ class _CustomerMessageDetailsScreenState
                       Expanded(
                         flex: 2,
                         child: FilledButton.icon(
-                          onPressed: _saving ? null : _openWhatsApp,
+                          onPressed: _saving ? null : _sendWhatsAppMessage,
                           icon: _saving
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
+                              ? DairyMilkLoader.mini(color: Colors.white, size: 20)
                               : const Icon(
-                                  LucideIcons.messageCircle,
+                                  LucideIcons.send,
                                   color: Colors.white,
-                                  size: 20,
+                                  size: 18,
                                 ),
                           label: Text(
                             status == 'failed'
-                                ? T.t('Retry')
-                                : T.t('Open in WhatsApp'),
+                                ? T.t('Retry via Business API')
+                                : T.t('Send WhatsApp Message'),
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xff25D366),
+                            backgroundColor: const Color(0xff2d7a55),
                             foregroundColor: Colors.white,
                             minimumSize: const Size.fromHeight(48),
                             shape: RoundedRectangleBorder(
@@ -708,7 +685,10 @@ class _CustomerMessageDetailsScreenState
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(16),
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: DairyMilkLoader(
+                          size: 46,
+                          message: 'Loading message history...',
+                        ),
                       ),
                     )
                   else if (_history.isEmpty)
