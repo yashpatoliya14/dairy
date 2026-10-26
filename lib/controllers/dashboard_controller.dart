@@ -15,6 +15,12 @@ class DashboardController extends GetxController {
   final error = ''.obs;
   final searchQuery = ''.obs;
 
+  // Today's summary observables
+  final todaySummary = <String, dynamic>{}.obs;
+  final todayLiters = 0.0.obs;
+  final todayEntriesDone = 0.obs;
+  final todayTotalCustomers = 0.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -24,8 +30,28 @@ class DashboardController extends GetxController {
   Future<void> load() async {
     loading.value = true;
     error.value = '';
-    await Future.wait([loadCustomers(), loadSettings(), loadProfile()]);
+    await Future.wait([
+      loadCustomers(),
+      loadSettings(),
+      loadProfile(),
+      loadTodaySummary(),
+    ]);
     loading.value = false;
+  }
+
+  Future<void> loadTodaySummary() async {
+    try {
+      final summaryRes = await api.getDailySummary();
+      todaySummary.assignAll(summaryRes);
+      final summary = summaryRes['summary'] as Map? ?? {};
+      todayLiters.value = _asDouble(summary['totalLiters'], 0.0);
+      todayEntriesDone.value =
+          int.tryParse('${summary['completedEntriesCount']}') ?? 0;
+      todayTotalCustomers.value =
+          int.tryParse('${summary['totalCustomers']}') ?? customers.length;
+    } catch (_) {
+      // Non-blocking fallback
+    }
   }
 
   Future<void> loadProfile() async {

@@ -14,7 +14,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Dairy Desk'), findsOneWidget);
-    expect(find.text('Email address'), findsOneWidget);
+    expect(find.text('Email address or mobile number'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.byType(SegmentedButton<bool>), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Log in'), findsOneWidget);

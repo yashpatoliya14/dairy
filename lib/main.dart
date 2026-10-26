@@ -14,6 +14,7 @@ import 'controllers/dashboard_controller.dart';
 import 'services/app_language.dart';
 import 'services/api_service.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
+import 'widgets/whatsapp_messaging_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +23,110 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
   runApp(const DairyApp());
+}
+
+bool _isValidEmail(String email) {
+  final trimmed = email.trim().toLowerCase();
+  final regex = RegExp(
+    r'^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$',
+  );
+  if (!regex.hasMatch(trimmed)) return false;
+
+  final parts = trimmed.split('@');
+  if (parts.length != 2) return false;
+  final local = parts[0];
+  final domain = parts[1];
+
+  if (local.isEmpty || local.length > 64) return false;
+  if (domain.isEmpty || domain.length > 255) return false;
+  if (local.contains('..') || domain.contains('..')) return false;
+
+  final domainLabels = domain.split('.');
+  if (domainLabels.length < 2) return false;
+  final tld = domainLabels.last;
+  if (tld.length < 2 || !RegExp(r'^[a-zA-Z]+$').hasMatch(tld)) return false;
+
+  // Reject typos where numbers precede domain provider, like "426gmail.com"
+  for (final label in domainLabels) {
+    if (RegExp(r'^\d+[a-zA-Z]+$').hasMatch(label)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+TextTheme _buildTextTheme(String language) {
+  if (language == 'gu') {
+    return GoogleFonts.notoSansGujaratiTextTheme().copyWith(
+      displayLarge: GoogleFonts.notoSansGujarati(
+        fontSize: 57,
+        fontWeight: FontWeight.w700,
+      ),
+      displayMedium: GoogleFonts.notoSansGujarati(
+        fontSize: 45,
+        fontWeight: FontWeight.w700,
+      ),
+      displaySmall: GoogleFonts.notoSansGujarati(
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineMedium: GoogleFonts.notoSansGujarati(
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineSmall: GoogleFonts.notoSansGujarati(
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  } else if (language == 'hi') {
+    return GoogleFonts.notoSansDevanagariTextTheme().copyWith(
+      displayLarge: GoogleFonts.notoSansDevanagari(
+        fontSize: 57,
+        fontWeight: FontWeight.w700,
+      ),
+      displayMedium: GoogleFonts.notoSansDevanagari(
+        fontSize: 45,
+        fontWeight: FontWeight.w700,
+      ),
+      displaySmall: GoogleFonts.notoSansDevanagari(
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineMedium: GoogleFonts.notoSansDevanagari(
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+      ),
+      headlineSmall: GoogleFonts.notoSansDevanagari(
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+
+  return GoogleFonts.dmSansTextTheme().copyWith(
+    displayLarge: GoogleFonts.manrope(
+      fontSize: 57,
+      fontWeight: FontWeight.w700,
+    ),
+    displayMedium: GoogleFonts.manrope(
+      fontSize: 45,
+      fontWeight: FontWeight.w700,
+    ),
+    displaySmall: GoogleFonts.manrope(
+      fontSize: 36,
+      fontWeight: FontWeight.w700,
+    ),
+    headlineMedium: GoogleFonts.manrope(
+      fontSize: 28,
+      fontWeight: FontWeight.w700,
+    ),
+    headlineSmall: GoogleFonts.manrope(
+      fontSize: 24,
+      fontWeight: FontWeight.w700,
+    ),
+  );
 }
 
 class DairyApp extends StatelessWidget {
@@ -37,35 +142,14 @@ class DairyApp extends StatelessWidget {
       permanent: true,
     );
     return Obx(() {
-      languageController.language.value;
+      final currentLang = languageController.language.value;
       return GetMaterialApp(
         title: 'Dairy Desk',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff2d7a55)),
           scaffoldBackgroundColor: const Color(0xfff7faf8),
-          textTheme: GoogleFonts.dmSansTextTheme().copyWith(
-            displayLarge: GoogleFonts.manrope(
-              fontSize: 57,
-              fontWeight: FontWeight.w700,
-            ),
-            displayMedium: GoogleFonts.manrope(
-              fontSize: 45,
-              fontWeight: FontWeight.w700,
-            ),
-            displaySmall: GoogleFonts.manrope(
-              fontSize: 36,
-              fontWeight: FontWeight.w700,
-            ),
-            headlineMedium: GoogleFonts.manrope(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-            ),
-            headlineSmall: GoogleFonts.manrope(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          textTheme: _buildTextTheme(currentLang),
           appBarTheme: const AppBarTheme(
             centerTitle: false,
             surfaceTintColor: Colors.transparent,
@@ -315,13 +399,36 @@ class _AuthPageState extends State<AuthPage> {
                     ],
                     TextFormField(
                       controller: email,
-                      keyboardType: TextInputType.emailAddress,
+                      keyboardType: signup
+                          ? TextInputType.emailAddress
+                          : TextInputType.text,
                       decoration: InputDecoration(
-                        labelText: T.t('Email address'),
+                        labelText: signup
+                            ? T.t('Email address')
+                            : T.t('Email address or mobile number'),
                       ),
-                      validator: (v) => v != null && v.contains('@')
-                          ? null
-                          : T.t('Enter a valid email'),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return T.t('Required');
+                        }
+                        final val = v.trim();
+                        if (signup) {
+                          return _isValidEmail(val)
+                              ? null
+                              : T.t('Enter a valid email');
+                        }
+                        // Login mode accepts email or mobile number
+                        if (val.contains('@')) {
+                          return _isValidEmail(val)
+                              ? null
+                              : T.t('Enter a valid email');
+                        }
+                        final digits = val.replaceAll(RegExp(r'\D'), '');
+                        if (digits.length >= 10 && digits.length <= 15) {
+                          return null;
+                        }
+                        return T.t('Enter a valid email or 10-digit mobile number');
+                      },
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -505,7 +612,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             controller: email,
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(labelText: T.t('Email address')),
-            validator: (value) => value != null && value.contains('@')
+            validator: (value) => value != null && _isValidEmail(value)
                 ? null
                 : T.t('Enter a valid email'),
           ),
@@ -686,14 +793,78 @@ class _CodePage extends StatelessWidget {
 void _showAuthMessage(BuildContext context, Object error) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
 }
-
-class Dashboard extends StatelessWidget {
+class Dashboard extends StatefulWidget {
   const Dashboard({super.key, required this.api});
   final ApiService api;
 
   @override
+  State<Dashboard> createState() => _DashboardState();
+}
+
+class _DashboardState extends State<Dashboard> {
+  int _currentTab = 0;
+  bool _openingWhatsApp = false;
+
+  void _goToWhatsApp() {
+    if (_openingWhatsApp) return;
+    setState(() {
+      _openingWhatsApp = true;
+      _currentTab = 1;
+    });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _openingWhatsApp = false);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.put(DashboardController(api));
+    final controller = Get.put(DashboardController(widget.api));
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentTab,
+        children: [
+          _buildCustomersView(context, controller),
+          WhatsAppMessagingScreen(api: widget.api),
+          SettingsPage(
+            api: widget.api,
+            defaultLiters: controller.defaultLiters.value,
+            defaultPrice: controller.defaultPrice.value,
+          ),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentTab,
+        onDestinationSelected: (index) {
+          setState(() => _currentTab = index);
+          if (index == 0) controller.load();
+        },
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(LucideIcons.users),
+            selectedIcon:
+                const Icon(LucideIcons.users, color: Color(0xff2d7a55)),
+            label: T.t('Customers'),
+          ),
+          NavigationDestination(
+            icon: const Icon(LucideIcons.messageCircle),
+            selectedIcon:
+                const Icon(LucideIcons.messageCircle, color: Color(0xff25D366)),
+            label: T.t('Messages'),
+          ),
+          NavigationDestination(
+            icon: const Icon(LucideIcons.settings),
+            selectedIcon:
+                const Icon(LucideIcons.settings, color: Color(0xff2d7a55)),
+            label: T.t('Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomersView(
+      BuildContext context, DashboardController controller) {
     return Obx(() {
       final query = controller.searchQuery.value;
       final visible = controller.customers.where((customer) {
@@ -704,59 +875,51 @@ class Dashboard extends StatelessWidget {
                 .toLowerCase();
         return name.contains(query) || number.contains(query);
       }).toList();
+
+      final totalCustomersCount = controller.todayTotalCustomers.value > 0
+          ? controller.todayTotalCustomers.value
+          : controller.customers.length;
+      final missingCount = totalCustomersCount > controller.todayEntriesDone.value
+          ? totalCustomersCount - controller.todayEntriesDone.value
+          : 0;
+
       return Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: Obx(
-            () => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                controller.dairyName.value.isEmpty
+                    ? T.t('Dairy Desk')
+                    : controller.dairyName.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.2,
+                ),
+              ),
+              if (controller.ownerName.value.isNotEmpty)
                 Text(
-                  controller.dairyName.value.isEmpty
-                      ? T.t('Dairy Desk')
-                      : controller.dairyName.value,
+                  'Hello, ${controller.ownerName.value}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -.2,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (controller.ownerName.value.isNotEmpty)
-                  Text(
-                    'Hello, ${controller.ownerName.value}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
+            ],
           ),
           actions: [
             IconButton(
               tooltip: T.t('Refresh customers'),
               onPressed: controller.loading.value ? null : controller.load,
               icon: const Icon(LucideIcons.refreshCw),
-            ),
-            IconButton(
-              tooltip: T.t('Settings'),
-              onPressed: () async {
-                final updated = await Get.to<bool>(
-                  () => SettingsPage(
-                    api: api,
-                    defaultLiters: controller.defaultLiters.value,
-                    defaultPrice: controller.defaultPrice.value,
-                  ),
-                );
-                if (updated == true) await controller.loadSettings();
-              },
-              icon: const Icon(LucideIcons.settings),
             ),
           ],
         ),
@@ -788,19 +951,122 @@ class Dashboard extends StatelessWidget {
                   250,
                 ),
                 children: [
+                  // Today's Entries Done Action Card
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Color(0xffe3ebe6)),
+                    ),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xffdcefe3),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      LucideIcons.milk,
+                                      size: 20,
+                                      color: Color(0xff2d7a55),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    T.t("Today's Milk"),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '${controller.todayLiters.value.toStringAsFixed(1)} L',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xff2d7a55),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${T.t("Entries Done")}: ${controller.todayEntriesDone.value} / $totalCustomersCount ${T.t('Customers')}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                              ),
+                              if (missingCount > 0)
+                                Text(
+                                  '${T.t("Entries Missing")}: $missingCount',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          FilledButton.icon(
+                            onPressed: _goToWhatsApp,
+                            icon: const Icon(
+                              LucideIcons.messageCircle,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            label: Text(
+                              T.t("Today's Entries Done"),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xff2d7a55),
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                   Text(
                     T.t('Your dairy at a glance'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   TextField(
                     onChanged: controller.setSearch,
                     decoration: InputDecoration(
                       hintText: T.t('Search by name or customer number'),
-                      prefixIcon: Icon(LucideIcons.search),
+                      prefixIcon: const Icon(LucideIcons.search),
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 18),
                   if (controller.loading.value && controller.customers.isEmpty)
                     const Center(
                       child: Padding(
@@ -820,8 +1086,11 @@ class Dashboard extends StatelessWidget {
                     ...visible.map(
                       (customer) => _CustomerTile(
                         customer: customer,
-                        api: api,
-                        onChanged: controller.loadCustomers,
+                        api: widget.api,
+                        onChanged: () async {
+                          await controller.loadCustomers();
+                          await controller.loadTodaySummary();
+                        },
                       ),
                     ),
                 ],
@@ -837,7 +1106,7 @@ class Dashboard extends StatelessWidget {
                   await controller.loadSettings();
                   final added = await Get.to<bool>(
                     () => CreateCustomerPage(
-                      api: api,
+                      api: widget.api,
                       defaultLiters: controller.defaultLiters.value,
                       defaultPrice: controller.defaultPrice.value,
                     ),
@@ -1000,18 +1269,6 @@ class _CustomerTile extends StatelessWidget {
         trailing: Wrap(
           spacing: 0,
           children: [
-            IconButton(
-              tooltip: T.t('Send WhatsApp Bill'),
-              onPressed: () => SendWhatsAppBillSheet.show(
-                context,
-                api: api,
-                customer: customer,
-              ),
-              icon: const Icon(
-                LucideIcons.messageCircle,
-                color: Color(0xff25D366),
-              ),
-            ),
             IconButton(
               tooltip: T.t('Save entry'),
               onPressed: () => _addMilk(context),

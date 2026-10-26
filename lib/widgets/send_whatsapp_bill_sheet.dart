@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -888,6 +889,21 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                     label: Text(_sending ? T.t('Sending...') : T.t('Send WhatsApp Bill')),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xff2d7a55),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _openWhatsAppDirect,
+                    icon: const Icon(LucideIcons.messageCircle, size: 18, color: Color(0xff25D366)),
+                    label: Text(T.t('Open in WhatsApp')),
+                    style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),

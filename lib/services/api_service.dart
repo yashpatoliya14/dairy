@@ -233,6 +233,70 @@ class ApiService {
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
+  Future<Map<String, dynamic>> getDailySummary({String? date}) async {
+    final query = date != null ? '?date=$date' : '';
+    final response = await _send('GET', '/whatsapp/daily-summary$query');
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> updateDailyMessageStatus({
+    required String customerId,
+    required String date,
+    required String status,
+    String? messageContent,
+    String? errorMessage,
+  }) async {
+    final body = <String, dynamic>{
+      'customerId': customerId,
+      'date': date,
+      'status': status,
+    };
+    if (messageContent != null) body['messageContent'] = messageContent;
+    if (errorMessage != null) body['errorMessage'] = errorMessage;
+
+    final response = await _send(
+      'POST',
+      '/whatsapp/daily-message-status',
+      body: body,
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> getCustomerMessageHistory(
+    String customerId,
+  ) async {
+    final response = await _send(
+      'GET',
+      '/whatsapp/customers/$customerId/history',
+    );
+    final data = jsonDecode(response.body);
+    final list = data is List ? data : <dynamic>[];
+    return list
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> updateProfile({
+    String? firstName,
+    String? lastName,
+    String? phoneNumber,
+    String? dairyName,
+  }) async {
+    final body = <String, dynamic>{};
+    if (firstName != null) body['firstName'] = firstName;
+    if (lastName != null) body['lastName'] = lastName;
+    if (phoneNumber != null) body['phoneNumber'] = phoneNumber;
+    if (dairyName != null) body['dairyName'] = dairyName;
+
+    final response = await _send(
+      'PATCH',
+      '/auth/profile',
+      body: body,
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
   Future<void> logout() async {
     _token = null;
     final preferences = await SharedPreferences.getInstance();
