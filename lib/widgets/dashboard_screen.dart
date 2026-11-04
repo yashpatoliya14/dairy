@@ -119,22 +119,6 @@ class DashboardScreen extends StatelessWidget {
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              tooltip: T.t('Refresh'),
-              icon: controller.loading.value
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xff2d7a55),
-                      ),
-                    )
-                  : const Icon(LucideIcons.refreshCw, size: 20),
-              onPressed: controller.loading.value ? null : controller.load,
-            ),
-          ],
         ),
         body: RefreshIndicator(
           onRefresh: controller.load,
@@ -433,7 +417,7 @@ class DashboardScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    T.t('Collection Summary'),
+                    T.t("Today's Entries"),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,

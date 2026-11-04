@@ -821,7 +821,6 @@ class _DashboardState extends State<Dashboard> {
         selectedIndex: _currentTab,
         onDestinationSelected: (index) {
           setState(() => _currentTab = index);
-          controller.load();
         },
         destinations: [
           NavigationDestination(
@@ -917,33 +916,30 @@ class _DashboardState extends State<Dashboard> {
               100,
             ),
             children: [
-              Text(
-                T.t('Customer Directory'),
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -.2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${visible.length} ${T.t('Customers')}',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    onChanged: controller.setSearch,
-                    decoration: InputDecoration(
-                      hintText: T.t('Search by name or customer number'),
-                      prefixIcon: const Icon(LucideIcons.search),
+              Container(
+                height: 42,
+                margin: const EdgeInsets.only(bottom: 14),
+                child: TextField(
+                  onChanged: controller.setSearch,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    hintText: T.t('Search by name or customer number'),
+                    prefixIcon: const Icon(LucideIcons.search, size: 18),
+                    suffixIcon: controller.searchQuery.value.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(LucideIcons.x, size: 16),
+                            onPressed: () => controller.setSearch(''),
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xffe2e8f0)),
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  if (controller.loading.value && controller.customers.isEmpty)
+                ),
+              ),
+              if (controller.loading.value && controller.customers.isEmpty)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(30),
@@ -1257,9 +1253,9 @@ class _CustomerTile extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        initial,
+                        number.isNotEmpty ? number : '#',
                         style: const TextStyle(
-                          fontSize: 19,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: Color(0xff2d7a55),
                         ),
@@ -2617,15 +2613,43 @@ class _ChoiceSelector<Option> extends StatelessWidget {
   );
 }
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, required this.api});
   final ApiService api;
 
   @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late Future<Map<String, dynamic>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.api.getProfile();
+  }
+
+  void _reload() {
+    setState(() {
+      _future = widget.api.getProfile();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(T.t('Profile'))),
+    appBar: AppBar(
+      title: Text(T.t('Profile')),
+      actions: [
+        IconButton(
+          tooltip: T.t('Refresh'),
+          icon: const Icon(LucideIcons.refreshCw, size: 18),
+          onPressed: _reload,
+        ),
+      ],
+    ),
     body: FutureBuilder<Map<String, dynamic>>(
-      future: api.getProfile(),
+      future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -2637,7 +2661,28 @@ class ProfilePage extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text(snapshot.error.toString()));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.alertCircle, size: 40, color: Colors.redAccent),
+                  const SizedBox(height: 12),
+                  Text(
+                    snapshot.error.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _reload,
+                    child: Text(T.t('Try again')),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
         final profile = snapshot.data ?? {};
         return ListView(
@@ -2722,6 +2767,16 @@ class ProfilePage extends StatelessWidget {
                     icon: LucideIcons.mail,
                     label: T.t('Email address'),
                     value: '${profile['email'] ?? '—'}',
+                  ),
+                  _DetailRow(
+                    icon: LucideIcons.phone,
+                    label: T.t('Mobile number'),
+                    value: '${profile['phoneNumber'] ?? '—'}',
+                  ),
+                  _DetailRow(
+                    icon: LucideIcons.shield,
+                    label: T.t('Role'),
+                    value: '${profile['role'] ?? 'Distributor Admin'}',
                   ),
                 ],
               ),
