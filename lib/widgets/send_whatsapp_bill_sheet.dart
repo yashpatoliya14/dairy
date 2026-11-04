@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -258,7 +258,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       }
 
       setState(() {
-        _successMessage = T.t('WhatsApp message sent successfully!');
+        _successMessage = T.t('WhatsApp bill submitted to provider successfully!');
       });
     } catch (e) {
       setState(() {

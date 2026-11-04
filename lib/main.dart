@@ -14,6 +14,7 @@ import 'controllers/dashboard_controller.dart';
 import 'services/app_language.dart';
 import 'services/api_service.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
+import 'views/monthly_milk_card_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -739,11 +740,6 @@ class Dashboard extends StatelessWidget {
           ),
           actions: [
             IconButton(
-              tooltip: T.t('Refresh customers'),
-              onPressed: controller.loading.value ? null : controller.load,
-              icon: const Icon(LucideIcons.refreshCw),
-            ),
-            IconButton(
               tooltip: T.t('Settings'),
               onPressed: () async {
                 final updated = await Get.to<bool>(
@@ -970,6 +966,13 @@ class _CustomerTile extends StatelessWidget {
     if (updated == true) await onChanged();
   }
 
+  Future<void> _openMilkCard() async {
+    final updated = await Get.to<bool>(
+      () => MonthlyMilkCardScreen(api: api, customer: customer),
+    );
+    if (updated == true) await onChanged();
+  }
+
   Future<void> _openDetails() async {
     final updated = await Get.to<bool>(
       () => CustomerDetailsPage(api: api, customer: customer),
@@ -988,7 +991,14 @@ class _CustomerTile extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: const Color(0xffdcefe3),
-          child: Text(name.isEmpty ? '?' : name[0].toUpperCase()),
+          child: Text(
+            number == '—' ? '1' : number,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xff2d7a55),
+              fontSize: 14,
+            ),
+          ),
         ),
         title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
         onTap: _openDetails,
@@ -1026,6 +1036,7 @@ class _CustomerTile extends StatelessWidget {
                     customer: customer,
                   );
                 }
+                if (value == 'milk_card') _openMilkCard();
                 if (value == 'edit') _edit(context);
                 if (value == 'details') _openDetails();
                 if (value == 'bill') _showBill(context);
@@ -1046,6 +1057,13 @@ class _CustomerTile extends StatelessWidget {
                   child: ListTile(
                     leading: const Icon(Icons.edit_outlined),
                     title: Text(T.t('Edit customer')),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'milk_card',
+                  child: ListTile(
+                    leading: const Icon(LucideIcons.calendarDays, color: Color(0xff2d7a55)),
+                    title: Text(T.t('Monthly Milk Card')),
                   ),
                 ),
                 PopupMenuItem(
@@ -1150,6 +1168,22 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         title: Text(T.t('Customer details')),
         actions: [
           IconButton(
+            tooltip: T.t('Monthly Milk Card'),
+            onPressed: () async {
+              await Get.to<bool>(
+                () => MonthlyMilkCardScreen(
+                  api: widget.api,
+                  customer: widget.customer,
+                ),
+              );
+              reload();
+            },
+            icon: const Icon(
+              LucideIcons.calendarDays,
+              color: Color(0xff2d7a55),
+            ),
+          ),
+          IconButton(
             tooltip: T.t('Send WhatsApp Bill'),
             onPressed: () => SendWhatsAppBillSheet.show(
               context,
@@ -1195,9 +1229,9 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                       radius: 34,
                       backgroundColor: const Color(0xffdcefe3),
                       child: Text(
-                        name.isEmpty ? '?' : name[0].toUpperCase(),
+                        number == '—' ? '1' : number,
                         style: const TextStyle(
-                          fontSize: 28,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Color(0xff2d7a55),
                         ),
@@ -1250,6 +1284,42 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   value: price.toStringAsFixed(2),
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            Card(
+              color: const Color(0xfff0fdf4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xff86efac)),
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xff2d7a55),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(LucideIcons.calendarDays, color: Colors.white, size: 20),
+                ),
+                title: Text(
+                  T.t('Monthly Milk Card'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xff166534)),
+                ),
+                subtitle: Text(
+                  T.t('View date-wise muster card, manage entries & total pay'),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xff166534)),
+                onTap: () async {
+                  await Get.to<bool>(
+                    () => MonthlyMilkCardScreen(
+                      api: widget.api,
+                      customer: widget.customer,
+                    ),
+                  );
+                  reload();
+                },
+              ),
             ),
             const SizedBox(height: 14),
             Card(
@@ -1886,24 +1956,72 @@ class _ChoiceSelector<Option> extends StatelessWidget {
   );
 }
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, required this.api});
   final ApiService api;
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late Future<Map<String, dynamic>> _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  void _loadProfile() {
+    setState(() {
+      _profileFuture = widget.api.getProfile();
+    });
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(T.t('Profile'))),
     body: FutureBuilder<Map<String, dynamic>>(
-      future: api.getProfile(),
+      future: _profileFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text(snapshot.error.toString()));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.alertCircle, color: Colors.red, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    T.t('Unable to load profile data'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    snapshot.error.toString(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _loadProfile,
+                    icon: const Icon(LucideIcons.refreshCw, size: 16),
+                    label: Text(T.t('Try again')),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
         final profile = snapshot.data ?? {};
+        final email = '${profile['email'] ?? ''}'.trim();
+        final phone = '${profile['phoneNumber'] ?? profile['phone'] ?? ''}'.trim();
         return ListView(
           padding: _pagePadding(context),
           children: [
@@ -1947,7 +2065,7 @@ class ProfilePage extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${profile['email'] ?? '—'}',
+                          email.isEmpty ? '—' : email,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: .85),
                           ),
@@ -1985,8 +2103,14 @@ class ProfilePage extends StatelessWidget {
                   _DetailRow(
                     icon: LucideIcons.mail,
                     label: T.t('Email address'),
-                    value: '${profile['email'] ?? '—'}',
+                    value: email.isEmpty ? '—' : email,
                   ),
+                  if (phone.isNotEmpty)
+                    _DetailRow(
+                      icon: LucideIcons.phone,
+                      label: T.t('Phone number'),
+                      value: phone,
+                    ),
                 ],
               ),
             ),
