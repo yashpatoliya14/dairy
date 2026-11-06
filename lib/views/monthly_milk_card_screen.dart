@@ -5,6 +5,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/api_service.dart';
 import '../services/app_language.dart';
+import '../widgets/monthly_entries_screen.dart';
+import '../widgets/payment_entry_sheet.dart';
 
 class MonthlyMilkCardScreen extends StatefulWidget {
   const MonthlyMilkCardScreen({
@@ -28,6 +30,7 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _hasMutatedData = false;
+  Map<String, dynamic>? _paymentData;
 
   // Keyed by 'YYYY-MM-DD'
   final Map<String, Map<String, dynamic>> _entriesByDate = {};
@@ -150,6 +153,30 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
     );
   }
 
+  double get _paymentReceived =>
+      _paymentData != null ? _asDouble(_paymentData!['receivedAmount'], 0.0) : 0.0;
+  bool get _hasPayment => _paymentData != null;
+  bool _isFullyPaid(double totalPay) =>
+      _hasPayment && _paymentReceived >= totalPay && totalPay > 0;
+  double _balanceDue(double totalPay) => totalPay - _paymentReceived;
+
+  Future<void> _loadPayment() async {
+    try {
+      final data = await widget.api.getPaymentEntry(
+        customerId: _customerId,
+        year: _selectedYear,
+        month: _selectedMonth,
+      );
+      if (mounted) {
+        setState(() {
+          _paymentData = data;
+        });
+      }
+    } catch (e) {
+      developer.log('Failed to load payment: $e', name: 'MonthlyMilkCard');
+    }
+  }
+
   Future<void> _loadMonthEntries() async {
     setState(() {
       _isLoading = true;
@@ -171,6 +198,8 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
           _entriesByDate[dateKey] = item;
         }
       }
+
+      await _loadPayment();
 
       if (mounted) {
         setState(() {
@@ -1093,6 +1122,25 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
             ],
           ),
           actions: [
+            IconButton(
+              tooltip: T.t('Tabular View'),
+              icon: const Icon(
+                LucideIcons.tableProperties,
+                color: Color(0xff2d7a55),
+              ),
+              onPressed: () {
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder: (_) => MonthlyEntriesScreen(
+                          api: widget.api,
+                          customer: widget.customer,
+                        ),
+                      ),
+                    )
+                    .then((_) => _loadMonthEntries());
+              },
+            ),
             // Mode Toggle Button: View Mode <-> Edit Mode
             TextButton.icon(
               style: TextButton.styleFrom(
@@ -1243,9 +1291,26 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
               else
                 _buildDateWiseMusterLedger(now),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 80),
             ],
           ),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _openPaymentEntrySheet(calculations),
+          icon: Icon(
+            _hasPayment ? LucideIcons.circleCheck : LucideIcons.receipt,
+            color: Colors.white,
+          ),
+          label: Text(
+            _hasPayment
+                ? '${T.t('Payment Entry')} (₹${_paymentReceived.toStringAsFixed(0)})'
+                : T.t('Payment Entry'),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: const Color(0xff2d7a55),
         ),
       ),
     );
@@ -1431,7 +1496,172 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
               ),
             ],
           ),
+          if (_hasPayment) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isFullyPaid(calc.totalPay)
+                    ? const Color(0xffdcfce7)
+                    : const Color(0xfffef3c7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _isFullyPaid(calc.totalPay)
+                      ? const Color(0xff86efac)
+                      : const Color(0xfffcd34d),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _isFullyPaid(calc.totalPay)
+                            ? LucideIcons.circleCheck
+                            : LucideIcons.circleAlert,
+                        size: 16,
+                        color: _isFullyPaid(calc.totalPay)
+                            ? const Color(0xff166534)
+                            : const Color(0xffb45309),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${T.t('Received')}: ₹${_paymentReceived.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _isFullyPaid(calc.totalPay)
+                              ? const Color(0xff166534)
+                              : const Color(0xff92400e),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    _isFullyPaid(calc.totalPay)
+                        ? T.t('Fully Paid')
+                        : '${T.t('Balance Due')}: ₹${_balanceDue(calc.totalPay).toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _isFullyPaid(calc.totalPay)
+                          ? const Color(0xff166534)
+                          : const Color(0xffb45309),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () => _openPaymentEntrySheet(calc),
+            icon: Icon(
+              _hasPayment ? LucideIcons.circleCheck : LucideIcons.receipt,
+              size: 16,
+            ),
+            label: Text(
+              _hasPayment
+                  ? '${T.t('Payment Entry')} (₹${_paymentReceived.toStringAsFixed(0)} ${T.t('Received')})'
+                  : T.t('Payment Entry'),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: _isFullyPaid(calc.totalPay)
+                  ? const Color(0xff065f46)
+                  : Colors.white,
+              foregroundColor: _isFullyPaid(calc.totalPay)
+                  ? Colors.white
+                  : const Color(0xff1b4d36),
+              minimumSize: const Size.fromHeight(40),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _openPaymentEntrySheet(_CardCalculations calc) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final monthName = _monthNames[_selectedMonth - 1];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => PaymentEntrySheet(
+        customerName: _customerName,
+        customerNumber: _customerNumber,
+        month: _selectedMonth,
+        year: _selectedYear,
+        monthName: '$monthName $_selectedYear',
+        totalLiters: calc.totalLiters,
+        effectiveRate: _defaultPrice,
+        totalAmount: calc.totalPay,
+        daysInMonth: _daysInSelectedMonth,
+        activeDeliveryDays: calc.recordedDays,
+        initialReceived: _hasPayment ? _paymentReceived : null,
+        initialNote: '${_paymentData?['note'] ?? ''}',
+        initialDate: _paymentData?['receivedDate'] != null
+            ? DateTime.tryParse('${_paymentData!['receivedDate']}')
+            : null,
+        hasExistingPayment: _hasPayment,
+        onSave: ({
+          required double receivedAmount,
+          String? note,
+          DateTime? receivedDate,
+        }) async {
+          try {
+            await widget.api.savePaymentEntry(
+              customerId: _customerId,
+              year: _selectedYear,
+              month: _selectedMonth,
+              billAmount: calc.totalPay,
+              receivedAmount: receivedAmount,
+              note: note,
+              receivedDate: receivedDate,
+            );
+            await _loadPayment();
+            messenger.clearSnackBars();
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(T.t('Payment saved successfully')),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          } catch (e) {
+            messenger.showSnackBar(
+              SnackBar(content: Text(T.t('Could not save payment'))),
+            );
+          }
+        },
+        onDelete: () async {
+          try {
+            await widget.api.deletePaymentEntry(
+              customerId: _customerId,
+              year: _selectedYear,
+              month: _selectedMonth,
+            );
+            await _loadPayment();
+            messenger.clearSnackBars();
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(T.t('Payment deleted')),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          } catch (e) {
+            messenger.showSnackBar(
+              SnackBar(content: Text(T.t('Could not delete payment'))),
+            );
+          }
+        },
       ),
     );
   }

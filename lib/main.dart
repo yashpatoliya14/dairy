@@ -14,7 +14,6 @@ import 'services/app_language.dart';
 import 'services/api_service.dart';
 import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
-import 'widgets/monthly_entries_screen.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
 import 'widgets/whatsapp_messaging_screen.dart';
 import 'views/monthly_milk_card_screen.dart';
@@ -1468,15 +1467,9 @@ class _CustomerTile extends StatelessWidget {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 170),
                   onSelected: (value) {
-                    if (value == 'monthly') {
-                      Get.to(
-                        () => MonthlyEntriesScreen(
-                          api: api,
-                          customer: customer,
-                        ),
-                      );
+                    if (value == 'milk_card' || value == 'monthly') {
+                      _openMilkCard();
                     }
-                    if (value == 'milk_card') _openMilkCard();
                     if (value == 'whatsapp') {
                       SendWhatsAppBillSheet.show(
                         context,
@@ -1489,22 +1482,6 @@ class _CustomerTile extends StatelessWidget {
                   },
                   itemBuilder: (context) => [
                     PopupMenuItem(
-                      value: 'monthly',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          LucideIcons.receiptText,
-                          color: Color(0xff2d7a55),
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('View bill & entries'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
                       value: 'milk_card',
                       child: ListTile(
                         dense: true,
@@ -1515,7 +1492,7 @@ class _CustomerTile extends StatelessWidget {
                           size: 18,
                         ),
                         title: Text(
-                          T.t('Monthly Milk Card'),
+                          T.t('Monthly Milk Card & Bill'),
                           style: const TextStyle(fontSize: 13),
                         ),
                       ),
@@ -1632,7 +1609,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         title: Text(T.t('Customer details')),
         actions: [
           IconButton(
-            tooltip: T.t('Monthly Milk Card'),
+            tooltip: T.t('Monthly Milk Card & Bill'),
             onPressed: () => Get.to(
               () => MonthlyMilkCardScreen(
                 api: widget.api,
@@ -1643,16 +1620,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
               LucideIcons.calendarDays,
               color: Color(0xff2d7a55),
             ),
-          ),
-          IconButton(
-            tooltip: T.t('View bill & entries'),
-            onPressed: () => Get.to(
-              () => MonthlyEntriesScreen(
-                api: widget.api,
-                customer: _customer,
-              ),
-            ),
-            icon: const Icon(LucideIcons.receiptText),
           ),
           IconButton(
             tooltip: T.t('Send WhatsApp Bill'),
@@ -2027,7 +1994,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             ),
             const SizedBox(height: 12),
 
-            // THIRD TILE: MONTHLY MILK CARD
+            // THIRD TILE: MONTHLY MILK CARD & BILL
             Card(
               color: const Color(0xfff0fdf4),
               elevation: 0,
@@ -2054,7 +2021,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   ),
                 ),
                 title: Text(
-                  T.t('Monthly Milk Card'),
+                  T.t('Monthly Milk Card & Bill'),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Color(0xff166534),
@@ -2062,7 +2029,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   ),
                 ),
                 subtitle: Text(
-                  T.t('View date-wise muster card, manage entries & total pay'),
+                  T.t('View date-wise muster card, billing & payment entry'),
                   style: TextStyle(
                     color: Colors.grey.shade700,
                     fontSize: 11.5,
@@ -2075,60 +2042,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                 ),
                 onTap: () => Get.to(
                   () => MonthlyMilkCardScreen(
-                    api: widget.api,
-                    customer: _customer,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Card(
-              color: const Color(0xfff0fdf4),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xffbbf7d0)),
-              ),
-              child: ListTile(
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 2,
-                ),
-                leading: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xff2d7a55),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    LucideIcons.calendarDays,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-                title: Text(
-                  T.t('Monthly Milk Entry Table'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xff166534),
-                    fontSize: 13.5,
-                  ),
-                ),
-                subtitle: Text(
-                  T.t('View and edit daily milk deliveries for any month'),
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 11.5,
-                  ),
-                ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 13,
-                  color: Color(0xff166534),
-                ),
-                onTap: () => Get.to(
-                  () => MonthlyEntriesScreen(
                     api: widget.api,
                     customer: _customer,
                   ),

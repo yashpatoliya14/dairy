@@ -293,6 +293,12 @@ class ApiService {
         .toList();
   }
 
+  static double _asDouble(dynamic value, [double fallback = 0.0]) {
+    if (value is num) return value.toDouble();
+    if (value == null) return fallback;
+    return double.tryParse(value.toString().replaceAll(',', '.')) ?? fallback;
+  }
+
   Future<Map<String, dynamic>> getMilkEntriesForMonth(
     String customerId, {
     required int year,
@@ -302,7 +308,35 @@ class ApiService {
       'GET',
       '/customers/$customerId/entries?year=$year&month=$month',
     );
-    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+    final data = jsonDecode(response.body);
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    if (data is List) {
+      final entries = data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final totalLiters = entries.fold<double>(
+        0.0,
+        (sum, e) => sum + _asDouble(e['liters']),
+      );
+      final totalAmount = entries.fold<double>(
+        0.0,
+        (sum, e) => sum + _asDouble(e['total']),
+      );
+      final daysInMonth = DateTime(year, month + 1, 0).day;
+      return {
+        'year': year,
+        'month': month,
+        'daysInMonth': daysInMonth,
+        'entriesCount': entries.length,
+        'totalLiters': totalLiters,
+        'totalAmount': totalAmount,
+        'entries': entries,
+      };
+    }
+    return {};
   }
 
   Future<Map<String, dynamic>> deleteMilkEntry(
