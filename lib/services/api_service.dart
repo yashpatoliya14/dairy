@@ -621,6 +621,66 @@ class ApiService {
     return response;
   }
 
+  // ─── Local Payment Entry Storage ───────────────────────────────────────────
+  // Payments are stored locally using SharedPreferences until a backend
+  // endpoint is available. Key format: payment_{customerId}_{year}_{month}
+
+  static String _paymentKey(String customerId, int year, int month) =>
+      'payment_${customerId}_${year}_$month';
+
+  /// Save a payment entry for a customer for a specific month.
+  Future<void> savePaymentEntry({
+    required String customerId,
+    required int year,
+    required int month,
+    required double billAmount,
+    required double receivedAmount,
+    String? note,
+    DateTime? receivedDate,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _paymentKey(customerId, year, month);
+    final data = jsonEncode({
+      'customerId': customerId,
+      'year': year,
+      'month': month,
+      'billAmount': billAmount,
+      'receivedAmount': receivedAmount,
+      'note': note ?? '',
+      'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+    await prefs.setString(key, data);
+  }
+
+  /// Get a payment entry for a customer for a specific month.
+  Future<Map<String, dynamic>?> getPaymentEntry({
+    required String customerId,
+    required int year,
+    required int month,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _paymentKey(customerId, year, month);
+    final data = prefs.getString(key);
+    if (data == null) return null;
+    try {
+      return Map<String, dynamic>.from(jsonDecode(data) as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Delete a payment entry for a customer for a specific month.
+  Future<void> deletePaymentEntry({
+    required String customerId,
+    required int year,
+    required int month,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _paymentKey(customerId, year, month);
+    await prefs.remove(key);
+  }
+
   String _message(int statusCode, String body) {
     try {
       final data = jsonDecode(body);

@@ -16,6 +16,7 @@ import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
 import 'widgets/monthly_entries_screen.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
+import 'widgets/whatsapp_messaging_screen.dart';
 import 'views/monthly_milk_card_screen.dart';
 
 Future<void> main() async {
@@ -899,18 +900,9 @@ class _DashboardState extends State<Dashboard> {
           ),
           actions: [
             IconButton(
-              tooltip: T.t('Settings'),
-              onPressed: () async {
-                final updated = await Get.to<bool>(
-                  () => SettingsPage(
-                    api: api,
-                    defaultLiters: controller.defaultLiters.value,
-                    defaultPrice: controller.defaultPrice.value,
-                  ),
-                );
-                if (updated == true) await controller.loadSettings();
-              },
-              icon: const Icon(LucideIcons.settings),
+              tooltip: T.t('Refresh customers'),
+              onPressed: controller.loading.value ? null : controller.load,
+              icon: const Icon(LucideIcons.refreshCw),
             ),
           ],
         ),
@@ -1218,15 +1210,6 @@ class _CustomerTile extends StatelessWidget {
         '${customer['name'] ?? customer['fullName'] ?? 'Unnamed customer'}'.trim();
     final number =
         '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'.trim();
-    final phone =
-        '${customer['phoneNumber'] ?? customer['mobileNumber'] ?? customer['phone'] ?? ''}'.trim();
-    final liters = (customer['liters'] ?? customer['defaultLiters'] ?? 0);
-    final price = (customer['price'] ?? customer['defaultPrice'] ?? 0);
-    final channel =
-        '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
-    final isWhatsApp = channel == 'whatsapp';
-
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1421,19 +1404,26 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         actions: [
           IconButton(
             tooltip: T.t('Monthly Milk Card'),
-            onPressed: () async {
-              await Get.to<bool>(
-                () => MonthlyMilkCardScreen(
-                  api: widget.api,
-                  customer: widget.customer,
-                ),
-              );
-              reload();
-            },
+            onPressed: () => Get.to(
+              () => MonthlyMilkCardScreen(
+                api: widget.api,
+                customer: _customer,
+              ),
+            ),
             icon: const Icon(
               LucideIcons.calendarDays,
               color: Color(0xff2d7a55),
             ),
+          ),
+          IconButton(
+            tooltip: T.t('View bill & entries'),
+            onPressed: () => Get.to(
+              () => MonthlyEntriesScreen(
+                api: widget.api,
+                customer: _customer,
+              ),
+            ),
+            icon: const Icon(LucideIcons.receiptText),
           ),
           IconButton(
             tooltip: T.t('Send WhatsApp Bill'),
@@ -1484,97 +1474,385 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                       child: Text(
                         number == '—' ? '1' : number,
                         style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Color(0xff2d7a55),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      name,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xffe8f5e9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xffc8e6c9),
+                                  ),
+                                ),
+                                child: Text(
+                                  '#$number',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xff2d7a55),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              InkWell(
+                                onTap: hasPhone
+                                    ? () => launchUrl(Uri.parse('tel:$phone'))
+                                    : null,
+                                borderRadius: BorderRadius.circular(4),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.phone_outlined,
+                                      size: 13.5,
+                                      color: hasPhone
+                                          ? const Color(0xff2d7a55)
+                                          : Colors.grey.shade500,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      hasPhone ? phone : T.t('Not provided'),
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: hasPhone
+                                            ? (isDark
+                                                ? Colors.grey.shade300
+                                                : const Color(0xff334155))
+                                            : Colors.grey.shade500,
+                                        decoration: hasPhone
+                                            ? TextDecoration.underline
+                                            : TextDecoration.none,
+                                        decorationColor:
+                                            const Color(0xff2d7a55),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSms
+                                      ? const Color(0xffeff6ff)
+                                      : const Color(0xfff0fdf4),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                    color: isSms
+                                        ? const Color(0xffbfdbfe)
+                                        : const Color(0xffbbf7d0),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isSms
+                                          ? LucideIcons.messageSquare
+                                          : LucideIcons.messageCircle,
+                                      size: 11.5,
+                                      color: isSms
+                                          ? const Color(0xff2563eb)
+                                          : const Color(0xff16a34a),
+                                    ),
+                                    const SizedBox(width: 3.5),
+                                    Text(
+                                      isSms ? 'SMS' : 'WhatsApp',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSms
+                                            ? const Color(0xff1e40af)
+                                            : const Color(0xff15803d),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text('${T.t('Customer no.')} $number'),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: 20,
+                        color: Color(0xff2d7a55),
+                      ),
+                      tooltip: T.t('Edit customer'),
+                      onPressed: _editCustomer,
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            _DetailsSection(
-              title: T.t('Contact'),
-              children: [
-                _DetailRow(
-                  icon: Icons.phone_outlined,
-                  label: T.t('Phone number'),
-                  value: phone,
+            const SizedBox(height: 12),
+
+            // SECOND TILE: COMPACT & PROFESSIONAL MILK DEFAULTS
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color:
+                      isDark ? Colors.grey.shade800 : const Color(0xffE2E8F0),
                 ),
-                _DetailRow(
-                  icon: channel == 'sms'
-                      ? Icons.sms_outlined
-                      : Icons.chat_outlined,
-                  label: T.t('Notification channel'),
-                  value: channel == 'sms'
-                      ? T.t('SMS / Messages')
-                      : T.t('WhatsApp'),
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.milk,
+                          size: 16,
+                          color: Color(0xff2d7a55),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          T.t('Milk defaults'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? Colors.grey.shade300
+                                : const Color(0xff334155),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : const Color(0xfff8fafc),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.grey.shade800
+                                    : const Color(0xffe2e8f0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Daily liters'),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${liters.toStringAsFixed(2)} L',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : const Color(0xfff8fafc),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.grey.shade800
+                                    : const Color(0xffe2e8f0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Price per liter'),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '₹${price.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xfff0fdf4),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xffbbf7d0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Daily amount'),
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xff166534),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '₹${dailyTotal.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xff15803d),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 14),
-            _DetailsSection(
-              title: T.t('Milk defaults'),
-              children: [
-                _DetailRow(
-                  icon: Icons.local_drink_outlined,
-                  label: T.t('Daily liters'),
-                  value: '${liters.toStringAsFixed(2)} L',
-                ),
-                _DetailRow(
-                  icon: Icons.payments_outlined,
-                  label: T.t('Price per liter'),
-                  value: price.toStringAsFixed(2),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+
+            // THIRD TILE: MONTHLY MILK CARD
             Card(
               color: const Color(0xfff0fdf4),
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 side: const BorderSide(color: Color(0xff86efac)),
               ),
               child: ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: const Color(0xff2d7a55),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(LucideIcons.calendarDays, color: Colors.white, size: 20),
+                  child: const Icon(
+                    LucideIcons.calendarDays,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 title: Text(
                   T.t('Monthly Milk Card'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xff166534)),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xff166534),
+                    fontSize: 13.5,
+                  ),
                 ),
                 subtitle: Text(
                   T.t('View date-wise muster card, manage entries & total pay'),
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 11.5,
+                  ),
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xff166534)),
-                onTap: () async {
-                  await Get.to<bool>(
-                    () => MonthlyMilkCardScreen(
-                      api: widget.api,
-                      customer: widget.customer,
-                    ),
-                  );
-                  reload();
-                },
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 13,
+                  color: Color(0xff166534),
+                ),
+                onTap: () => Get.to(
+                  () => MonthlyMilkCardScreen(
+                    api: widget.api,
+                    customer: _customer,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             Card(
               color: const Color(0xfff0fdf4),
               elevation: 0,
@@ -2227,7 +2505,7 @@ class _ProfilePageState extends State<ProfilePage> {
         IconButton(
           tooltip: T.t('Refresh'),
           icon: const Icon(LucideIcons.refreshCw, size: 18),
-          onPressed: _reload,
+          onPressed: _loadProfile,
         ),
       ],
     ),

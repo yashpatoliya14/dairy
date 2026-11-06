@@ -94,6 +94,12 @@ class MonthlyEntriesController extends GetxController {
   // Quantity increment
   final increment = 0.5;
 
+  // Payment state
+  final paymentReceived = 0.0.obs;
+  final paymentNote = ''.obs;
+  final paymentDate = Rxn<DateTime>();
+  final hasPayment = false.obs;
+
   /// Set the customer and load the current month's data.
   void setCustomer(Map<String, dynamic> c) {
     customer.value = c;
@@ -173,6 +179,8 @@ class MonthlyEntriesController extends GetxController {
             .map((e) => Map<String, dynamic>.from(e))
             .toList(),
       );
+      // Load payment data for this month
+      await loadPayment();
     } catch (e) {
       error.value = e.toString();
       developer.log('Failed to load month: $e', name: 'MonthlyEntries');
@@ -295,6 +303,96 @@ class MonthlyEntriesController extends GetxController {
   }
 
   void clearUndo() => undoStack.clear();
+
+  // ─── Payment Entry Methods ─────────────────────────────────────────────────
+
+  /// Load the payment entry for the current month.
+  Future<void> loadPayment() async {
+    if (customerId.isEmpty) return;
+    try {
+      final data = await api.getPaymentEntry(
+        customerId: customerId,
+        year: selectedYear.value,
+        month: selectedMonth.value,
+      );
+      if (data != null) {
+        paymentReceived.value = _asDouble(data['receivedAmount'], 0.0);
+        paymentNote.value = '${data['note'] ?? ''}'.trim();
+        final dateStr = data['receivedDate'];
+        paymentDate.value = dateStr != null ? DateTime.tryParse('$dateStr') : null;
+        hasPayment.value = true;
+      } else {
+        _resetPayment();
+      }
+    } catch (e) {
+      developer.log('Failed to load payment: $e', name: 'MonthlyEntries');
+      _resetPayment();
+    }
+  }
+
+  /// Save a payment entry for the current month.
+  Future<bool> savePayment({
+    required double receivedAmount,
+    String? note,
+    DateTime? receivedDate,
+  }) async {
+    if (customerId.isEmpty) return false;
+    try {
+      await api.savePaymentEntry(
+        customerId: customerId,
+        year: selectedYear.value,
+        month: selectedMonth.value,
+        billAmount: totalAmount.value,
+        receivedAmount: receivedAmount,
+        note: note,
+        receivedDate: receivedDate,
+      );
+      paymentReceived.value = receivedAmount;
+      paymentNote.value = (note ?? '').trim();
+      paymentDate.value = receivedDate ?? DateTime.now();
+      hasPayment.value = true;
+      return true;
+    } catch (e) {
+      developer.log('Failed to save payment: $e', name: 'MonthlyEntries');
+      return false;
+    }
+  }
+
+  /// Delete the payment entry for the current month.
+  Future<bool> deletePayment() async {
+    if (customerId.isEmpty) return false;
+    try {
+      await api.deletePaymentEntry(
+        customerId: customerId,
+        year: selectedYear.value,
+        month: selectedMonth.value,
+      );
+      _resetPayment();
+      return true;
+    } catch (e) {
+      developer.log('Failed to delete payment: $e', name: 'MonthlyEntries');
+      return false;
+    }
+  }
+
+  void _resetPayment() {
+    paymentReceived.value = 0.0;
+    paymentNote.value = '';
+    paymentDate.value = null;
+    hasPayment.value = false;
+  }
+
+  /// Outstanding balance for the current month.
+  double get balanceDue =>
+      totalAmount.value - paymentReceived.value;
+
+  /// Whether the bill is fully paid.
+  bool get isFullyPaid =>
+      hasPayment.value && paymentReceived.value >= totalAmount.value;
+
+  /// Whether the bill is partially paid.
+  bool get isPartiallyPaid =>
+      hasPayment.value && paymentReceived.value > 0 && paymentReceived.value < totalAmount.value;
 
   /// Whether we're viewing a future month (shouldn't allow entries).
   bool get isFutureMonth {

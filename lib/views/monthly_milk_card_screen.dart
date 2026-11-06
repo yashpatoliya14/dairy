@@ -1,4 +1,4 @@
-﻿import 'dart:developer' as developer;
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -956,6 +956,9 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
     final liters = _asDouble(entry['liters'], 0.0);
     final total = _asDouble(entry['total'], 0.0);
 
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(sheetContext);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -987,9 +990,6 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
     );
 
     if (confirmed != true) return;
-
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(sheetContext);
 
     try {
       if (entryId.isNotEmpty) {
@@ -1068,7 +1068,9 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
-        // Can reload
+        if (_hasMutatedData) {
+          developer.log('Milk card data changed', name: 'MonthlyMilkCard');
+        }
       },
       child: Scaffold(
         appBar: AppBar(

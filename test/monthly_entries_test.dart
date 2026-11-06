@@ -68,8 +68,9 @@ class MockApiService extends ApiService {
   }
 
   @override
-  Future<void> deleteMilkEntry(String customerId, String entryId) async {
+  Future<Map<String, dynamic>> deleteMilkEntry(String customerId, String entryId) async {
     deletedEntryIds.add(entryId);
+    return {'success': true};
   }
 }
 

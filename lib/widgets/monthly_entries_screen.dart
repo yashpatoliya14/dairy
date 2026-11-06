@@ -440,19 +440,35 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xffdcfce7),
+                                    color: controller.isFullyPaid
+                                        ? const Color(0xffdcfce7)
+                                        : controller.isPartiallyPaid
+                                            ? const Color(0xfffef3c7)
+                                            : const Color(0xffdcfce7),
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: const Color(0xff86efac),
+                                      color: controller.isFullyPaid
+                                          ? const Color(0xff86efac)
+                                          : controller.isPartiallyPaid
+                                              ? const Color(0xfffcd34d)
+                                              : const Color(0xff86efac),
                                       width: 0.8,
                                     ),
                                   ),
                                   child: Text(
-                                    T.t('Billed'),
-                                    style: const TextStyle(
+                                    controller.isFullyPaid
+                                        ? T.t('Fully Paid')
+                                        : controller.isPartiallyPaid
+                                            ? T.t('Partially Paid')
+                                            : T.t('Billed'),
+                                    style: TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xff166534),
+                                      color: controller.isFullyPaid
+                                          ? const Color(0xff166534)
+                                          : controller.isPartiallyPaid
+                                              ? const Color(0xffb45309)
+                                              : const Color(0xff166534),
                                     ),
                                   ),
                                 ),
@@ -575,9 +591,107 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                     ),
                   ],
 
+                  if (controller.hasPayment.value) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: controller.isFullyPaid
+                            ? const Color(0xfff0fdf4)
+                            : const Color(0xfffffbeb),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: controller.isFullyPaid
+                              ? const Color(0xffbbf7d0)
+                              : const Color(0xfffef08a),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            controller.isFullyPaid
+                                ? LucideIcons.circleCheck
+                                : LucideIcons.circleAlert,
+                            size: 14,
+                            color: controller.isFullyPaid
+                                ? const Color(0xff16a34a)
+                                : const Color(0xffd97706),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${T.t('Received')}: ₹${controller.paymentReceived.value.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: controller.isFullyPaid
+                                        ? const Color(0xff166534)
+                                        : const Color(0xff92400e),
+                                  ),
+                                ),
+                                Text(
+                                  controller.isFullyPaid
+                                      ? T.t('Fully Paid')
+                                      : '${T.t('Balance Due')}: ₹${controller.balanceDue.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: controller.isFullyPaid
+                                        ? const Color(0xff166534)
+                                        : const Color(0xffb45309),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 10),
 
-                  // Quick Action Buttons (WhatsApp Bill & Copy Bill)
+                  // Quick Action 1: Payment Entry Button
+                  FilledButton.icon(
+                    onPressed: () => _openPaymentEntrySheet(context),
+                    icon: Icon(
+                      controller.hasPayment.value
+                          ? LucideIcons.circleCheck
+                          : LucideIcons.receipt,
+                      size: 16,
+                    ),
+                    label: Text(
+                      controller.hasPayment.value
+                          ? '${T.t('Payment Entry')} (₹${controller.paymentReceived.value.toStringAsFixed(0)} ${T.t('Received')})'
+                          : T.t('Payment Entry'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: controller.isFullyPaid
+                          ? const Color(0xff065f46)
+                          : const Color(0xff1e40af),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: const Size.fromHeight(36),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Quick Action Row 2: (WhatsApp Bill & Copy Bill)
                   Row(
                     children: [
                       // Send WhatsApp Bill
@@ -593,7 +707,9 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                               initialTotalDays: daysInMonth,
                               initialMonthlyLiters: totalLiters,
                               initialRate: effectiveRate,
-                              initialPreviousDue: 0.0,
+                              initialPreviousDue: controller.hasPayment.value
+                                  ? (controller.balanceDue > 0 ? controller.balanceDue : 0.0)
+                                  : 0.0,
                             );
                           },
                           icon: const Icon(LucideIcons.messageCircle, size: 15),
@@ -683,8 +799,16 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
       '• Total Quantity: ${totalLiters.toStringAsFixed(1)} L',
       '• Rate: ₹${effectiveRate.toStringAsFixed(2)}/L',
       '• Monthly Charge: ₹${totalAmount.toStringAsFixed(2)}',
-      '• Previous Due: ₹0.00',
-      '• *Net Total Due: ₹${totalAmount.toStringAsFixed(2)}*',
+      if (controller.hasPayment.value) ...[
+        '• Amount Received: ₹${controller.paymentReceived.value.toStringAsFixed(2)}',
+        if (controller.balanceDue > 0)
+          '• *Balance Due: ₹${controller.balanceDue.toStringAsFixed(2)}*'
+        else
+          '• *Status: Fully Paid (₹0.00 Due)*',
+      ] else ...[
+        '• Previous Due: ₹0.00',
+        '• *Net Total Due: ₹${totalAmount.toStringAsFixed(2)}*',
+      ],
       '  ($words)',
       '',
       '💳 *Payment Modes:* UPI (GPay/PhonePe/Paytm), Cash & Bank',
@@ -814,13 +938,32 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                 label: T.t('Subtotal'),
                 value: '₹${totalAmount.toStringAsFixed(2)}',
               ),
-              const SizedBox(height: 6),
-              _BillDetailRow(label: T.t('Previous Due'), value: '₹0.00'),
+              if (controller.hasPayment.value) ...[
+                const SizedBox(height: 6),
+                _BillDetailRow(
+                  label: T.t('Amount Received'),
+                  value: '₹${controller.paymentReceived.value.toStringAsFixed(2)}',
+                  isBold: true,
+                ),
+                const SizedBox(height: 6),
+                _BillDetailRow(
+                  label: T.t('Balance Due'),
+                  value: '₹${controller.balanceDue.toStringAsFixed(2)}',
+                  isBold: true,
+                ),
+              ] else ...[
+                const SizedBox(height: 6),
+                _BillDetailRow(label: T.t('Previous Due'), value: '₹0.00'),
+              ],
               const Divider(height: 20),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xff064e3b),
+                  color: controller.isFullyPaid
+                      ? const Color(0xff064e3b)
+                      : controller.isPartiallyPaid
+                          ? const Color(0xff78350f)
+                          : const Color(0xff064e3b),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
@@ -830,15 +973,23 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          T.t('Total Amount Payable'),
-                          style: const TextStyle(
-                            color: Color(0xffa7f3d0),
+                          controller.hasPayment.value
+                              ? (controller.isFullyPaid
+                                  ? '${T.t('Total Amount Payable')} (${T.t('Fully Paid')})'
+                                  : T.t('Balance Due'))
+                              : T.t('Total Amount Payable'),
+                          style: TextStyle(
+                            color: controller.isPartiallyPaid
+                                ? const Color(0xfffef08a)
+                                : const Color(0xffa7f3d0),
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
                         ),
                         Text(
-                          '₹${totalAmount.toStringAsFixed(2)}',
+                          controller.hasPayment.value && !controller.isFullyPaid
+                              ? '₹${controller.balanceDue.toStringAsFixed(2)}'
+                              : '₹${totalAmount.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -1078,6 +1229,108 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
     if (result != null) {
       controller.setMonthYear(result.year, result.month);
     }
+  }
+
+  Future<void> _openPaymentEntrySheet(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final monthName = _monthLabel(
+      controller.selectedMonth.value,
+      controller.selectedYear.value,
+    );
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PaymentEntrySheet(
+        customerName: controller.customerName,
+        customerNumber: controller.customerNumber,
+        month: controller.selectedMonth.value,
+        year: controller.selectedYear.value,
+        monthName: monthName,
+        totalLiters: controller.totalLiters.value,
+        effectiveRate: controller.effectiveRate,
+        totalAmount: controller.totalAmount.value,
+        daysInMonth: controller.daysInMonth.value,
+        activeDeliveryDays: controller.activeDeliveryDays,
+        initialReceived: controller.hasPayment.value
+            ? controller.paymentReceived.value
+            : null,
+        initialNote: controller.paymentNote.value,
+        initialDate: controller.paymentDate.value,
+        hasExistingPayment: controller.hasPayment.value,
+        onSave: ({
+          required double receivedAmount,
+          String? note,
+          DateTime? receivedDate,
+        }) async {
+          final success = await controller.savePayment(
+            receivedAmount: receivedAmount,
+            note: note,
+            receivedDate: receivedDate,
+          );
+          if (!mounted) return;
+          if (success) {
+            messenger.clearSnackBars();
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(T.t('Payment saved successfully')),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          } else {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(T.t('Could not save payment')),
+                backgroundColor: Colors.red.shade700,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+        onDelete: controller.hasPayment.value
+            ? () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (dCtx) => AlertDialog(
+                    title: Text(T.t('Delete Payment?')),
+                    content: Text(
+                      T.t('This will remove the payment record for this month.'),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dCtx).pop(false),
+                        child: Text(T.t('Cancel')),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(dCtx).pop(true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                        child: Text(T.t('Delete')),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  final success = await controller.deletePayment();
+                  if (!mounted) return;
+                  if (success) {
+                    messenger.clearSnackBars();
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(T.t('Payment deleted')),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              }
+            : null,
+      ),
+    );
   }
 
   static double _asDouble(dynamic value, [double fallback = 0]) {
@@ -1816,6 +2069,731 @@ class _QuantityButton extends StatelessWidget {
             icon,
             size: 28,
             color: onTap != null ? color : Colors.grey.shade400,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Payment Entry Bottom Sheet ──────────────────────────────────────────────
+
+class _PaymentEntrySheet extends StatefulWidget {
+  const _PaymentEntrySheet({
+    required this.customerName,
+    required this.customerNumber,
+    required this.month,
+    required this.year,
+    required this.monthName,
+    required this.totalLiters,
+    required this.effectiveRate,
+    required this.totalAmount,
+    required this.daysInMonth,
+    required this.activeDeliveryDays,
+    required this.initialReceived,
+    required this.initialNote,
+    required this.initialDate,
+    required this.hasExistingPayment,
+    required this.onSave,
+    this.onDelete,
+  });
+
+  final String customerName;
+  final String customerNumber;
+  final int month;
+  final int year;
+  final String monthName;
+  final double totalLiters;
+  final double effectiveRate;
+  final double totalAmount;
+  final int daysInMonth;
+  final int activeDeliveryDays;
+  final double? initialReceived;
+  final String initialNote;
+  final DateTime? initialDate;
+  final bool hasExistingPayment;
+  final Future<void> Function({
+    required double receivedAmount,
+    String? note,
+    DateTime? receivedDate,
+  }) onSave;
+  final Future<void> Function()? onDelete;
+
+  @override
+  State<_PaymentEntrySheet> createState() => _PaymentEntrySheetState();
+}
+
+class _PaymentEntrySheetState extends State<_PaymentEntrySheet> {
+  late final TextEditingController _receivedController;
+  late final TextEditingController _noteController;
+  late DateTime _selectedDate;
+  String _selectedMode = '';
+  bool _saving = false;
+
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialReceived ?? widget.totalAmount;
+    _receivedController = TextEditingController(
+      text: initial > 0
+          ? (initial == initial.truncateToDouble()
+              ? initial.toStringAsFixed(0)
+              : initial.toStringAsFixed(2))
+          : '',
+    );
+    _noteController = TextEditingController(text: widget.initialNote);
+    _selectedDate = widget.initialDate ?? DateTime.now();
+
+    final lower = widget.initialNote.toLowerCase();
+    if (lower.contains('cash')) {
+      _selectedMode = 'Cash';
+    } else if (lower.contains('upi')) {
+      _selectedMode = 'UPI';
+    } else if (lower.contains('bank')) {
+      _selectedMode = 'Bank Transfer';
+    } else if (lower.contains('cheque')) {
+      _selectedMode = 'Cheque';
+    }
+  }
+
+  @override
+  void dispose() {
+    _receivedController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  double get _currentReceived =>
+      double.tryParse(_receivedController.text.trim()) ?? 0.0;
+
+  double get _currentBalance => widget.totalAmount - _currentReceived;
+
+  void _fillFullAmount() {
+    setState(() {
+      _receivedController.text =
+          widget.totalAmount == widget.totalAmount.truncateToDouble()
+              ? widget.totalAmount.toStringAsFixed(0)
+              : widget.totalAmount.toStringAsFixed(2);
+    });
+  }
+
+  void _fillHalfAmount() {
+    final half = widget.totalAmount / 2;
+    setState(() {
+      _receivedController.text = half == half.truncateToDouble()
+          ? half.toStringAsFixed(0)
+          : half.toStringAsFixed(2);
+    });
+  }
+
+  void _selectMode(String mode) {
+    setState(() {
+      if (_selectedMode == mode) {
+        _selectedMode = '';
+      } else {
+        _selectedMode = mode;
+        if (_noteController.text.trim().isEmpty) {
+          _noteController.text = mode;
+        }
+      }
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(widget.year - 1),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final received = double.parse(_receivedController.text.trim());
+    final note = _noteController.text.trim();
+    final finalNote = note.isNotEmpty
+        ? note
+        : (_selectedMode.isNotEmpty ? _selectedMode : '');
+    await widget.onSave(
+      receivedAmount: received,
+      note: finalNote,
+      receivedDate: _selectedDate,
+    );
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final received = _currentReceived;
+    final balance = _currentBalance;
+    final isFullyPaid = received >= widget.totalAmount && widget.totalAmount > 0;
+    final isPartiallyPaid = received > 0 && received < widget.totalAmount;
+    final isOverPaid = received > widget.totalAmount;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Header with Title & Customer
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xffdcfce7),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    LucideIcons.receiptText,
+                                    color: Color(0xff166534),
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  T.t('Payment Entry'),
+                                  style: const TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xff111827),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${widget.customerName} (#${widget.customerNumber})  •  ${widget.monthName}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(LucideIcons.x, size: 20),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // ─── MONTHLY BILL SUMMARY CARD ─────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xfff0fdf4), Color(0xffdcfce7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xff86efac),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  LucideIcons.receipt,
+                                  size: 15,
+                                  color: Color(0xff166534),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  T.t('Monthly Bill'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff166534),
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xff86efac),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                '${widget.activeDeliveryDays}/${widget.daysInMonth} ${T.t('Days')}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff166534),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${widget.totalLiters.toStringAsFixed(1)} L  @  ₹${widget.effectiveRate.toStringAsFixed(2)}/L',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  T.t('Bill Amount'),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '₹${widget.totalAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xff14532d),
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ─── AMOUNT RECEIVED INPUT ─────────────────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        T.t('Amount Received'),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xff374151),
+                        ),
+                      ),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          InkWell(
+                            onTap: _fillFullAmount,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xffdcfce7),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xff86efac),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                '${T.t('Full Amount')} (₹${widget.totalAmount.toStringAsFixed(0)})',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff166534),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (widget.totalAmount > 0)
+                            InkWell(
+                              onTap: _fillHalfAmount,
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xfff1f5f9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xffcbd5e1),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Text(
+                                  '50% (₹${(widget.totalAmount / 2).toStringAsFixed(0)})',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xff475569),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  TextFormField(
+                    controller: _receivedController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xff111827),
+                    ),
+                    decoration: InputDecoration(
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 14),
+                        child: Text(
+                          '₹',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xff166534),
+                          ),
+                        ),
+                      ),
+                      prefixIconConstraints:
+                          const BoxConstraints(minWidth: 0, minHeight: 0),
+                      hintText: '0.00',
+                      filled: true,
+                      fillColor: const Color(0xfff8fafc),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xff16a34a), width: 2),
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return T.t('Required');
+                      }
+                      final parsed = double.tryParse(value.trim());
+                      if (parsed == null || !parsed.isFinite) {
+                        return T.t('Enter a valid number');
+                      }
+                      if (parsed < 0) {
+                        return T.t('Cannot be negative');
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ─── REAL-TIME BALANCE CALCULATION BANNER ──────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isFullyPaid
+                          ? const Color(0xffecfdf5)
+                          : isPartiallyPaid
+                              ? const Color(0xfffffbeb)
+                              : isOverPaid
+                                  ? const Color(0xffeff6ff)
+                                  : const Color(0xfff8fafc),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isFullyPaid
+                            ? const Color(0xffa7f3d0)
+                            : isPartiallyPaid
+                                ? const Color(0xfffde68a)
+                                : isOverPaid
+                                    ? const Color(0xffbfdbfe)
+                                    : const Color(0xffe2e8f0),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              isFullyPaid
+                                  ? LucideIcons.circleCheck
+                                  : isPartiallyPaid
+                                      ? LucideIcons.circleAlert
+                                      : isOverPaid
+                                          ? LucideIcons.circlePlus
+                                          : LucideIcons.circleDot,
+                              size: 16,
+                              color: isFullyPaid
+                                  ? const Color(0xff059669)
+                                  : isPartiallyPaid
+                                      ? const Color(0xffd97706)
+                                      : isOverPaid
+                                          ? const Color(0xff2563eb)
+                                          : const Color(0xff64748b),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isFullyPaid
+                                  ? T.t('Fully Paid')
+                                  : isPartiallyPaid
+                                      ? T.t('Partially Paid')
+                                      : isOverPaid
+                                          ? '${T.t('Advance')}: ₹${(-balance).toStringAsFixed(2)}'
+                                          : T.t('Unpaid'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isFullyPaid
+                                    ? const Color(0xff065f46)
+                                    : isPartiallyPaid
+                                        ? const Color(0xff92400e)
+                                        : isOverPaid
+                                            ? const Color(0xff1e40af)
+                                            : const Color(0xff475569),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          isFullyPaid
+                              ? '₹0.00'
+                              : '${T.t('Balance Due')}: ₹${balance > 0 ? balance.toStringAsFixed(2) : '0.00'}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: isFullyPaid
+                                ? const Color(0xff059669)
+                                : balance > 0
+                                    ? const Color(0xffb45309)
+                                    : const Color(0xff1e40af),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ─── PAYMENT MODE SELECTION ────────────────────────────────
+                  Text(
+                    T.t('Payment Mode'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xff374151),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final mode in ['Cash', 'UPI', 'Bank Transfer', 'Cheque'])
+                        ChoiceChip(
+                          label: Text(T.t(mode)),
+                          selected: _selectedMode == mode,
+                          onSelected: (_) => _selectMode(mode),
+                          selectedColor: const Color(0xffdcefe3),
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _selectedMode == mode
+                                ? const Color(0xff166534)
+                                : Colors.grey.shade700,
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // ─── PAYMENT DATE & NOTES ──────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickDate,
+                          icon: const Icon(LucideIcons.calendar, size: 15),
+                          label: Text(
+                            '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          controller: _noteController,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: T.t('e.g. Cash, UPI, Bank Transfer'),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ─── SAVE / DELETE BUTTONS ─────────────────────────────────
+                  Row(
+                    children: [
+                      if (widget.hasExistingPayment && widget.onDelete != null) ...[
+                        OutlinedButton(
+                          onPressed: _saving
+                              ? null
+                              : () async {
+                                  Navigator.of(context).pop();
+                                  await widget.onDelete!();
+                                },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade700,
+                            side: BorderSide(color: Colors.red.shade300),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 12, horizontal: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Icon(Icons.delete_outline, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : _handleSave,
+                          icon: _saving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(LucideIcons.check, size: 18),
+                          label: Text(
+                            widget.hasExistingPayment
+                                ? T.t('Update Payment')
+                                : T.t('Save Payment'),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xff166534),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
