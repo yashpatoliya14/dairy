@@ -275,8 +275,12 @@ class ApiService {
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
-  Future<List<Map<String, dynamic>>> getMilkEntries(String customerId) async {
-    final response = await _send('GET', '/customers/$customerId/entries');
+  Future<List<Map<String, dynamic>>> getMilkEntries(
+    String customerId, {
+    String? month,
+  }) async {
+    final query = (month != null && month.isNotEmpty) ? '?month=$month' : '';
+    final response = await _send('GET', '/customers/$customerId/entries$query');
     final data = jsonDecode(response.body);
     final list = data is List
         ? data
@@ -301,8 +305,23 @@ class ApiService {
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
-  Future<void> deleteMilkEntry(String customerId, String entryId) async {
-    await _send('DELETE', '/customers/$customerId/entries/$entryId');
+  Future<Map<String, dynamic>> deleteMilkEntry(
+    String customerId,
+    String entryId,
+  ) async {
+    final response = await _send(
+      'DELETE',
+      '/customers/$customerId/entries/$entryId',
+    );
+    final body = response.body.trim();
+    if (body.isEmpty) return {'success': true};
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+    return {'success': true};
   }
 
   Future<Map<String, dynamic>> sendWhatsAppBill(

@@ -16,7 +16,7 @@ import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
 import 'widgets/monthly_entries_screen.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
-import 'widgets/whatsapp_messaging_screen.dart';
+import 'views/monthly_milk_card_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -899,9 +899,18 @@ class _DashboardState extends State<Dashboard> {
           ),
           actions: [
             IconButton(
-              tooltip: T.t('Refresh customers'),
-              onPressed: controller.loading.value ? null : controller.load,
-              icon: const Icon(LucideIcons.refreshCw),
+              tooltip: T.t('Settings'),
+              onPressed: () async {
+                final updated = await Get.to<bool>(
+                  () => SettingsPage(
+                    api: api,
+                    defaultLiters: controller.defaultLiters.value,
+                    defaultPrice: controller.defaultPrice.value,
+                  ),
+                );
+                if (updated == true) await controller.loadSettings();
+              },
+              icon: const Icon(LucideIcons.settings),
             ),
           ],
         ),
@@ -1189,6 +1198,13 @@ class _CustomerTile extends StatelessWidget {
     if (updated == true) await onChanged();
   }
 
+  Future<void> _openMilkCard() async {
+    final updated = await Get.to<bool>(
+      () => MonthlyMilkCardScreen(api: api, customer: customer),
+    );
+    if (updated == true) await onChanged();
+  }
+
   Future<void> _openDetails() async {
     final updated = await Get.to<bool>(
       () => CustomerDetailsPage(api: api, customer: customer),
@@ -1214,341 +1230,136 @@ class _CustomerTile extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xffe2e8f0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xff1e293b).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: _openDetails,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                // Avatar with initials & optional WhatsApp badge
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xffdcefe3), Color(0xffc2e7cf)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        number.isNotEmpty ? number : '#',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xff2d7a55),
-                        ),
-                      ),
-                    ),
-                    if (isWhatsApp)
-                      Positioned(
-                        right: -3,
-                        bottom: -3,
-                        child: Container(
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Color(0xff25D366),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              LucideIcons.messageCircle,
-                              size: 10,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-
-                // Customer info & metrics
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xff111827),
-                                letterSpacing: -0.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (number.isNotEmpty && number != '—')
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xfff1f5f9),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: const Color(0xffe2e8f0),
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Text(
-                                '#$number',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xff475569),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-
-                      // Metrics row: Liters pill & Rate pill
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xffdcefe3),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  LucideIcons.droplets,
-                                  size: 11,
-                                  color: Color(0xff2d7a55),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '$liters L',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xff2d7a55),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xfff0fdf4),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xffbbf7d0),
-                                width: 0.8,
-                              ),
-                            ),
-                            child: Text(
-                              '₹$price/L',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xff166534),
-                              ),
-                            ),
-                          ),
-                          if (phone.isNotEmpty && phone != 'null')
-                            Text(
-                              phone,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: Colors.grey.shade500,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Save Milk Entry Button
-                Tooltip(
-                  message: T.t('Save entry'),
-                  child: Material(
-                    color: const Color(0xff2d7a55),
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () => _addMilk(context),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 7,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              LucideIcons.circlePlus,
-                              size: 15,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              T.t('Entry'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 2),
-
-                // Three-dot popup menu
-                PopupMenuButton<String>(
-                  tooltip: T.t('More options'),
-                  icon: Icon(
-                    LucideIcons.moreVertical,
-                    size: 19,
-                    color: Colors.grey.shade600,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 170),
-                  onSelected: (value) {
-                    if (value == 'monthly') {
-                      Get.to(
-                        () => MonthlyEntriesScreen(
-                          api: api,
-                          customer: customer,
-                        ),
-                      );
-                    }
-                    if (value == 'whatsapp') {
-                      SendWhatsAppBillSheet.show(
-                        context,
-                        api: api,
-                        customer: customer,
-                      );
-                    }
-                    if (value == 'edit') _edit(context);
-                    if (value == 'details') _openDetails();
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'monthly',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          LucideIcons.receiptText,
-                          color: Color(0xff2d7a55),
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('View bill & entries'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'whatsapp',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          LucideIcons.messageCircle,
-                          color: Color(0xff25D366),
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('Send WhatsApp Bill'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.edit_outlined,
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('Edit customer'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'details',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.person_outline,
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('View customer details'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xffdcefe3),
+          child: Text(
+            number == '—' ? '1' : number,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xff2d7a55),
+              fontSize: 14,
             ),
           ),
         ),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        onTap: _openDetails,
+        subtitle: Text(
+          'No. $number  •  ${customer['liters']} L  •  '
+          '${customer['notificationChannel'] ?? 'whatsapp'}',
+        ),
+        trailing: Wrap(
+          spacing: 0,
+          children: [
+            IconButton(
+              tooltip: T.t('Send WhatsApp Bill'),
+              onPressed: () => SendWhatsAppBillSheet.show(
+                context,
+                api: api,
+                customer: customer,
+              ),
+              icon: const Icon(
+                LucideIcons.messageCircle,
+                color: Color(0xff25D366),
+              ),
+            ),
+            IconButton(
+              tooltip: T.t('Save entry'),
+              onPressed: () => _addMilk(context),
+              icon: const Icon(Icons.save_outlined),
+            ),
+            PopupMenuButton<String>(
+              tooltip: T.t('More options'),
+              onSelected: (value) {
+                if (value == 'whatsapp') {
+                  SendWhatsAppBillSheet.show(
+                    context,
+                    api: api,
+                    customer: customer,
+                  );
+                }
+                if (value == 'milk_card') _openMilkCard();
+                if (value == 'edit') _edit(context);
+                if (value == 'details') _openDetails();
+                if (value == 'bill') _showBill(context);
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'whatsapp',
+                  child: ListTile(
+                    leading: const Icon(
+                      LucideIcons.messageCircle,
+                      color: Color(0xff25D366),
+                    ),
+                    title: Text(T.t('Send WhatsApp Bill')),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: Text(T.t('Edit customer')),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'milk_card',
+                  child: ListTile(
+                    leading: const Icon(LucideIcons.calendarDays, color: Color(0xff2d7a55)),
+                    title: Text(T.t('Monthly Milk Card')),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'details',
+                  child: ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: Text(T.t('View customer details')),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'bill',
+                  child: ListTile(
+                    leading: const Icon(LucideIcons.receiptText),
+                    title: Text(T.t('View bill')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showBill(BuildContext context) async {
+    late final List<Map<String, dynamic>> entries;
+    try {
+      entries = await api.getMilkEntries('${customer['id']}');
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    final total = entries.fold<double>(
+      0,
+      (sum, entry) =>
+          sum +
+          _asDouble(
+            entry['total'],
+            fallback: _asDouble(entry['liters']) * _asDouble(entry['price']),
+          ),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${T.t('Bill')} - ${customer['name']}'),
+        content: Text(
+          '${T.t('Total entries')}: ${entries.length}\n'
+          '${T.t('Total amount')}: ${total.toStringAsFixed(2)}',
+        ),
+        actions: [TextButton(onPressed: Get.back, child: Text(T.t('Close')))],
       ),
     );
   }
@@ -1609,14 +1420,20 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         title: Text(T.t('Customer details')),
         actions: [
           IconButton(
-            tooltip: T.t('View bill & entries'),
-            onPressed: () => Get.to(
-              () => MonthlyEntriesScreen(
-                api: widget.api,
-                customer: _customer,
-              ),
+            tooltip: T.t('Monthly Milk Card'),
+            onPressed: () async {
+              await Get.to<bool>(
+                () => MonthlyMilkCardScreen(
+                  api: widget.api,
+                  customer: widget.customer,
+                ),
+              );
+              reload();
+            },
+            icon: const Icon(
+              LucideIcons.calendarDays,
+              color: Color(0xff2d7a55),
             ),
-            icon: const Icon(LucideIcons.receiptText),
           ),
           IconButton(
             tooltip: T.t('Send WhatsApp Bill'),
@@ -1665,333 +1482,99 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                       radius: 24,
                       backgroundColor: const Color(0xffdcefe3),
                       child: Text(
-                        name.isEmpty ? '?' : name[0].toUpperCase(),
+                        number == '—' ? '1' : number,
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Color(0xff2d7a55),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  name,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xffe8f5e9),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: const Color(0xffc8e6c9),
-                                  ),
-                                ),
-                                child: Text(
-                                  '#$number',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xff2d7a55),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              InkWell(
-                                onTap: hasPhone
-                                    ? () => launchUrl(Uri.parse('tel:$phone'))
-                                    : null,
-                                borderRadius: BorderRadius.circular(4),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.phone_outlined,
-                                      size: 13.5,
-                                      color: hasPhone
-                                          ? const Color(0xff2d7a55)
-                                          : Colors.grey.shade500,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      hasPhone ? phone : T.t('Not provided'),
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w500,
-                                        color: hasPhone
-                                            ? (isDark
-                                                ? Colors.grey.shade300
-                                                : const Color(0xff334155))
-                                            : Colors.grey.shade500,
-                                        decoration: hasPhone
-                                            ? TextDecoration.underline
-                                            : TextDecoration.none,
-                                        decorationColor:
-                                            const Color(0xff2d7a55),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSms
-                                      ? const Color(0xffeff6ff)
-                                      : const Color(0xfff0fdf4),
-                                  borderRadius: BorderRadius.circular(5),
-                                  border: Border.all(
-                                    color: isSms
-                                        ? const Color(0xffbfdbfe)
-                                        : const Color(0xffbbf7d0),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      isSms
-                                          ? LucideIcons.messageSquare
-                                          : LucideIcons.messageCircle,
-                                      size: 11.5,
-                                      color: isSms
-                                          ? const Color(0xff2563eb)
-                                          : const Color(0xff16a34a),
-                                    ),
-                                    const SizedBox(width: 3.5),
-                                    Text(
-                                      isSms ? 'SMS' : 'WhatsApp',
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: isSms
-                                            ? const Color(0xff1e40af)
-                                            : const Color(0xff15803d),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 12),
+                    Text(
+                      name,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.edit_outlined,
-                        size: 20,
-                        color: Color(0xff2d7a55),
-                      ),
-                      tooltip: T.t('Edit customer'),
-                      onPressed: _editCustomer,
-                    ),
+                    const SizedBox(height: 4),
+                    Text('${T.t('Customer no.')} $number'),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-
-            // SECOND TILE: COMPACT & PROFESSIONAL MILK DEFAULTS
+            const SizedBox(height: 14),
+            _DetailsSection(
+              title: T.t('Contact'),
+              children: [
+                _DetailRow(
+                  icon: Icons.phone_outlined,
+                  label: T.t('Phone number'),
+                  value: phone,
+                ),
+                _DetailRow(
+                  icon: channel == 'sms'
+                      ? Icons.sms_outlined
+                      : Icons.chat_outlined,
+                  label: T.t('Notification channel'),
+                  value: channel == 'sms'
+                      ? T.t('SMS / Messages')
+                      : T.t('WhatsApp'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _DetailsSection(
+              title: T.t('Milk defaults'),
+              children: [
+                _DetailRow(
+                  icon: Icons.local_drink_outlined,
+                  label: T.t('Daily liters'),
+                  value: '${liters.toStringAsFixed(2)} L',
+                ),
+                _DetailRow(
+                  icon: Icons.payments_outlined,
+                  label: T.t('Price per liter'),
+                  value: price.toStringAsFixed(2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             Card(
-              elevation: 0,
+              color: const Color(0xfff0fdf4),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color:
-                      isDark ? Colors.grey.shade800 : const Color(0xffE2E8F0),
-                ),
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xff86efac)),
               ),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          LucideIcons.milk,
-                          size: 16,
-                          color: Color(0xff2d7a55),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          T.t('Milk defaults'),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? Colors.grey.shade300
-                                : const Color(0xff334155),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.grey.shade900
-                                  : const Color(0xfff8fafc),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.grey.shade800
-                                    : const Color(0xffe2e8f0),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  T.t('Daily liters'),
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${liters.toStringAsFixed(2)} L',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.grey.shade900
-                                  : const Color(0xfff8fafc),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.grey.shade800
-                                    : const Color(0xffe2e8f0),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  T.t('Price per liter'),
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '₹${price.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xfff0fdf4),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: const Color(0xffbbf7d0),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  T.t('Daily amount'),
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xff166534),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '₹${dailyTotal.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xff15803d),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xff2d7a55),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(LucideIcons.calendarDays, color: Colors.white, size: 20),
                 ),
+                title: Text(
+                  T.t('Monthly Milk Card'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xff166534)),
+                ),
+                subtitle: Text(
+                  T.t('View date-wise muster card, manage entries & total pay'),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xff166534)),
+                onTap: () async {
+                  await Get.to<bool>(
+                    () => MonthlyMilkCardScreen(
+                      api: widget.api,
+                      customer: widget.customer,
+                    ),
+                  );
+                  reload();
+                },
               ),
             ),
-            const SizedBox(height: 12),
-
-            // QUICK ACTION: MONTHLY MILK ENTRY TABLE
+            const SizedBox(height: 14),
             Card(
               color: const Color(0xfff0fdf4),
               elevation: 0,
@@ -2622,17 +2205,17 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  late Future<Map<String, dynamic>> _future;
+  late Future<Map<String, dynamic>> _profileFuture;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.api.getProfile();
+    _loadProfile();
   }
 
-  void _reload() {
+  void _loadProfile() {
     setState(() {
-      _future = widget.api.getProfile();
+      _profileFuture = widget.api.getProfile();
     });
   }
 
@@ -2649,7 +2232,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ],
     ),
     body: FutureBuilder<Map<String, dynamic>>(
-      future: _future,
+      future: _profileFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -2667,17 +2250,23 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(LucideIcons.alertCircle, size: 40, color: Colors.redAccent),
+                  const Icon(LucideIcons.alertCircle, color: Colors.red, size: 48),
                   const SizedBox(height: 12),
+                  Text(
+                    T.t('Unable to load profile data'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 6),
                   Text(
                     snapshot.error.toString(),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _reload,
-                    child: Text(T.t('Try again')),
+                  FilledButton.icon(
+                    onPressed: _loadProfile,
+                    icon: const Icon(LucideIcons.refreshCw, size: 16),
+                    label: Text(T.t('Try again')),
                   ),
                 ],
               ),
@@ -2685,6 +2274,8 @@ class _ProfilePageState extends State<ProfilePage> {
           );
         }
         final profile = snapshot.data ?? {};
+        final email = '${profile['email'] ?? ''}'.trim();
+        final phone = '${profile['phoneNumber'] ?? profile['phone'] ?? ''}'.trim();
         return ListView(
           padding: _pagePadding(context),
           children: [
@@ -2728,7 +2319,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${profile['email'] ?? '—'}',
+                          email.isEmpty ? '—' : email,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: .85),
                           ),
@@ -2766,18 +2357,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   _DetailRow(
                     icon: LucideIcons.mail,
                     label: T.t('Email address'),
-                    value: '${profile['email'] ?? '—'}',
+                    value: email.isEmpty ? '—' : email,
                   ),
-                  _DetailRow(
-                    icon: LucideIcons.phone,
-                    label: T.t('Mobile number'),
-                    value: '${profile['phoneNumber'] ?? '—'}',
-                  ),
-                  _DetailRow(
-                    icon: LucideIcons.shield,
-                    label: T.t('Role'),
-                    value: '${profile['role'] ?? 'Distributor Admin'}',
-                  ),
+                  if (phone.isNotEmpty)
+                    _DetailRow(
+                      icon: LucideIcons.phone,
+                      label: T.t('Phone number'),
+                      value: phone,
+                    ),
                 ],
               ),
             ),

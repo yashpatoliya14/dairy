@@ -17,6 +17,15 @@
                 "ANDROID_SDK_ROOT": "C:\\Users\\yashp\\Downloads\\platform-tools-latest-windows",
                 "Path": "D:\\flutter\\bin;C:\\Program Files\\Microsoft\\jdk-17.0.20.101-hotspot\\bin;C:\\Users\\yashp\\Downloads\\platform-tools-latest-windows\\platform-tools;${env:Path}"
             }
+        },
+        {
+            "name": "Dairy Desk (Chrome)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "chrome",
+            "toolArgs": [
+                "--web-hostname=127.0.0.1"
+            ]
         }
     ]
 }

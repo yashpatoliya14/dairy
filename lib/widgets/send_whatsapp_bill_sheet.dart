@@ -300,7 +300,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       }
 
       setState(() {
-        _successMessage = T.t('WhatsApp message sent successfully!');
+        _successMessage = T.t('WhatsApp bill submitted to provider successfully!');
       });
     } catch (e) {
       setState(() {
