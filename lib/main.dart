@@ -1210,139 +1210,368 @@ class _CustomerTile extends StatelessWidget {
         '${customer['name'] ?? customer['fullName'] ?? 'Unnamed customer'}'.trim();
     final number =
         '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'.trim();
+    final phone =
+        '${customer['phoneNumber'] ?? customer['mobileNumber'] ?? customer['phone'] ?? ''}'.trim();
+    final liters = (customer['liters'] ?? customer['defaultLiters'] ?? 0);
+    final price = (customer['price'] ?? customer['defaultPrice'] ?? 0);
+    final channel =
+        '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
+    final isWhatsApp = channel == 'whatsapp';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xffdcefe3),
-          child: Text(
-            number == '—' ? '1' : number,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xff2d7a55),
-              fontSize: 14,
-            ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xffe2e8f0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xff1e293b).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-        ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        onTap: _openDetails,
-        subtitle: Text(
-          'No. $number  •  ${customer['liters']} L  •  '
-          '${customer['notificationChannel'] ?? 'whatsapp'}',
-        ),
-        trailing: Wrap(
-          spacing: 0,
-          children: [
-            IconButton(
-              tooltip: T.t('Send WhatsApp Bill'),
-              onPressed: () => SendWhatsAppBillSheet.show(
-                context,
-                api: api,
-                customer: customer,
-              ),
-              icon: const Icon(
-                LucideIcons.messageCircle,
-                color: Color(0xff25D366),
-              ),
-            ),
-            IconButton(
-              tooltip: T.t('Save entry'),
-              onPressed: () => _addMilk(context),
-              icon: const Icon(Icons.save_outlined),
-            ),
-            PopupMenuButton<String>(
-              tooltip: T.t('More options'),
-              onSelected: (value) {
-                if (value == 'whatsapp') {
-                  SendWhatsAppBillSheet.show(
-                    context,
-                    api: api,
-                    customer: customer,
-                  );
-                }
-                if (value == 'milk_card') _openMilkCard();
-                if (value == 'edit') _edit(context);
-                if (value == 'details') _openDetails();
-                if (value == 'bill') _showBill(context);
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'whatsapp',
-                  child: ListTile(
-                    leading: const Icon(
-                      LucideIcons.messageCircle,
-                      color: Color(0xff25D366),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: _openDetails,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Avatar with sequential number & optional WhatsApp badge
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xffdcefe3), Color(0xffc2e7cf)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        number.isNotEmpty ? number : '#',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xff2d7a55),
+                        ),
+                      ),
                     ),
-                    title: Text(T.t('Send WhatsApp Bill')),
+                    if (isWhatsApp)
+                      Positioned(
+                        right: -3,
+                        bottom: -3,
+                        child: Container(
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Color(0xff25D366),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              LucideIcons.messageCircle,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+
+                // Customer info & metrics
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xff111827),
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (number.isNotEmpty && number != '—')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfff1f5f9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xffe2e8f0),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                '#$number',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff475569),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+
+                      // Metrics row: Liters pill & Rate pill
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xffdcefe3),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  LucideIcons.droplets,
+                                  size: 11,
+                                  color: Color(0xff2d7a55),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$liters L',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff2d7a55),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xfff0fdf4),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xffbbf7d0),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              '₹$price/L',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xff166534),
+                              ),
+                            ),
+                          ),
+                          if (phone.isNotEmpty && phone != 'null')
+                            Text(
+                              phone,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Colors.grey.shade500,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: const Icon(Icons.edit_outlined),
-                    title: Text(T.t('Edit customer')),
+
+                const SizedBox(width: 8),
+
+                // Save Milk Entry Button
+                Tooltip(
+                  message: T.t('Save entry'),
+                  child: Material(
+                    color: const Color(0xff2d7a55),
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      onTap: () => _addMilk(context),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              LucideIcons.circlePlus,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              T.t('Entry'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'milk_card',
-                  child: ListTile(
-                    leading: const Icon(LucideIcons.calendarDays, color: Color(0xff2d7a55)),
-                    title: Text(T.t('Monthly Milk Card')),
+                const SizedBox(width: 2),
+
+                // Three-dot popup menu
+                PopupMenuButton<String>(
+                  tooltip: T.t('More options'),
+                  icon: Icon(
+                    LucideIcons.moreVertical,
+                    size: 19,
+                    color: Colors.grey.shade600,
                   ),
-                ),
-                PopupMenuItem(
-                  value: 'details',
-                  child: ListTile(
-                    leading: const Icon(Icons.person_outline),
-                    title: Text(T.t('View customer details')),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'bill',
-                  child: ListTile(
-                    leading: const Icon(LucideIcons.receiptText),
-                    title: Text(T.t('View bill')),
-                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 170),
+                  onSelected: (value) {
+                    if (value == 'monthly') {
+                      Get.to(
+                        () => MonthlyEntriesScreen(
+                          api: api,
+                          customer: customer,
+                        ),
+                      );
+                    }
+                    if (value == 'milk_card') _openMilkCard();
+                    if (value == 'whatsapp') {
+                      SendWhatsAppBillSheet.show(
+                        context,
+                        api: api,
+                        customer: customer,
+                      );
+                    }
+                    if (value == 'edit') _edit(context);
+                    if (value == 'details') _openDetails();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'monthly',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.receiptText,
+                          color: Color(0xff2d7a55),
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('View bill & entries'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'milk_card',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.calendarDays,
+                          color: Color(0xff2d7a55),
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('Monthly Milk Card'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'whatsapp',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.messageCircle,
+                          color: Color(0xff25D366),
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('Send WhatsApp Bill'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('Edit customer'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'details',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.person_outline,
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('View customer details'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showBill(BuildContext context) async {
-    late final List<Map<String, dynamic>> entries;
-    try {
-      entries = await api.getMilkEntries('${customer['id']}');
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-      return;
-    }
-    if (!context.mounted) return;
-    final total = entries.fold<double>(
-      0,
-      (sum, entry) =>
-          sum +
-          _asDouble(
-            entry['total'],
-            fallback: _asDouble(entry['liters']) * _asDouble(entry['price']),
           ),
-    );
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${T.t('Bill')} - ${customer['name']}'),
-        content: Text(
-          '${T.t('Total entries')}: ${entries.length}\n'
-          '${T.t('Total amount')}: ${total.toStringAsFixed(2)}',
         ),
-        actions: [TextButton(onPressed: Get.back, child: Text(T.t('Close')))],
       ),
     );
   }
