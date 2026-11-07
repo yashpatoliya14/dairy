@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../controllers/dashboard_controller.dart';
 import '../services/api_service.dart';
 import '../services/app_language.dart';
 import 'customer_message_details_screen.dart';
@@ -502,7 +504,16 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
   @override
   Widget build(BuildContext context) {
     final summary = _dailyData?['summary'] as Map? ?? {};
-    final dairyName = '${_dailyData?['dairyName'] ?? ''}'.trim();
+    final dashboardCtrl = Get.isRegistered<DashboardController>()
+        ? Get.find<DashboardController>()
+        : null;
+    final dairy = dashboardCtrl != null && dashboardCtrl.dairyName.value.isNotEmpty
+        ? dashboardCtrl.dairyName.value
+        : '${_dailyData?['dairyName'] ?? ''}'.trim();
+    final dairyName = dairy.isNotEmpty ? dairy : T.t('Dairy Desk');
+    final ownerName = dashboardCtrl != null && dashboardCtrl.ownerName.value.isNotEmpty
+        ? dashboardCtrl.ownerName.value
+        : '${_dailyData?['ownerName'] ?? ''}'.trim();
     final customers = _filteredCustomers();
     final eligibleSelected = customers.where((c) {
       final cid = '${c['customer']['id']}';
@@ -514,34 +525,37 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xff1b4d36),
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actionsIconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          dairyName.isNotEmpty ? '$dairyName • ${T.t('Messages')}' : T.t('Send Messages'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            tooltip: _selectionMode
-                ? T.t('Close')
-                : T.t('Select All'),
-            icon: Icon(
-              _selectionMode
-                  ? LucideIcons.x
-                  : LucideIcons.checkSquare,
+        elevation: 0,
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              dairyName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.2,
+                color: Colors.white,
+              ),
             ),
-            onPressed: () {
-              setState(() {
-                _selectionMode = !_selectionMode;
-                if (!_selectionMode) {
-                  _selectedCustomerIds.clear();
-                }
-              });
-            },
-          ),
-        ],
+            if (ownerName.isNotEmpty)
+              Text(
+                '${T.t("Welcome back")}, $ownerName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xffdcefe3),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,
@@ -762,33 +776,81 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
 
             const SizedBox(height: 8),
 
-            // Search Bar (Sleek 36px Height)
-            SizedBox(
-              height: 36,
-              child: TextField(
-                onChanged: (v) => setState(() => _searchQuery = v),
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: T.t('Search by name or mobile number'),
-                  hintStyle: const TextStyle(fontSize: 12),
-                  prefixIcon: const Icon(LucideIcons.search, size: 16),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xffe2e8f0)),
+            // Search Bar & Selection Button
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: TextField(
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: T.t('Search by name or mobile number'),
+                        hintStyle: const TextStyle(fontSize: 12),
+                        prefixIcon: const Icon(LucideIcons.search, size: 16),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xffe2e8f0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xffe2e8f0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xff2d7a55)),
+                        ),
+                        fillColor: Colors.white,
+                        filled: true,
+                      ),
+                    ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xffe2e8f0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xff2d7a55)),
-                  ),
-                  fillColor: Colors.white,
-                  filled: true,
                 ),
-              ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectionMode = !_selectionMode;
+                      if (!_selectionMode) {
+                        _selectedCustomerIds.clear();
+                      }
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: _selectionMode ? const Color(0xff1b4d36) : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _selectionMode ? const Color(0xff1b4d36) : const Color(0xffe2e8f0),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _selectionMode ? LucideIcons.checkSquare : LucideIcons.square,
+                          size: 16,
+                          color: _selectionMode ? Colors.white : const Color(0xff2d7a55),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _selectionMode ? T.t('Cancel') : T.t('Select'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _selectionMode ? Colors.white : const Color(0xff2d7a55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 8),

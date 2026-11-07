@@ -939,7 +939,7 @@ class _DashboardState extends State<Dashboard> {
               ),
               if (controller.ownerName.value.isNotEmpty)
                 Text(
-                  'Hello, ${controller.ownerName.value}',
+                  '${T.t("Welcome back")}, ${controller.ownerName.value}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

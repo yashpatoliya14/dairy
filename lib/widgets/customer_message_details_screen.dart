@@ -618,50 +618,67 @@ class _CustomerMessageDetailsScreenState
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _copyMessage,
-                          icon: const Icon(LucideIcons.copy, size: 18),
-                          label: Text(T.t('Copy Message')),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 460;
+
+                      final copyBtn = OutlinedButton.icon(
+                        onPressed: _copyMessage,
+                        icon: const Icon(LucideIcons.copy, size: 18),
+                        label: Text(T.t('Copy Message')),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(46),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : _sendWhatsAppMessage,
-                          icon: _saving
-                              ? DairyMilkLoader.mini(color: Colors.white, size: 20)
-                              : const Icon(
-                                  LucideIcons.send,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                          label: Text(
-                            status == 'failed'
-                                ? T.t('Retry via Business API')
-                                : T.t('Send WhatsApp Message'),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xff2d7a55),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                      );
+
+                      final sendBtn = FilledButton.icon(
+                        onPressed: _saving ? null : _sendWhatsAppMessage,
+                        icon: _saving
+                            ? DairyMilkLoader.mini(color: Colors.white, size: 20)
+                            : const Icon(
+                                LucideIcons.send,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                        label: Text(
+                          status == 'failed'
+                              ? T.t('Retry via Business API')
+                              : T.t('Send WhatsApp Message'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xff2d7a55),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            sendBtn,
+                            const SizedBox(height: 10),
+                            copyBtn,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: copyBtn),
+                          const SizedBox(width: 12),
+                          Expanded(flex: 2, child: sendBtn),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
