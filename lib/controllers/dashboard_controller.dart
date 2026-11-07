@@ -32,8 +32,8 @@ class DashboardController extends GetxController {
   final todayNotSentCount = 0.obs;
   final dailyCustomerItems = <Map<String, dynamic>>[].obs;
 
-  // Daily list filter: 'all', 'missing', 'completed'
-  final dailyFilter = 'all'.obs;
+  // Daily list filter: 'all', 'missing', 'completed' - defaults to 'completed' (milk entry done today)
+  final dailyFilter = 'completed'.obs;
 
   bool get isSelectedDateToday {
     final now = DateTime.now();

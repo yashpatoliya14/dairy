@@ -27,7 +27,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
   late DateTime _selectedDate;
   bool _loading = true;
   String _searchQuery = '';
-  String _selectedFilter = 'all'; // 'all', 'pending', 'sent', 'failed', 'no_entry'
+  String _selectedFilter = 'entry_done'; // 'entry_done', 'all', 'pending', 'sent', 'failed', 'no_entry'
 
   Map<String, dynamic>? _dailyData;
   String? _errorMessage;
@@ -483,6 +483,8 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
       final hasEntry = item['hasEntry'] == true;
 
       switch (_selectedFilter) {
+        case 'entry_done':
+          return hasEntry;
         case 'pending':
           return status == 'pending' || status == 'not_sent';
         case 'sent':
@@ -539,11 +541,6 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
               });
             },
           ),
-          IconButton(
-            tooltip: T.t('Refresh customers'),
-            icon: const Icon(LucideIcons.refreshCw),
-            onPressed: _loading ? null : _loadData,
-          ),
         ],
       ),
       body: RefreshIndicator(
@@ -551,122 +548,171 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
-            // Date Picker Row
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xffe3ebe6)),
+            // Date Picker Row (Sleek & Compact)
+            Container(
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xffe2e8f0)),
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: T.t('Yesterday'),
-                      icon: const Icon(LucideIcons.chevronLeft),
-                      onPressed: _previousDay,
-                    ),
-                    Expanded(
-                      child: InkWell(
-                        onTap: _pickDate,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                LucideIcons.calendar,
-                                size: 18,
-                                color: Color(0xff2d7a55),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isToday ? '${T.t('Today')} ($_formattedDate)' : _formattedDate,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: T.t('Yesterday'),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    iconSize: 18,
+                    icon: const Icon(LucideIcons.chevronLeft),
+                    onPressed: _previousDay,
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            LucideIcons.calendar,
+                            size: 14,
+                            color: Color(0xff2d7a55),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isToday ? '${T.t('Today')} ($_formattedDate)' : _formattedDate,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: Color(0xff1b4d36),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (!isToday)
-                      TextButton(
-                        onPressed: _goToToday,
-                        child: Text(T.t('Today')),
+                  ),
+                  if (!isToday)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        visualDensity: VisualDensity.compact,
+                        minimumSize: const Size(0, 32),
                       ),
-                    IconButton(
-                      tooltip: T.t('Select date'),
-                      icon: const Icon(LucideIcons.chevronRight),
-                      onPressed: _nextDay,
+                      onPressed: _goToToday,
+                      child: Text(
+                        T.t('Today'),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ],
-                ),
+                  IconButton(
+                    tooltip: T.t('Select date'),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    iconSize: 18,
+                    icon: const Icon(LucideIcons.chevronRight),
+                    onPressed: _nextDay,
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
-            // Daily Summary Metrics Card
+            // Daily Summary Metrics Card (Compact & Professional)
             Card(
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xffe3ebe6)),
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xffe2e8f0)),
               ),
               color: Colors.white,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Column(
                   children: [
                     Row(
                       children: [
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Text(
-                                T.t('Total Liters'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xffe8f5e9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  LucideIcons.milk,
+                                  size: 14,
+                                  color: Color(0xff2d7a55),
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${summary['totalLiters'] ?? 0} L',
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xff2d7a55),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      T.t('Total Liters'),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${summary['totalLiters'] ?? 0} L',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xff2d7a55),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
+                        Container(width: 1, height: 24, color: const Color(0xffe2e8f0)),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Text(
-                                T.t('Total Amount'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xfff0fdf4),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  LucideIcons.indianRupee,
+                                  size: 14,
+                                  color: Color(0xff166534),
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '₹${summary['totalAmount'] ?? 0}',
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      T.t('Total Amount'),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    Text(
+                                      '₹${summary['totalAmount'] ?? 0}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xff1f2937),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -674,9 +720,10 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                         ),
                       ],
                     ),
-                    const Divider(height: 24),
+                    const SizedBox(height: 6),
+                    Container(height: 1, color: const Color(0xfff1f5f9)),
+                    const SizedBox(height: 6),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         Expanded(
                           child: _SummaryBadge(
@@ -713,31 +760,50 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
-            // Search Bar
-            TextField(
-              onChanged: (v) => setState(() => _searchQuery = v),
-              decoration: InputDecoration(
-                hintText: T.t('Search by name or mobile number'),
-                prefixIcon: const Icon(LucideIcons.search, size: 20),
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            // Search Bar (Sleek 36px Height)
+            SizedBox(
+              height: 36,
+              child: TextField(
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: T.t('Search by name or mobile number'),
+                  hintStyle: const TextStyle(fontSize: 12),
+                  prefixIcon: const Icon(LucideIcons.search, size: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xffe2e8f0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xffe2e8f0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xff2d7a55)),
+                  ),
+                  fillColor: Colors.white,
+                  filled: true,
                 ),
-                fillColor: Colors.white,
-                filled: true,
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
-            // Filter Chips
+            // Filter Chips (Defaulting to Entries Done)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                  _FilterChip(
+                    label: T.t('Entries Done'),
+                    selected: _selectedFilter == 'entry_done',
+                    onTap: () => setState(() => _selectedFilter = 'entry_done'),
+                  ),
+                  const SizedBox(width: 6),
                   _FilterChip(
                     label: T.t('All'),
                     selected: _selectedFilter == 'all',
@@ -763,7 +829,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                   ),
                   const SizedBox(width: 6),
                   _FilterChip(
-                    label: T.t('No milk entry'),
+                    label: T.t('No Entry'),
                     selected: _selectedFilter == 'no_entry',
                     onTap: () => setState(() => _selectedFilter = 'no_entry'),
                   ),
@@ -1312,19 +1378,19 @@ class _SummaryBadge extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 13,
             fontWeight: FontWeight.w800,
             color: color,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 1),
         Text(
           label,
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
@@ -1348,22 +1414,22 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xff2d7a55) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: selected ? const Color(0xff1b4d36) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected
-                ? const Color(0xff2d7a55)
-                : const Color(0xffe3ebe6),
+                ? const Color(0xff1b4d36)
+                : const Color(0xffe2e8f0),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? Colors.white : Colors.black87,
           ),

@@ -129,29 +129,24 @@ class DashboardScreen extends StatelessWidget {
             children: [
               // Date Navigator Bar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xffe3ebe6)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xffe2e8f0)),
                 ),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(LucideIcons.chevronLeft, size: 20),
-                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(LucideIcons.chevronLeft, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       onPressed: controller.previousDay,
                     ),
                     Expanded(
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(6),
                         onTap: () async {
                           final picked = await showDatePicker(
                             context: context,
@@ -163,30 +158,27 @@ class DashboardScreen extends StatelessWidget {
                             await controller.setSelectedDate(picked);
                           }
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                LucideIcons.calendar,
-                                size: 16,
-                                color: Color(0xff2d7a55),
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  _formatDateTitle(controller.selectedDate.value),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                    color: Color(0xff1f2937),
-                                  ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              LucideIcons.calendar,
+                              size: 14,
+                              color: Color(0xff2d7a55),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                _formatDateTitle(controller.selectedDate.value),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: Color(0xff1b4d36),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

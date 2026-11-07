@@ -1319,61 +1319,71 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
   Widget _buildMonthNavigator() {
     final isCurrent = _isCurrentMonth;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left),
-              tooltip: T.t('Previous Month'),
-              onPressed: _previousMonth,
-            ),
-            Expanded(
-              child: InkWell(
-                onTap: _pickMonthYear,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        LucideIcons.calendar,
-                        size: 18,
-                        color: Color(0xff2d7a55),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_monthNames[_selectedMonth - 1]} $_selectedYear',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                    ],
+    return Container(
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xffe2e8f0)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            tooltip: T.t('Previous Month'),
+            onPressed: _previousMonth,
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: _pickMonthYear,
+              borderRadius: BorderRadius.circular(6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    LucideIcons.calendar,
+                    size: 14,
+                    color: Color(0xff2d7a55),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_monthNames[_selectedMonth - 1]} $_selectedYear',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff1b4d36),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down, color: Colors.grey, size: 16),
+                ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              tooltip: T.t('Next Month'),
-              onPressed: _nextMonth,
-            ),
-            if (!isCurrent)
-              TextButton(
-                onPressed: _goToCurrentMonth,
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-                child: Text(T.t('Today')),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            tooltip: T.t('Next Month'),
+            onPressed: _nextMonth,
+          ),
+          if (!isCurrent)
+            TextButton(
+              onPressed: _goToCurrentMonth,
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
               ),
-          ],
-        ),
+              child: Text(
+                T.t('Today'),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+        ],
       ),
     );
   }

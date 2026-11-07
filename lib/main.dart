@@ -951,13 +951,6 @@ class _DashboardState extends State<Dashboard> {
                 ),
             ],
           ),
-          actions: [
-            IconButton(
-              tooltip: T.t('Refresh customers'),
-              onPressed: controller.loading.value ? null : controller.load,
-              icon: const Icon(LucideIcons.refreshCw, color: Colors.white),
-            ),
-          ],
         ),
         body: RefreshIndicator(
           onRefresh: controller.load,
@@ -971,18 +964,21 @@ class _DashboardState extends State<Dashboard> {
             ),
             children: [
               Container(
-                height: 42,
-                margin: const EdgeInsets.only(bottom: 14),
+                height: 36,
+                margin: const EdgeInsets.only(bottom: 12),
                 child: TextField(
                   onChanged: controller.setSearch,
-                  style: const TextStyle(fontSize: 14),
+                  style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                     hintText: T.t('Search by name or customer number'),
-                    prefixIcon: const Icon(LucideIcons.search, size: 18),
+                    hintStyle: const TextStyle(fontSize: 12),
+                    prefixIcon: const Icon(LucideIcons.search, size: 16),
                     suffixIcon: controller.searchQuery.value.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(LucideIcons.x, size: 16),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            icon: const Icon(LucideIcons.x, size: 14),
                             onPressed: () => controller.setSearch(''),
                           )
                         : null,
@@ -990,6 +986,16 @@ class _DashboardState extends State<Dashboard> {
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xffe2e8f0)),
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xffe2e8f0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xff2d7a55)),
+                    ),
+                    fillColor: Colors.white,
+                    filled: true,
                   ),
                 ),
               ),

@@ -142,6 +142,8 @@ void main() {
       final fakeApi = _FakeApiService();
       final controller = DashboardController(fakeApi);
 
+      expect(controller.dailyFilter.value, 'completed');
+      controller.setDailyFilter('all');
       expect(controller.dailyFilter.value, 'all');
       controller.setDailyFilter('missing');
       expect(controller.dailyFilter.value, 'missing');

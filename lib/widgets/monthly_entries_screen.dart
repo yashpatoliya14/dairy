@@ -198,32 +198,55 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
   }
 
   Widget _buildMonthNav(BuildContext context, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    return Container(
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xffe2e8f0)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
             tooltip: T.t('Previous month'),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            iconSize: 18,
             onPressed: controller.previousMonth,
             icon: const Icon(LucideIcons.chevronLeft),
           ),
-          Obx(() => TextButton(
-            onPressed: () => _pickMonthYear(context),
-            child: Text(
-              _monthLabel(
-                controller.selectedMonth.value,
-                controller.selectedYear.value,
-              ),
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: cs.primary,
+          Obx(() => InkWell(
+            onTap: () => _pickMonthYear(context),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.calendarDays, size: 14, color: Color(0xff2d7a55)),
+                  const SizedBox(width: 6),
+                  Text(
+                    _monthLabel(
+                      controller.selectedMonth.value,
+                      controller.selectedYear.value,
+                    ),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: Color(0xff1b4d36),
+                    ),
+                  ),
+                ],
               ),
             ),
           )),
           IconButton(
             tooltip: T.t('Next month'),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            iconSize: 18,
             onPressed: controller.nextMonth,
             icon: const Icon(LucideIcons.chevronRight),
           ),
