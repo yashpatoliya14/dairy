@@ -115,6 +115,30 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
           ),
         ],
       ),
+      floatingActionButton: Obx(() {
+        if (controller.loading.value && controller.entries.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return FloatingActionButton.extended(
+          onPressed: () => _openPaymentEntrySheet(context),
+          icon: Icon(
+            controller.hasPayment.value
+                ? LucideIcons.circleCheck
+                : LucideIcons.receipt,
+            color: Colors.white,
+          ),
+          label: Text(
+            controller.hasPayment.value
+                ? '${T.t('Payment Entry')} (₹${controller.paymentReceived.value.toStringAsFixed(0)})'
+                : T.t('Payment Entry'),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: const Color(0xff2d7a55),
+        );
+      }),
     );
   }
 
