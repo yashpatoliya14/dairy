@@ -897,6 +897,32 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildPresetBadge({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xfff0fdf4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xff86efac), width: 1),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Color(0xff166534),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openRecordMilkDialog(
     BuildContext context, {
     required String customerId,
@@ -923,6 +949,7 @@ class DashboardScreen extends StatelessWidget {
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: const EdgeInsets.fromLTRB(16, 16, 12, 0),
           title: Row(
             children: [
               Container(
@@ -935,21 +962,20 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    if (number.isNotEmpty)
-                      Text(
-                        '#$number',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                      ),
-                  ],
+                child: Text(
+                  name,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                tooltip: T.t('Close'),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
               ),
             ],
           ),
@@ -966,14 +992,17 @@ class DashboardScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            setDialogState(() {
-                              curLiters = (curLiters - 0.5).clamp(0.0, 999.0);
-                              litersCtrl.text = curLiters == curLiters.truncateToDouble()
-                                  ? curLiters.toStringAsFixed(0)
-                                  : curLiters.toStringAsFixed(2);
-                            });
-                          },
+                          onTap: curLiters > 0
+                              ? () {
+                                  setDialogState(() {
+                                    curLiters = (curLiters - 0.25).clamp(0.0, 999.0);
+                                    curLiters = double.parse(curLiters.toStringAsFixed(2));
+                                    litersCtrl.text = curLiters == curLiters.truncateToDouble()
+                                        ? curLiters.toStringAsFixed(0)
+                                        : curLiters.toStringAsFixed(2);
+                                  });
+                                }
+                              : null,
                           child: SizedBox(
                             width: 44,
                             height: 44,
@@ -1013,7 +1042,8 @@ class DashboardScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           onTap: () {
                             setDialogState(() {
-                              curLiters = curLiters + 0.5;
+                              curLiters = curLiters + 0.25;
+                              curLiters = double.parse(curLiters.toStringAsFixed(2));
                               litersCtrl.text = curLiters == curLiters.truncateToDouble()
                                   ? curLiters.toStringAsFixed(0)
                                   : curLiters.toStringAsFixed(2);
@@ -1028,6 +1058,61 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+
+                  // Quick Presets: +250 ml, +500 ml, +750 ml, +1 L
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _buildPresetBadge(
+                        label: '+250 ml',
+                        onTap: () {
+                          setDialogState(() {
+                            curLiters = double.parse((curLiters + 0.25).toStringAsFixed(2));
+                            litersCtrl.text = curLiters == curLiters.truncateToDouble()
+                                ? curLiters.toStringAsFixed(0)
+                                : curLiters.toStringAsFixed(2);
+                          });
+                        },
+                      ),
+                      _buildPresetBadge(
+                        label: '+500 ml',
+                        onTap: () {
+                          setDialogState(() {
+                            curLiters = double.parse((curLiters + 0.50).toStringAsFixed(2));
+                            litersCtrl.text = curLiters == curLiters.truncateToDouble()
+                                ? curLiters.toStringAsFixed(0)
+                                : curLiters.toStringAsFixed(2);
+                          });
+                        },
+                      ),
+                      _buildPresetBadge(
+                        label: '+750 ml',
+                        onTap: () {
+                          setDialogState(() {
+                            curLiters = double.parse((curLiters + 0.75).toStringAsFixed(2));
+                            litersCtrl.text = curLiters == curLiters.truncateToDouble()
+                                ? curLiters.toStringAsFixed(0)
+                                : curLiters.toStringAsFixed(2);
+                          });
+                        },
+                      ),
+                      _buildPresetBadge(
+                        label: '+1 L',
+                        onTap: () {
+                          setDialogState(() {
+                            curLiters = double.parse((curLiters + 1.00).toStringAsFixed(2));
+                            litersCtrl.text = curLiters == curLiters.truncateToDouble()
+                                ? curLiters.toStringAsFixed(0)
+                                : curLiters.toStringAsFixed(2);
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: priceCtrl,
@@ -1046,20 +1131,27 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: Text(T.t('Cancel')),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xff2d7a55),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xff2d7a55),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () {
+                  if (!formKey.currentState!.validate()) return;
+                  Navigator.of(dialogCtx).pop(true);
+                },
+                child: Text(
+                  T.t('Save entry'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
               ),
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                Navigator.of(dialogCtx).pop(true);
-              },
-              child: Text(T.t('Save entry')),
             ),
           ],
         ),

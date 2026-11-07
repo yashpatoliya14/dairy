@@ -92,7 +92,7 @@ class MonthlyEntriesController extends GetxController {
   static const int maxUndoHistory = 10;
 
   // Quantity increment
-  final increment = 0.5;
+  final increment = 0.25;
 
   // Payment state
   final paymentReceived = 0.0.obs;

@@ -1819,25 +1819,45 @@ class _EntryEditorSheetState extends State<_EntryEditorSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            // Title
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${widget.customerName}  •  $dateLabel',
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurfaceVariant,
-              ),
+            // Title and close button row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${widget.customerName}  •  $dateLabel',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  tooltip: T.t('Close'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
-            // Quick Presets Row
+            // Quick Presets Row (+250 ml, +500 ml, +750 ml, +1 L)
             Wrap(
               spacing: 8,
               runSpacing: 6,
@@ -1864,16 +1884,34 @@ class _EntryEditorSheetState extends State<_EntryEditorSheet> {
                     },
                   ),
                 ActionChip(
-                  label: const Text('+0.5 L'),
+                  label: const Text('+250 ml'),
                   onPressed: () {
                     setState(() {
-                      liters = double.parse((liters + 0.5).toStringAsFixed(2));
+                      liters = double.parse((liters + 0.25).toStringAsFixed(2));
                       litersController.text = _formatNum(liters);
                     });
                   },
                 ),
                 ActionChip(
-                  label: const Text('+1.0 L'),
+                  label: const Text('+500 ml'),
+                  onPressed: () {
+                    setState(() {
+                      liters = double.parse((liters + 0.50).toStringAsFixed(2));
+                      litersController.text = _formatNum(liters);
+                    });
+                  },
+                ),
+                ActionChip(
+                  label: const Text('+750 ml'),
+                  onPressed: () {
+                    setState(() {
+                      liters = double.parse((liters + 0.75).toStringAsFixed(2));
+                      litersController.text = _formatNum(liters);
+                    });
+                  },
+                ),
+                ActionChip(
+                  label: const Text('+1 L'),
                   onPressed: () {
                     setState(() {
                       liters = double.parse((liters + 1.0).toStringAsFixed(2));

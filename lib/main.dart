@@ -993,6 +993,39 @@ class _CustomerTile extends StatelessWidget {
   final ApiService api;
   final Future<void> Function() onChanged;
 
+  static String _formatLiters(double val) {
+    if (val == val.truncateToDouble()) return val.toStringAsFixed(0);
+    String s = val.toStringAsFixed(2);
+    if (s.endsWith('0')) s = s.substring(0, s.length - 1);
+    return s;
+  }
+
+  Widget _buildPresetChip({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xfff0fdf4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xff86efac), width: 1),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Color(0xff166534),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _addMilk(BuildContext context) async {
     final liters = TextEditingController(text: '${customer['liters'] ?? 0}');
     final price = TextEditingController(text: '${customer['price'] ?? 0}');
@@ -1003,124 +1036,209 @@ class _CustomerTile extends StatelessWidget {
         double currentLiters = double.tryParse(liters.text.trim()) ?? 0;
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) => AlertDialog(
-            title: Text('${T.t('Add today’s milk')} - ${customer['name']}'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${T.t('Add today’s milk')} - ${customer['name']}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  tooltip: T.t('Close'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
+              ],
+            ),
             content: Form(
               key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Plus/Minus row for liters
-                  Row(
-                    children: [
-                      Material(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Plus/Minus row for liters
+                    Row(
+                      children: [
+                        Material(
+                          color: Colors.red.shade50,
                           borderRadius: BorderRadius.circular(12),
-                          onTap: currentLiters > 0
-                              ? () {
-                                  setDialogState(() {
-                                    currentLiters = double.parse(
-                                      (currentLiters - 0.5).clamp(0, double.infinity).toStringAsFixed(2),
-                                    );
-                                    liters.text = currentLiters == currentLiters.truncateToDouble()
-                                        ? currentLiters.toStringAsFixed(0)
-                                        : currentLiters.toStringAsFixed(2);
-                                  });
-                                }
-                              : null,
-                          child: SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: Icon(Icons.remove, color: Colors.red.shade400),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: currentLiters > 0
+                                ? () {
+                                    setDialogState(() {
+                                      currentLiters = double.parse(
+                                        (currentLiters - 0.25).clamp(0, double.infinity).toStringAsFixed(2),
+                                      );
+                                      liters.text = _formatLiters(currentLiters);
+                                    });
+                                  }
+                                : null,
+                            child: SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Icon(Icons.remove, color: Colors.red.shade400),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: liters,
-                          autofocus: false,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: liters,
+                            autofocus: false,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: T.t('Liters'),
+                              suffixText: 'L',
+                            ),
+                            onChanged: (value) {
+                              final parsed = double.tryParse(value.trim());
+                              if (parsed != null && parsed >= 0) {
+                                setDialogState(() => currentLiters = parsed);
+                              }
+                            },
+                            validator: _number,
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: T.t('Liters'),
-                            suffixText: 'L',
-                          ),
-                          onChanged: (value) {
-                            final parsed = double.tryParse(value.trim());
-                            if (parsed != null && parsed >= 0) {
-                              setDialogState(() => currentLiters = parsed);
-                            }
-                          },
-                          validator: _number,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Material(
-                        color: const Color(0xffdcefe3),
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
+                        const SizedBox(width: 8),
+                        Material(
+                          color: const Color(0xffdcefe3),
                           borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              setDialogState(() {
+                                currentLiters = double.parse(
+                                  (currentLiters + 0.25).toStringAsFixed(2),
+                                );
+                                liters.text = _formatLiters(currentLiters);
+                              });
+                            },
+                            child: const SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Icon(Icons.add, color: Color(0xff2d7a55)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Quick Presets: +250 ml, +500 ml, +750 ml, +1 L
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _buildPresetChip(
+                          label: '+250 ml',
                           onTap: () {
                             setDialogState(() {
                               currentLiters = double.parse(
-                                (currentLiters + 0.5).toStringAsFixed(2),
+                                (currentLiters + 0.25).toStringAsFixed(2),
                               );
-                              liters.text = currentLiters == currentLiters.truncateToDouble()
-                                  ? currentLiters.toStringAsFixed(0)
-                                  : currentLiters.toStringAsFixed(2);
+                              liters.text = _formatLiters(currentLiters);
                             });
                           },
-                          child: const SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: Icon(Icons.add, color: Color(0xff2d7a55)),
-                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: price,
-                    autofocus: false,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                        _buildPresetChip(
+                          label: '+500 ml',
+                          onTap: () {
+                            setDialogState(() {
+                              currentLiters = double.parse(
+                                (currentLiters + 0.50).toStringAsFixed(2),
+                              );
+                              liters.text = _formatLiters(currentLiters);
+                            });
+                          },
+                        ),
+                        _buildPresetChip(
+                          label: '+750 ml',
+                          onTap: () {
+                            setDialogState(() {
+                              currentLiters = double.parse(
+                                (currentLiters + 0.75).toStringAsFixed(2),
+                              );
+                              liters.text = _formatLiters(currentLiters);
+                            });
+                          },
+                        ),
+                        _buildPresetChip(
+                          label: '+1 L',
+                          onTap: () {
+                            setDialogState(() {
+                              currentLiters = double.parse(
+                                (currentLiters + 1.00).toStringAsFixed(2),
+                              );
+                              liters.text = _formatLiters(currentLiters);
+                            });
+                          },
+                        ),
+                      ],
                     ),
-                    decoration: InputDecoration(labelText: T.t('Price per liter')),
-                    validator: _number,
-                  ),
-                ],
+
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: price,
+                      autofocus: false,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: T.t('Price per liter'),
+                        prefixText: '₹ ',
+                      ),
+                      validator: _number,
+                    ),
+                  ],
+                ),
               ),
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(T.t('Cancel')),
-              ),
-              FilledButton(
-                onPressed: () {
-                  developer.log(
-                    'Save entry button pressed for customer ${customer['id']}',
-                    name: 'MilkEntry',
-                  );
-                  if (!formKey.currentState!.validate()) return;
-                  final litersValue = double.parse(liters.text.trim());
-                  final priceValue = double.parse(price.text.trim());
-                  developer.log(
-                    'Entry form valid: liters=$litersValue price=$priceValue',
-                    name: 'MilkEntry',
-                  );
-                  Navigator.of(dialogContext).pop({'liters': litersValue, 'price': priceValue});
-                },
-                child: Text(T.t('Save entry')),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff2d7a55),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    developer.log(
+                      'Save entry button pressed for customer ${customer['id']}',
+                      name: 'MilkEntry',
+                    );
+                    if (!formKey.currentState!.validate()) return;
+                    final litersValue = double.parse(liters.text.trim());
+                    final priceValue = double.parse(price.text.trim());
+                    developer.log(
+                      'Entry form valid: liters=$litersValue price=$priceValue',
+                      name: 'MilkEntry',
+                    );
+                    Navigator.of(dialogContext).pop({'liters': litersValue, 'price': priceValue});
+                  },
+                  child: Text(
+                    T.t('Save entry'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
               ),
             ],
           ),
