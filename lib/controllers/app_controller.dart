@@ -38,10 +38,7 @@ class AppController extends GetxController with WidgetsBindingObserver {
         checkSessionValidity();
       });
 
-      // Watch continuously for version updates in the background
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        updateService.checkForUpdate(silent: true);
-      });
+      // Periodic background checks for updates (initial check is triggered on Dashboard load)
       updateService.startPeriodicBackgroundChecks(
         interval: const Duration(minutes: 15),
       );

@@ -441,14 +441,6 @@ class _AuthPageState extends State<AuthPage> {
         await widget.api.saveLastAccountEmail(email.text.trim());
       }
       if (!mounted) return;
-      if (Get.isRegistered<AppController>()) {
-        final appCtrl = Get.find<AppController>();
-        final updateInfo = await appCtrl.updateService.checkForUpdate(silent: true);
-        if (updateInfo != null && updateInfo.isUpdateAvailable) {
-          appCtrl.updateService.navigateToUpdateScreen(updateInfo);
-          return;
-        }
-      }
       Get.offAll(() => Dashboard(api: widget.api));
     } catch (error) {
       if (mounted) _showMessage(error.toString());
@@ -716,48 +708,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final formKey = GlobalKey<FormState>();
   late final TextEditingController email;
   bool busy = false;
-  bool loadingEmail = true;
-  String? dairyName;
 
   @override
   void initState() {
     super.initState();
     email = TextEditingController(text: widget.initialEmail ?? '');
-    _resolveRegisteredEmail();
-  }
-
-  Future<void> _resolveRegisteredEmail() async {
-    // 1. If an email was passed from the login field, use it
-    if (email.text.trim().isNotEmpty && _isValidEmail(email.text.trim())) {
-      if (mounted) setState(() => loadingEmail = false);
-      return;
-    }
-
-    // 2. Check locally remembered account email
-    final saved = await widget.api.getLastAccountEmail();
-    if (saved != null && saved.isNotEmpty && _isValidEmail(saved)) {
-      if (mounted) {
-        setState(() {
-          email.text = saved;
-          loadingEmail = false;
-        });
-      }
-      return;
-    }
-
-    // 3. Dynamically fetch registered dairy email from backend
-    try {
-      final data = await widget.api.getRegisteredEmail();
-      if (mounted) {
-        setState(() {
-          email.text = (data['email'] as String?) ?? '';
-          dairyName = data['dairyName'] as String?;
-          loadingEmail = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => loadingEmail = false);
-    }
   }
 
   @override
@@ -767,11 +722,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Future<void> submit() async {
+    if (!formKey.currentState!.validate()) return;
     final targetEmail = email.text.trim();
-    if (targetEmail.isEmpty || !_isValidEmail(targetEmail)) {
-      _showMessage(T.t('Registered account email could not be resolved'));
-      return;
-    }
     setState(() => busy = true);
     try {
       final res = await widget.api.requestPasswordReset(targetEmail);
@@ -791,13 +743,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     }
   }
 
-  void _showMessage(String message) => Get.snackbar(
-    T.t('Unable to continue'),
-    message,
-    snackPosition: SnackPosition.BOTTOM,
-    margin: const EdgeInsets.all(16),
-  );
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(T.t('Forgot password'))),
@@ -806,77 +751,37 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       child: ListView(
         padding: _pagePadding(context),
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xff2d7a55).withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xff2d7a55).withOpacity(0.2)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(LucideIcons.shieldCheck, size: 22, color: Color(0xff2d7a55)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        T.t('Verified Dairy Account'),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xff2d7a55),
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        T.t('Reset code will be dispatched securely to your registered email address.'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          Text(
+            T.t('Enter your registered email address to receive a 6-digit password reset code.'),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.grey.shade800,
             ),
           ),
           const SizedBox(height: 20),
-          if (loadingEmail) ...[
-            Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: DairyMilkLoader.mini(color: const Color(0xff2d7a55), size: 26),
-              ),
+          TextFormField(
+            controller: email,
+            keyboardType: TextInputType.emailAddress,
+            decoration: InputDecoration(
+              labelText: T.t('Email address'),
+              prefixIcon: const Icon(LucideIcons.mail, size: 18),
+              hintText: 'name@example.com',
             ),
-          ] else ...[
-            TextFormField(
-              controller: email,
-              readOnly: true,
-              keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                labelText: T.t('Account Email (Locked)'),
-                prefixIcon: const Icon(LucideIcons.lock, size: 18),
-                helperText: dairyName != null ? 'Dairy: $dairyName' : T.t('Registered account'),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: busy || email.text.trim().isEmpty ? null : submit,
-              icon: busy
-                  ? const SizedBox.shrink()
-                  : const Icon(LucideIcons.send, size: 18),
-              label: busy
-                  ? DairyMilkLoader.mini(color: Colors.white, size: 22)
-                  : Text(T.t('Send reset code')),
-            ),
-          ],
+            validator: (value) {
+              final v = value?.trim() ?? '';
+              if (v.isEmpty) return T.t('Required');
+              return _isValidEmail(v) ? null : T.t('Enter a valid email address');
+            },
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: busy ? null : submit,
+            icon: busy
+                ? const SizedBox.shrink()
+                : const Icon(LucideIcons.send, size: 18),
+            label: busy
+                ? DairyMilkLoader.mini(color: Colors.white, size: 22)
+                : Text(T.t('Send reset code')),
+          ),
         ],
       ),
     ),
@@ -1215,6 +1120,15 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (Get.isRegistered<AppController>()) {
+      final appCtrl = Get.find<AppController>();
+      if (appCtrl.updateService.hasUpdate.value) {
+        return const Scaffold(
+          backgroundColor: Color(0xff09281a),
+          body: SizedBox.shrink(),
+        );
+      }
+    }
     return Scaffold(
       body: IndexedStack(
         index: _currentTab,

@@ -1,3 +1,4 @@
+import 'app_controller.dart';
 import 'package:get/get.dart';
 
 import '../services/api_service.dart';
@@ -58,6 +59,18 @@ class DashboardController extends GetxController {
   Future<void> load() async {
     loading.value = true;
     error.value = '';
+
+    // Check for updates on top of dashboard data fetch
+    if (Get.isRegistered<AppController>()) {
+      final appCtrl = Get.find<AppController>();
+      final updateInfo = await appCtrl.updateService.checkForUpdate(silent: true);
+      if (updateInfo != null && updateInfo.isUpdateAvailable) {
+        loading.value = false;
+        appCtrl.updateService.navigateToUpdateScreen(updateInfo);
+        return; // Stop loading: dashboard data is not fetched and dashboard is not shown
+      }
+    }
+
     await Future.wait([
       loadCustomers(),
       loadSettings(),

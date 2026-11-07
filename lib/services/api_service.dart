@@ -85,13 +85,13 @@ class ApiService {
     final preferences = await SharedPreferences.getInstance();
     final token = preferences.getString(_tokenKey);
     final expiry = preferences.getInt(_expiryKey);
-    if (token != null) {
+    if (token != null && token.trim().isNotEmpty) {
       final jwtExp = extractJwtExpiry(token);
       final storedExpiry =
           expiry != null ? DateTime.fromMillisecondsSinceEpoch(expiry) : null;
-      final effectiveExpiry = jwtExp ?? storedExpiry;
+      final effectiveExpiry = jwtExp ?? storedExpiry ?? DateTime.now().add(sessionLifetime);
 
-      if (effectiveExpiry != null && DateTime.now().isBefore(effectiveExpiry)) {
+      if (DateTime.now().isBefore(effectiveExpiry)) {
         _token = token;
         _expiry = effectiveExpiry;
         return;
@@ -757,6 +757,8 @@ class ApiService {
     final response = await _send(
       'GET',
       '/app/version$query',
+      includeAuth: false,
+      showLoader: false,
       timeout: const Duration(seconds: 10),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
