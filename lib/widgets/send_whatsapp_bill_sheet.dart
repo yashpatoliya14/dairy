@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../controllers/dashboard_controller.dart';
 import '../services/api_service.dart';
 import '../services/app_language.dart';
 import 'dairy_milk_loader.dart';
@@ -22,6 +23,8 @@ class SendWhatsAppBillSheet extends StatefulWidget {
     this.initialMonthlyLiters,
     this.initialRate,
     this.initialPreviousDue,
+    this.initialMonthToDateBill,
+    this.initialAdvanceCredit,
   });
 
   final ApiService api;
@@ -32,6 +35,8 @@ class SendWhatsAppBillSheet extends StatefulWidget {
   final double? initialMonthlyLiters;
   final double? initialRate;
   final double? initialPreviousDue;
+  final double? initialMonthToDateBill;
+  final double? initialAdvanceCredit;
 
   static Future<void> show(
     BuildContext context, {
@@ -43,6 +48,8 @@ class SendWhatsAppBillSheet extends StatefulWidget {
     double? initialMonthlyLiters,
     double? initialRate,
     double? initialPreviousDue,
+    double? initialMonthToDateBill,
+    double? initialAdvanceCredit,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -57,6 +64,8 @@ class SendWhatsAppBillSheet extends StatefulWidget {
         initialMonthlyLiters: initialMonthlyLiters,
         initialRate: initialRate,
         initialPreviousDue: initialPreviousDue,
+        initialMonthToDateBill: initialMonthToDateBill,
+        initialAdvanceCredit: initialAdvanceCredit,
       ),
     );
   }
@@ -72,13 +81,14 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
   late final TextEditingController _phoneController;
   late final TextEditingController _dailyLitersController;
   late final TextEditingController _rateController;
-  late final TextEditingController _notesController;
+  late final TextEditingController _monthToDateBillController;
+  late final TextEditingController _pastOverdueController;
 
   // Monthly mode controllers
   late final TextEditingController _monthNameController;
   late final TextEditingController _totalDaysController;
   late final TextEditingController _monthlyLitersController;
-  late final TextEditingController _previousDueController;
+  late final TextEditingController _advanceCreditController;
 
   DateTime _selectedDate = DateTime.now();
   String _session = 'Morning';
@@ -93,27 +103,39 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     _billType = widget.initialBillType;
 
     final customer = widget.customer;
-    final rawPhone = '${customer['phoneNumber'] ?? customer['phone'] ?? ''}'.trim();
+    final rawPhone =
+        '${customer['phoneNumber'] ?? customer['phone'] ?? ''}'.trim();
     final digits = rawPhone.replaceAll(RegExp(r'\D'), '');
     final cleanPhone = digits.length == 10 ? '91$digits' : digits;
 
     final defaultLiters = _asDouble(customer['liters'], 1.0);
     final defaultPrice = _asDouble(customer['price'], 60.0);
+    final effectiveRate = widget.initialRate ?? defaultPrice;
 
     _phoneController = TextEditingController(text: cleanPhone);
     _dailyLitersController = TextEditingController(
       text: defaultLiters.toStringAsFixed(1),
     );
     _rateController = TextEditingController(
-      text: widget.initialRate != null
-          ? widget.initialRate!.toStringAsFixed(2)
-          : defaultPrice.toStringAsFixed(2),
+      text: effectiveRate.toStringAsFixed(2),
     );
-    _notesController = TextEditingController();
+
+    final initialTodayAmt = defaultLiters * effectiveRate;
+    _monthToDateBillController = TextEditingController(
+      text: widget.initialMonthToDateBill != null
+          ? widget.initialMonthToDateBill!.toStringAsFixed(2)
+          : initialTodayAmt.toStringAsFixed(2),
+    );
+
+    _pastOverdueController = TextEditingController(
+      text: widget.initialPreviousDue != null
+          ? widget.initialPreviousDue!.toStringAsFixed(2)
+          : '0.00',
+    );
 
     // Monthly defaults
     final now = DateTime.now();
-    final monthNames = [
+    const monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
@@ -130,10 +152,10 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           ? widget.initialMonthlyLiters!.toStringAsFixed(1)
           : (defaultLiters * 30).toStringAsFixed(1),
     );
-    _previousDueController = TextEditingController(
-      text: widget.initialPreviousDue != null
-          ? widget.initialPreviousDue!.toStringAsFixed(2)
-          : '0',
+    _advanceCreditController = TextEditingController(
+      text: widget.initialAdvanceCredit != null
+          ? widget.initialAdvanceCredit!.toStringAsFixed(2)
+          : '0.00',
     );
 
     _session = now.hour < 14 ? 'Morning' : 'Evening';
@@ -144,11 +166,12 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     _phoneController.dispose();
     _dailyLitersController.dispose();
     _rateController.dispose();
-    _notesController.dispose();
+    _monthToDateBillController.dispose();
+    _pastOverdueController.dispose();
     _monthNameController.dispose();
     _totalDaysController.dispose();
     _monthlyLitersController.dispose();
-    _previousDueController.dispose();
+    _advanceCreditController.dispose();
     super.dispose();
   }
 
@@ -165,81 +188,118 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     });
   }
 
+  void _onDailyLitersOrRateChanged() {
+    final liters = double.tryParse(_dailyLitersController.text) ?? 0.0;
+    final rate = double.tryParse(_rateController.text) ?? 0.0;
+    final todayAmount = liters * rate;
+    // Auto-update month-to-date bill if it's matching today amount
+    final currentMtd = double.tryParse(_monthToDateBillController.text) ?? 0.0;
+    if (currentMtd <= todayAmount || currentMtd == 0) {
+      _monthToDateBillController.text = todayAmount.toStringAsFixed(2);
+    }
+    setState(() {});
+  }
+
   String get _customerName {
     final c = widget.customer;
     return '${c['name'] ?? c['fullName'] ?? 'Customer'}'.trim();
   }
 
+  String get _customerUniqueNumber {
+    final c = widget.customer;
+    return '${c['uniqueNumber'] ?? c['customerNumber'] ?? '—'}';
+  }
+
+  bool get _hasValidPhone {
+    final clean = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    return clean.length >= 10;
+  }
+
   String _formatDate(DateTime d) {
-    final monthNames = [
+    const monthNames = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return '${d.day.toString().padLeft(2, '0')} ${monthNames[d.month - 1]} ${d.year}';
   }
 
+  String _getDistributorName() {
+    final dashboardCtrl = Get.isRegistered<DashboardController>()
+        ? Get.find<DashboardController>()
+        : null;
+    final dairy = dashboardCtrl?.dairyName.value.trim() ?? '';
+    final owner = dashboardCtrl?.ownerName.value.trim() ?? '';
+    if (dairy.isNotEmpty) return dairy;
+    if (owner.isNotEmpty) return owner;
+    return 'Dairy Owner';
+  }
+
+  String _getDistributorPhone() {
+    return '+91 9104152524';
+  }
+
   String _buildFormattedMessage() {
     final name = _customerName;
-    final note = _notesController.text.trim();
     final rate = double.tryParse(_rateController.text) ?? 0.0;
+    final distributorName = _getDistributorName();
+    final distributorPhone = _getDistributorPhone();
 
     if (_billType == BillType.daily) {
       final liters = double.tryParse(_dailyLitersController.text) ?? 0.0;
-      final total = liters * rate;
-      final dateStr = _formatDate(_selectedDate);
+      final todayAmount = liters * rate;
+      final monthToDate = double.tryParse(_monthToDateBillController.text) ?? todayAmount;
+      final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
+      final totalPayable = monthToDate + pastOverdue;
+      final dateShift = '${_formatDate(_selectedDate)} • $_session';
 
-      final lines = [
-        '🥛 *Milk Billing & Delivery Update* 🥛',
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        'Hello ' + name + ',',
-        '',
-        'Your milk bill update for ' + dateStr + ' has been generated.',
-        '',
-        'Details:',
-        '• Quantity: ' + liters.toStringAsFixed(1) + ' L',
-        '• Rate: ₹' + rate.toStringAsFixed(2) + '/L',
-        '• Total Amount Due: ₹' + total.toStringAsFixed(2),
-        if (note.isNotEmpty) '• Note: ' + note,
-        '',
-        'Please review your delivery details. For any queries or corrections, please contact your distributor:',
-        '',
-        'Distributor Name: Haresh Sambad',
-        'Contact Number: +91 9104152524',
-        'They will be happy to assist you.',
-        'Dairy Desk Management',
-      ];
-      return lines.join('\n');
+      return '🥛 *DAILY MILK DELIVERY UPDATE* 🥛\n'
+          '━━━━━━━━━━━━━━━━━━━━\n'
+          'Hello *$name*,\n\n'
+          'Here is your milk delivery summary for *$dateShift*:\n\n'
+          '📋 *TODAY\'S DELIVERY:*\n'
+          '• Milk Quantity: ${liters.toStringAsFixed(1)} L\n'
+          '• Rate per Liter: ₹${rate.toStringAsFixed(2)}/L\n'
+          '• Today\'s Amount: ₹${todayAmount.toStringAsFixed(2)}\n\n'
+          '💰 *ACCOUNT BALANCE:*\n'
+          '• Month-to-date Bill: ₹${monthToDate.toStringAsFixed(2)}\n'
+          '• Past Overdue: ₹${pastOverdue.toStringAsFixed(2)}\n'
+          '━━━━━━━━━━━━━━━━━━━━\n'
+          '⭐ *TOTAL AMOUNT TO PAY: ₹${totalPayable.toStringAsFixed(2)}*\n'
+          '━━━━━━━━━━━━━━━━━━━━\n\n'
+          '📞 *Dairy Owner Contact:*\n'
+          '• Name: $distributorName\n'
+          '• Contact: $distributorPhone\n\n'
+          'Thank you for choosing our dairy service! 🥛';
     } else {
       final month = _monthNameController.text.trim();
       final days = int.tryParse(_totalDaysController.text) ?? 30;
       final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
       final monthlyAmount = totalLiters * rate;
-      final prevDue = double.tryParse(_previousDueController.text) ?? 0.0;
-      final netPayable = monthlyAmount + prevDue;
+      final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
+      final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
+      final netPayable = (monthlyAmount + pastOverdue) - advanceCredit;
 
-      final lines = [
-        '🧾 *Milk Billing & Delivery Update* 🧾',
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        'Hello ' + name + ',',
-        '',
-        'Your milk bill update for ' + month + ' (' + days.toString() + ' Days) has been generated.',
-        '',
-        'Details:',
-        '• Total Quantity: ' + totalLiters.toStringAsFixed(1) + ' L',
-        '• Rate: ₹' + rate.toStringAsFixed(2) + '/L',
-        '• Monthly Charge: ₹' + monthlyAmount.toStringAsFixed(2),
-        if (prevDue > 0) '• Previous Due: ₹' + prevDue.toStringAsFixed(2),
-        '• Total Amount Due: ₹' + netPayable.toStringAsFixed(2),
-        if (note.isNotEmpty) '• Note: ' + note,
-        '',
-        'Please review your delivery details. For any queries or corrections, please contact your distributor:',
-        '',
-        'Distributor Name: Haresh Sambad',
-        'Contact Number: +91 9104152524',
-        'They will be happy to assist you.',
-        'Dairy Desk Management',
-      ];
-      return lines.join('\n');
+      return '🧾 *MILK BILL STATEMENT* 🧾\n'
+          '━━━━━━━━━━━━━━━━━━━━\n'
+          'Hello *$name*,\n\n'
+          'Your milk bill for *$month* has been generated.\n\n'
+          '📋 *DELIVERY SUMMARY:*\n'
+          '• Active Delivery Days: $days Days\n'
+          '• Total Quantity: ${totalLiters.toStringAsFixed(1)} L\n'
+          '• Rate per Liter: ₹${rate.toStringAsFixed(2)}/L\n\n'
+          '💰 *BILL BREAKDOWN:*\n'
+          '• Monthly Milk Bill: ₹${monthlyAmount.toStringAsFixed(2)}\n'
+          '• Past Overdue: ₹${pastOverdue.toStringAsFixed(2)}\n'
+          '• Advance / Credits: ₹${advanceCredit.toStringAsFixed(2)}\n'
+          '━━━━━━━━━━━━━━━━━━━━\n'
+          '⭐ *NET TOTAL PAYABLE: ₹${(netPayable > 0 ? netPayable : 0.0).toStringAsFixed(2)}*\n'
+          '━━━━━━━━━━━━━━━━━━━━\n\n'
+          '📲 *Payment Options:*\n'
+          'Cash, UPI (GPay / PhonePe / Paytm), or Bank Transfer.\n\n'
+          '📞 *Dairy Owner Contact:*\n'
+          '• Name: $distributorName\n'
+          '• Contact: $distributorPhone\n\n'
+          'Thank you for your business! Please settle your bill on time. 🥛';
     }
   }
 
@@ -248,7 +308,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     if (cleanPhone.length < 10) {
       setState(() {
         _errorMessage = T.t(
-          'Please enter a valid phone number with country code (e.g. 919876543210 or 12025550123)',
+          'Please enter a valid phone number with country code (e.g. 919876543210)',
         );
         _successMessage = null;
       });
@@ -262,12 +322,17 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     });
 
     final rate = double.tryParse(_rateController.text) ?? 0.0;
-    final note = _notesController.text.trim();
+    final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
+    final distributorName = _getDistributorName();
+    final distributorPhone = _getDistributorPhone();
 
     try {
       if (_billType == BillType.daily) {
         final liters = double.tryParse(_dailyLitersController.text) ?? 0.0;
-        final total = liters * rate;
+        final todayAmount = liters * rate;
+        final monthToDate = double.tryParse(_monthToDateBillController.text) ?? todayAmount;
+        final totalPayable = monthToDate + pastOverdue;
+
         await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
@@ -276,14 +341,20 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'deliverySession': _session,
           'liters': liters,
           'ratePerLiter': rate,
-          'totalAmount': total,
-          'notes': note.isEmpty ? null : note,
+          'totalAmount': todayAmount,
+          'monthToDateBill': monthToDate,
+          'previousDue': pastOverdue,
+          'netPayable': totalPayable,
+          'distributorName': distributorName,
+          'distributorPhone': distributorPhone,
           'useTemplate': true,
         });
       } else {
         final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
         final monthlyAmount = totalLiters * rate;
-        final prevDue = double.tryParse(_previousDueController.text) ?? 0.0;
+        final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
+        final netPayable = (monthlyAmount + pastOverdue) - advanceCredit;
+
         await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
@@ -294,15 +365,18 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'liters': totalLiters,
           'ratePerLiter': rate,
           'monthlyAmount': monthlyAmount,
-          'totalAmount': monthlyAmount,
-          'previousDue': prevDue,
-          'notes': note.isEmpty ? null : note,
+          'totalAmount': netPayable > 0 ? netPayable : monthlyAmount,
+          'previousDue': pastOverdue,
+          'advanceCredit': advanceCredit,
+          'netPayable': netPayable > 0 ? netPayable : 0.0,
+          'distributorName': distributorName,
+          'distributorPhone': distributorPhone,
           'useTemplate': true,
         });
       }
 
       setState(() {
-        _successMessage = T.t('WhatsApp bill submitted to provider successfully!');
+        _successMessage = T.t('WhatsApp template message sent successfully! 🚀');
       });
     } catch (e) {
       setState(() {
@@ -325,7 +399,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     final message = _buildFormattedMessage();
     final encodedMessage = Uri.encodeComponent(message);
 
-    final nativeUri = Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedMessage');
+    final nativeUri =
+        Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedMessage');
     final webUri = Uri.parse('https://wa.me/$cleanPhone?text=$encodedMessage');
 
     try {
@@ -355,50 +430,57 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final number =
-        '${widget.customer['uniqueNumber'] ?? widget.customer['customerNumber'] ?? '—'}';
     final rate = double.tryParse(_rateController.text) ?? 0.0;
+    final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
 
-    double calculatedTotal = 0;
+    double calculatedTotal = 0.0;
     if (_billType == BillType.daily) {
       final liters = double.tryParse(_dailyLitersController.text) ?? 0.0;
-      calculatedTotal = liters * rate;
+      final todayAmount = liters * rate;
+      final mtd = double.tryParse(_monthToDateBillController.text) ?? todayAmount;
+      calculatedTotal = mtd + pastOverdue;
     } else {
       final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
-      final prevDue = double.tryParse(_previousDueController.text) ?? 0.0;
-      calculatedTotal = (totalLiters * rate) + prevDue;
+      final monthlyAmount = totalLiters * rate;
+      final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
+      final net = (monthlyAmount + pastOverdue) - advanceCredit;
+      calculatedTotal = net > 0 ? net : 0.0;
     }
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.92,
+        maxHeight: MediaQuery.of(context).size.height * 0.94,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
+          // Header: WhatsApp Dark Green gradient
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
             decoration: const BoxDecoration(
-              color: Color(0xff2d7a55),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              gradient: LinearGradient(
+                colors: [Color(0xff075e54), Color(0xff128c7e)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    LucideIcons.messageCircle,
-                    color: Colors.white,
-                    size: 22,
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  child: Text(
+                    _customerName.isNotEmpty ? _customerName[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -406,21 +488,65 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        T.t('Send WhatsApp Milk Bill'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _customerName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '#$_customerUniqueNumber',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$_customerName • #$number',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 13,
-                        ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            _hasValidPhone ? LucideIcons.checkCheck : LucideIcons.phoneOff,
+                            color: _hasValidPhone
+                                ? const Color(0xff4ade80)
+                                : const Color(0xfffcd34d),
+                            size: 13,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _hasValidPhone
+                                ? '+${_phoneController.text}'
+                                : T.t('No Mobile Number'),
+                            style: TextStyle(
+                              color: _hasValidPhone
+                                  ? Colors.white.withValues(alpha: 0.9)
+                                  : const Color(0xfffcd34d),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -428,6 +554,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, color: Colors.white),
+                  tooltip: T.t('Close'),
                 ),
               ],
             ),
@@ -436,13 +563,14 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           // Scrollable Form Body
           Flexible(
             child: ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
               children: [
                 // Mode Toggle Tabs (Daily vs Monthly)
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xfff0f4f1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xfff1f5f3),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xffe2e8e4)),
                   ),
                   padding: const EdgeInsets.all(4),
                   child: Row(
@@ -456,7 +584,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                               _successMessage = null;
                             });
                           },
-                          child: Container(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: _billType == BillType.daily
@@ -466,7 +595,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                               boxShadow: _billType == BillType.daily
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
+                                        color: Colors.black.withValues(alpha: 0.08),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
                                       ),
@@ -480,7 +609,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                                   LucideIcons.sunMedium,
                                   size: 16,
                                   color: _billType == BillType.daily
-                                      ? const Color(0xff2d7a55)
+                                      ? const Color(0xff075e54)
                                       : Colors.grey.shade600,
                                 ),
                                 const SizedBox(width: 6),
@@ -488,10 +617,10 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                                   T.t('Daily Milk Update'),
                                   style: TextStyle(
                                     fontWeight: _billType == BillType.daily
-                                        ? FontWeight.bold
+                                        ? FontWeight.w700
                                         : FontWeight.w500,
                                     color: _billType == BillType.daily
-                                        ? const Color(0xff2d7a55)
+                                        ? const Color(0xff075e54)
                                         : Colors.grey.shade700,
                                     fontSize: 13,
                                   ),
@@ -511,7 +640,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                               _successMessage = null;
                             });
                           },
-                          child: Container(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: _billType == BillType.monthly
@@ -521,7 +651,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                               boxShadow: _billType == BillType.monthly
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
+                                        color: Colors.black.withValues(alpha: 0.08),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
                                       ),
@@ -535,18 +665,18 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                                   LucideIcons.receiptText,
                                   size: 16,
                                   color: _billType == BillType.monthly
-                                      ? const Color(0xff2d7a55)
+                                      ? const Color(0xff075e54)
                                       : Colors.grey.shade600,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  T.t('Monthly Total Bill'),
+                                  T.t('Monthly Bill Statement'),
                                   style: TextStyle(
                                     fontWeight: _billType == BillType.monthly
-                                        ? FontWeight.bold
+                                        ? FontWeight.w700
                                         : FontWeight.w500,
                                     color: _billType == BillType.monthly
-                                        ? const Color(0xff2d7a55)
+                                        ? const Color(0xff075e54)
                                         : Colors.grey.shade700,
                                     fontSize: 13,
                                   ),
@@ -559,7 +689,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // Success or Error banner
                 if (_successMessage != null) ...[
@@ -572,7 +702,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(LucideIcons.circleCheck, color: Color(0xff059669), size: 20),
+                        const Icon(LucideIcons.circleCheck,
+                            color: Color(0xff059669), size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -587,7 +718,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                 ],
                 if (_errorMessage != null) ...[
                   Container(
@@ -599,7 +730,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(LucideIcons.circleAlert, color: Color(0xffdc2626), size: 20),
+                        const Icon(LucideIcons.circleAlert,
+                            color: Color(0xffdc2626), size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -613,26 +745,61 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                 ],
 
-                // Recipient WhatsApp Number
+                // Warning if Customer Has No Valid Mobile Number
+                if (!_hasValidPhone) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfffffbeb),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xfffde68a)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.triangleAlert,
+                            color: Colors.amber.shade900, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            T.t('Customer has no valid mobile number. Please enter a 10-digit number below to send message.'),
+                            style: TextStyle(
+                              color: Colors.amber.shade900,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Recipient WhatsApp Number Field
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: T.t('Recipient WhatsApp Number'),
                     hintText: '919876543210',
                     prefixIcon: const Icon(LucideIcons.phone, size: 18),
-                    helperText: T.t('Include country code (e.g. 91 for India, 1 for US), no + or spaces.'),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    helperText: T.t('Include country code (e.g. 919876543210), digits only.'),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                // Mode Specific Fields
+                // MODE SPECIFIC INPUT FIELDS
                 if (_billType == BillType.daily) ...[
-                  // Date and Session Row
+                  // Date and Session
                   Row(
                     children: [
                       Expanded(
@@ -640,30 +807,41 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                           onTap: _pickDate,
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: T.t('Delivery Date'),
-                              prefixIcon: const Icon(LucideIcons.calendar, size: 18),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              labelText: T.t('Date'),
+                              prefixIcon:
+                                  const Icon(LucideIcons.calendar, size: 18),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
                             ),
                             child: Text(
                               _formatDate(_selectedDate),
-                              style: const TextStyle(fontSize: 14),
+                              style: const TextStyle(fontSize: 13),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           initialValue: _session,
                           decoration: InputDecoration(
-                            labelText: T.t('Session'),
-                            prefixIcon: const Icon(LucideIcons.clock, size: 18),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            labelText: T.t('Shift'),
+                            prefixIcon:
+                                const Icon(LucideIcons.clock, size: 18),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'Morning', child: Text('🌅 Morning')),
-                            DropdownMenuItem(value: 'Evening', child: Text('🌇 Evening')),
-                            DropdownMenuItem(value: 'Full Day', child: Text('☀️ Full Day')),
+                            DropdownMenuItem(
+                                value: 'Morning', child: Text('🌅 Morning')),
+                            DropdownMenuItem(
+                                value: 'Evening', child: Text('🌇 Evening')),
+                            DropdownMenuItem(
+                                value: 'Full Day', child: Text('☀️ Full Day')),
                           ],
                           onChanged: (val) {
                             if (val != null) setState(() => _session = val);
@@ -672,7 +850,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
                   // Liters and Rate
                   Row(
@@ -680,33 +858,87 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                       Expanded(
                         child: TextField(
                           controller: _dailyLitersController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (_) => setState(() {}),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => _onDailyLitersOrRateChanged(),
                           decoration: InputDecoration(
-                            labelText: T.t('Today\'s Liters'),
-                            prefixIcon: const Icon(LucideIcons.droplet, size: 18),
+                            labelText: T.t('Today Liters'),
+                            prefixIcon:
+                                const Icon(LucideIcons.droplet, size: 18),
                             suffixText: 'L',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
                           controller: _rateController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (_) => setState(() {}),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => _onDailyLitersOrRateChanged(),
                           decoration: InputDecoration(
                             labelText: T.t('Rate / Liter'),
-                            prefixIcon: const Icon(LucideIcons.indianRupee, size: 18),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            prefixIcon:
+                                const Icon(LucideIcons.indianRupee, size: 18),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Month-to-date Bill & Past Overdue
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _monthToDateBillController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: T.t('Month-to-Date Bill'),
+                            prefixIcon:
+                                const Icon(LucideIcons.calendarDays, size: 18),
+                            prefixText: '₹',
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _pastOverdueController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: T.t('Past Overdue'),
+                            prefixIcon:
+                                const Icon(LucideIcons.history, size: 18),
+                            prefixText: '₹',
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ] else ...[
-                  // Monthly Fields
+                  // MONTHLY MODE FIELDS
                   Row(
                     children: [
                       Expanded(
@@ -716,12 +948,16 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
                             labelText: T.t('Billing Month'),
-                            prefixIcon: const Icon(LucideIcons.calendar, size: 18),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            prefixIcon:
+                                const Icon(LucideIcons.calendar, size: 18),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         flex: 2,
                         child: TextField(
@@ -731,103 +967,149 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                           decoration: InputDecoration(
                             labelText: T.t('Days'),
                             suffixText: 'days',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: _monthlyLitersController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            labelText: T.t('Total Month Liters'),
-                            prefixIcon: const Icon(LucideIcons.droplet, size: 18),
+                            labelText: T.t('Total Liters'),
+                            prefixIcon:
+                                const Icon(LucideIcons.droplet, size: 18),
                             suffixText: 'L',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
                           controller: _rateController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
                             labelText: T.t('Rate / Liter'),
-                            prefixIcon: const Icon(LucideIcons.indianRupee, size: 18),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            prefixIcon:
+                                const Icon(LucideIcons.indianRupee, size: 18),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // Previous Due
-                  TextField(
-                    controller: _previousDueController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      labelText: T.t('Previous Due / Balance (₹)'),
-                      prefixIcon: const Icon(LucideIcons.circleAlert, size: 18),
-                      hintText: '0',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _pastOverdueController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: T.t('Past Overdue'),
+                            prefixIcon:
+                                const Icon(LucideIcons.history, size: 18),
+                            prefixText: '₹',
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _advanceCreditController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: T.t('Advance Credit'),
+                            prefixIcon: const Icon(LucideIcons.coins, size: 18),
+                            prefixText: '₹',
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-                const SizedBox(height: 14),
-
-                // Note Field
-                TextField(
-                  controller: _notesController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    labelText: T.t('Optional Note'),
-                    hintText: _billType == BillType.daily
-                        ? 'Delivered to doorstep / Paid in cash'
-                        : 'UPI: dairy@upi / Pay before 5th',
-                    prefixIcon: const Icon(LucideIcons.fileText, size: 18),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
                 const SizedBox(height: 16),
 
-                // Total Summary Card
+                // NET PAYABLE HIGHLIGHT CARD
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xfff0fdf4),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xffbbf7d0)),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xffe7f7ef), Color(0xfff0fdf4)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xff86efac)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        _billType == BillType.daily
-                            ? T.t('Today\'s Total Amount:')
-                            : T.t('Net Total Payable:'),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xff166534),
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _billType == BillType.daily
+                                ? T.t('TOTAL AMOUNT TO PAY')
+                                : T.t('NET TOTAL PAYABLE'),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: Color(0xff075e54),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _billType == BillType.daily
+                                ? '${T.t('Month Bill')} + ${T.t('Past Overdue')}'
+                                : '${T.t('Bill')} + ${T.t('Past Overdue')} - ${T.t('Advance')}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
                         '₹${calculatedTotal.toStringAsFixed(2)}',
                         style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xff166534),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xff075e54),
                         ),
                       ),
                     ],
@@ -835,37 +1117,41 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                 ),
                 const SizedBox(height: 18),
 
-                // Live Preview Card
+                // LIVE WHATSAPP CHAT BUBBLE PREVIEW
                 Container(
-                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xfff8fafc),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
+                    color: const Color(0xffece5dd),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xffd1d7db)),
                   ),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header of Preview
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
-                              const Icon(LucideIcons.eye, size: 16, color: Color(0xff2d7a55)),
+                              const Icon(LucideIcons.messageSquare,
+                                  size: 15, color: Color(0xff075e54)),
                               const SizedBox(width: 6),
                               Text(
-                                T.t('Live Message Preview'),
+                                T.t('WhatsApp Message Preview'),
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
                                   fontSize: 12,
-                                  color: Color(0xff334155),
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff075e54),
                                 ),
                               ),
                             ],
                           ),
                           InkWell(
                             onTap: () {
-                              Clipboard.setData(ClipboardData(text: _buildFormattedMessage()));
+                              Clipboard.setData(
+                                ClipboardData(text: _buildFormattedMessage()),
+                              );
                               Get.snackbar(
                                 T.t('Copied!'),
                                 T.t('Message copied to clipboard'),
@@ -875,14 +1161,15 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                             },
                             child: Row(
                               children: [
-                                const Icon(LucideIcons.copy, size: 14, color: Color(0xff2d7a55)),
+                                const Icon(LucideIcons.copy,
+                                    size: 13, color: Color(0xff075e54)),
                                 const SizedBox(width: 4),
                                 Text(
                                   T.t('Copy'),
                                   style: const TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xff2d7a55),
                                     fontWeight: FontWeight.w600,
+                                    color: Color(0xff075e54),
                                   ),
                                 ),
                               ],
@@ -890,22 +1177,66 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Text(
-                          _buildFormattedMessage(),
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 11.5,
-                            height: 1.4,
-                            color: Color(0xff1e293b),
+                      const SizedBox(height: 10),
+
+                      // WhatsApp Outgoing Chat Bubble
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.82,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xffdcf8c6),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(14),
+                              topRight: Radius.circular(0),
+                              bottomLeft: Radius.circular(14),
+                              bottomRight: Radius.circular(14),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _buildFormattedMessage(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.42,
+                                  color: Color(0xff111b21),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  const Spacer(),
+                                  Text(
+                                    '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    LucideIcons.checkCheck,
+                                    size: 14,
+                                    color: Color(0xff53bdeb),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -914,20 +1245,33 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                 ),
                 const SizedBox(height: 20),
 
-                // Actions
+                // ACTION BUTTONS
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _sending ? null : _sendViaBackend,
+                    onPressed: (_sending || !_hasValidPhone)
+                        ? null
+                        : _sendViaBackend,
                     icon: _sending
                         ? DairyMilkLoader.mini(color: Colors.white, size: 18)
                         : const Icon(LucideIcons.send, size: 18),
-                    label: Text(_sending ? T.t('Sending...') : T.t('Send WhatsApp Bill')),
+                    label: Text(
+                      _sending
+                          ? T.t('Sending WhatsApp Bill...')
+                          : T.t('Send WhatsApp Bill (API)'),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xff2d7a55),
+                      backgroundColor: const Color(0xff075e54),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      disabledForegroundColor: Colors.grey.shade600,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
@@ -936,13 +1280,22 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: _openWhatsAppDirect,
-                    icon: const Icon(LucideIcons.messageCircle, size: 18, color: Color(0xff25D366)),
-                    label: Text(T.t('Open in WhatsApp')),
+                    onPressed: _hasValidPhone ? _openWhatsAppDirect : null,
+                    icon: const Icon(LucideIcons.messageCircle,
+                        size: 18, color: Color(0xff25D366)),
+                    label: Text(
+                      T.t('Open in WhatsApp App'),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      foregroundColor: const Color(0xff075e54),
+                      side: const BorderSide(color: Color(0xff25D366), width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),

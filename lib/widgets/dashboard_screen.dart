@@ -6,6 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../controllers/dashboard_controller.dart';
 import '../services/api_service.dart';
 import '../services/app_language.dart';
+import 'customer_bills_screen.dart';
+import 'daily_collection_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
@@ -22,20 +24,13 @@ class DashboardScreen extends StatelessWidget {
   final VoidCallback onOpenAddCustomer;
 
   String _formatDateTitle(DateTime date) {
-    final now = DateTime.now();
-    final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
-    final yesterday = now.subtract(const Duration(days: 1));
-    final isYesterday = date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day;
-
-    final months = [
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
-    final dateStr = '${date.day} ${months[date.month - 1]} ${date.year}';
-
-    if (isToday) return '${T.t("Today")}, $dateStr';
-    if (isYesterday) return '${T.t("Yesterday")}, $dateStr';
-    return dateStr;
+    final weekday = weekdays[date.weekday - 1];
+    return '$weekday, ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   @override
@@ -172,21 +167,29 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (!controller.isSelectedDateToday)
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                    if (controller.isSelectedDateToday)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xffdcefe3),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        onPressed: controller.goToToday,
                         child: Text(
                           T.t('Today'),
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: Color(0xff2d7a55),
                           ),
                         ),
+                      )
+                    else
+                      IconButton(
+                        icon: const Icon(LucideIcons.calendarCheck, size: 18, color: Color(0xff2d7a55)),
+                        tooltip: T.t('Today'),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        onPressed: controller.goToToday,
                       ),
                     IconButton(
                       icon: const Icon(LucideIcons.chevronRight, size: 20),
@@ -233,14 +236,24 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   // Collection Progress
                   Expanded(
-                    child: _buildMetricCard(
-                      icon: LucideIcons.clipboardCheck,
-                      iconBg: const Color(0xffe0f2fe),
-                      iconColor: const Color(0xff0369a1),
-                      title: T.t('Collection Progress'),
-                      value: '$completedCount / $totalCustomers',
-                      subtitle: '${(completionPct * 100).toStringAsFixed(0)}% ${T.t("Completed")}',
-                      badgeColor: const Color(0xff0369a1),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => Get.to(
+                        () => DailyCollectionScreen(
+                          api: api,
+                          controller: controller,
+                        ),
+                      ),
+                      child: _buildMetricCard(
+                        icon: LucideIcons.clipboardCheck,
+                        iconBg: const Color(0xffe0f2fe),
+                        iconColor: const Color(0xff0369a1),
+                        title: T.t('Collection Progress'),
+                        value: '$completedCount / $totalCustomers',
+                        subtitle: '${(completionPct * 100).toStringAsFixed(0)}% ${T.t("Completed")}',
+                        badgeColor: const Color(0xff0369a1),
+                        showTapArrow: true,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -265,9 +278,17 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Progress Bar Card
-              Container(
-                padding: const EdgeInsets.all(16),
+              // Progress Bar Card (Clickable to Collection Page)
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Get.to(
+                  () => DailyCollectionScreen(
+                    api: api,
+                    controller: controller,
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -342,6 +363,7 @@ class DashboardScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              ),
               const SizedBox(height: 20),
 
               // Quick Actions Bar
@@ -385,10 +407,15 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildActionTile(
-                      icon: LucideIcons.settings,
-                      label: T.t('Settings'),
-                      color: const Color(0xff64748b),
-                      onTap: () => onNavigateTab(3),
+                      icon: LucideIcons.receiptText,
+                      label: T.t('Bills'),
+                      color: const Color(0xffd97706),
+                      onTap: () => Get.to(
+                        () => CustomerBillsScreen(
+                          api: api,
+                          controller: controller,
+                        ),
+                      ),
                     ),
                   ),
                 ],

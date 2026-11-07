@@ -41,6 +41,7 @@ class ApiService {
 
   static const _tokenKey = 'dairy_jwt';
   static const _expiryKey = 'dairy_jwt_expiry';
+  static const _lastEmailKey = 'dairy_last_account_email';
   static const Duration sessionLifetime = Duration(days: 30);
 
   DateTime? _expiry;
@@ -149,8 +150,8 @@ class ApiService {
     );
   }
 
-  Future<void> requestPasswordReset(String email) async {
-    await _postAuth(
+  Future<Map<String, dynamic>> requestPasswordReset(String email) {
+    return _postAuth(
       '/auth/forgot-password',
       {'email': email},
       loaderMessage: 'Sending reset code...',
@@ -171,6 +172,32 @@ class ApiService {
       },
       loaderMessage: 'Resetting password...',
     );
+  }
+
+  Future<String?> getLastAccountEmail() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_lastEmailKey);
+  }
+
+  Future<void> saveLastAccountEmail(String email) async {
+    final clean = email.trim();
+    if (clean.isNotEmpty) {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(_lastEmailKey, clean);
+    }
+  }
+
+  Future<Map<String, dynamic>> getRegisteredEmail([String? query]) async {
+    final path = query != null && query.trim().isNotEmpty
+        ? '/auth/registered-email?query=${Uri.encodeComponent(query.trim())}'
+        : '/auth/registered-email';
+    final response = await _send(
+      'GET',
+      path,
+      includeAuth: false,
+      showLoader: false,
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
   Future<Map<String, dynamic>> _postAuth(
@@ -540,6 +567,9 @@ class ApiService {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setString(_tokenKey, token);
       await preferences.setInt(_expiryKey, expiryDate.millisecondsSinceEpoch);
+      if (body['email'] is String) {
+        await preferences.setString(_lastEmailKey, (body['email'] as String).trim());
+      }
     }
     return data;
   }
@@ -713,6 +743,23 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final key = _paymentKey(customerId, year, month);
     await prefs.remove(key);
+  }
+
+  Future<Map<String, dynamic>> checkAppVersion({
+    String? currentVersion,
+    int? buildNumber,
+  }) async {
+    final queryParams = <String, String>{};
+    if (currentVersion != null) queryParams['currentVersion'] = currentVersion;
+    if (buildNumber != null) queryParams['buildNumber'] = '$buildNumber';
+
+    final query = queryParams.isEmpty ? '' : '?${Uri(queryParameters: queryParams).query}';
+    final response = await _send(
+      'GET',
+      '/app/version$query',
+      timeout: const Duration(seconds: 10),
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
   String _message(int statusCode, String body) {

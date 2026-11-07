@@ -5,11 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'controllers/app_controller.dart';
 import 'controllers/dashboard_controller.dart';
 import 'services/app_language.dart';
+import 'services/app_update_service.dart';
 import 'services/api_service.dart';
 import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
@@ -387,8 +389,9 @@ class DairySplashScreen extends StatelessWidget {
 }
 
 class AuthPage extends StatefulWidget {
-  const AuthPage({super.key, required this.api});
+  const AuthPage({super.key, required this.api, this.initialEmail});
   final ApiService api;
+  final String? initialEmail;
   @override
   State<AuthPage> createState() => _AuthPageState();
 }
@@ -399,9 +402,22 @@ class _AuthPageState extends State<AuthPage> {
   final formKey = GlobalKey<FormState>();
   final firstName = TextEditingController();
   final lastName = TextEditingController();
-  final email = TextEditingController();
+  late final TextEditingController email;
   final password = TextEditingController();
   final dairyName = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    email = TextEditingController(text: widget.initialEmail ?? '');
+    if (widget.initialEmail == null || widget.initialEmail!.trim().isEmpty) {
+      widget.api.getLastAccountEmail().then((saved) {
+        if (saved != null && saved.isNotEmpty && mounted && email.text.trim().isEmpty) {
+          setState(() => email.text = saved);
+        }
+      });
+    }
+  }
 
   Future<void> submit() async {
     if (!formKey.currentState!.validate()) return;
@@ -422,8 +438,17 @@ class _AuthPageState extends State<AuthPage> {
         return;
       } else {
         await widget.api.login(email.text.trim(), password.text);
+        await widget.api.saveLastAccountEmail(email.text.trim());
       }
       if (!mounted) return;
+      if (Get.isRegistered<AppController>()) {
+        final appCtrl = Get.find<AppController>();
+        final updateInfo = await appCtrl.updateService.checkForUpdate(silent: true);
+        if (updateInfo != null && updateInfo.isUpdateAvailable) {
+          appCtrl.updateService.navigateToUpdateScreen(updateInfo);
+          return;
+        }
+      }
       Get.offAll(() => Dashboard(api: widget.api));
     } catch (error) {
       if (mounted) _showMessage(error.toString());
@@ -589,7 +614,7 @@ class _AuthPageState extends State<AuthPage> {
                           onPressed: busy
                               ? null
                               : () => Get.to(
-                                  () => ForgotPasswordPage(api: widget.api),
+                                  () => ForgotPasswordPage(api: widget.api, initialEmail: email.text.trim()),
                                 ),
                           child: Text(T.t('Forgot password?')),
                         ),
@@ -679,8 +704,9 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
 }
 
 class ForgotPasswordPage extends StatefulWidget {
-  const ForgotPasswordPage({super.key, required this.api});
+  const ForgotPasswordPage({super.key, required this.api, this.initialEmail});
   final ApiService api;
+  final String? initialEmail;
 
   @override
   State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
@@ -688,8 +714,51 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final formKey = GlobalKey<FormState>();
-  final email = TextEditingController();
+  late final TextEditingController email;
   bool busy = false;
+  bool loadingEmail = true;
+  String? dairyName;
+
+  @override
+  void initState() {
+    super.initState();
+    email = TextEditingController(text: widget.initialEmail ?? '');
+    _resolveRegisteredEmail();
+  }
+
+  Future<void> _resolveRegisteredEmail() async {
+    // 1. If an email was passed from the login field, use it
+    if (email.text.trim().isNotEmpty && _isValidEmail(email.text.trim())) {
+      if (mounted) setState(() => loadingEmail = false);
+      return;
+    }
+
+    // 2. Check locally remembered account email
+    final saved = await widget.api.getLastAccountEmail();
+    if (saved != null && saved.isNotEmpty && _isValidEmail(saved)) {
+      if (mounted) {
+        setState(() {
+          email.text = saved;
+          loadingEmail = false;
+        });
+      }
+      return;
+    }
+
+    // 3. Dynamically fetch registered dairy email from backend
+    try {
+      final data = await widget.api.getRegisteredEmail();
+      if (mounted) {
+        setState(() {
+          email.text = (data['email'] as String?) ?? '';
+          dairyName = data['dairyName'] as String?;
+          loadingEmail = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => loadingEmail = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -698,13 +767,22 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Future<void> submit() async {
-    if (!formKey.currentState!.validate()) return;
+    final targetEmail = email.text.trim();
+    if (targetEmail.isEmpty || !_isValidEmail(targetEmail)) {
+      _showMessage(T.t('Registered account email could not be resolved'));
+      return;
+    }
     setState(() => busy = true);
     try {
-      await widget.api.requestPasswordReset(email.text.trim());
+      final res = await widget.api.requestPasswordReset(targetEmail);
       if (!mounted) return;
+      final devOtp = res['devOtp'] as String?;
       await Get.to(
-        () => ResetPasswordPage(api: widget.api, email: email.text.trim()),
+        () => ResetPasswordPage(
+          api: widget.api,
+          email: targetEmail,
+          devOtp: devOtp,
+        ),
       );
     } catch (error) {
       if (mounted) _showAuthMessage(context, error);
@@ -712,6 +790,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       if (mounted) setState(() => busy = false);
     }
   }
+
+  void _showMessage(String message) => Get.snackbar(
+    T.t('Unable to continue'),
+    message,
+    snackPosition: SnackPosition.BOTTOM,
+    margin: const EdgeInsets.all(16),
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -721,26 +806,77 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       child: ListView(
         padding: _pagePadding(context),
         children: [
-          Text(
-            T.t('Enter your email and we will send you a reset code.'),
-            style: Theme.of(context).textTheme.bodyLarge,
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xff2d7a55).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xff2d7a55).withOpacity(0.2)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(LucideIcons.shieldCheck, size: 22, color: Color(0xff2d7a55)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        T.t('Verified Dairy Account'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xff2d7a55),
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        T.t('Reset code will be dispatched securely to your registered email address.'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
-          TextFormField(
-            controller: email,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(labelText: T.t('Email address')),
-            validator: (value) => value != null && _isValidEmail(value)
-                ? null
-                : T.t('Enter a valid email'),
-          ),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: busy ? null : submit,
-            child: busy
-                ? DairyMilkLoader.mini(color: Colors.white, size: 22)
-                : Text(T.t('Send reset code')),
-          ),
+          if (loadingEmail) ...[
+            Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: DairyMilkLoader.mini(color: const Color(0xff2d7a55), size: 26),
+              ),
+            ),
+          ] else ...[
+            TextFormField(
+              controller: email,
+              readOnly: true,
+              keyboardType: TextInputType.emailAddress,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                labelText: T.t('Account Email (Locked)'),
+                prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                helperText: dairyName != null ? 'Dairy: $dairyName' : T.t('Registered account'),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: busy || email.text.trim().isEmpty ? null : submit,
+              icon: busy
+                  ? const SizedBox.shrink()
+                  : const Icon(LucideIcons.send, size: 18),
+              label: busy
+                  ? DairyMilkLoader.mini(color: Colors.white, size: 22)
+                  : Text(T.t('Send reset code')),
+            ),
+          ],
         ],
       ),
     ),
@@ -748,9 +884,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 }
 
 class ResetPasswordPage extends StatefulWidget {
-  const ResetPasswordPage({super.key, required this.api, required this.email});
+  const ResetPasswordPage({
+    super.key,
+    required this.api,
+    required this.email,
+    this.devOtp,
+  });
   final ApiService api;
   final String email;
+  final String? devOtp;
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -758,13 +900,40 @@ class ResetPasswordPage extends StatefulWidget {
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final formKey = GlobalKey<FormState>();
-  final code = TextEditingController();
+  late final TextEditingController code;
   final password = TextEditingController();
   final confirmation = TextEditingController();
   bool busy = false;
+  bool obscurePassword = true;
+  bool obscureConfirm = true;
+  int resendCountdown = 60;
+  Timer? resendTimer;
+  String? currentDevOtp;
+
+  @override
+  void initState() {
+    super.initState();
+    currentDevOtp = widget.devOtp;
+    code = TextEditingController(text: widget.devOtp ?? '');
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    resendTimer?.cancel();
+    if (mounted) setState(() => resendCountdown = 60);
+    resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (resendCountdown <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => resendCountdown = 0);
+      } else {
+        if (mounted) setState(() => resendCountdown--);
+      }
+    });
+  }
 
   @override
   void dispose() {
+    resendTimer?.cancel();
     code.dispose();
     password.dispose();
     confirmation.dispose();
@@ -781,8 +950,15 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         password.text,
       );
       if (mounted) {
-        Get.offAll(() => AuthPage(api: widget.api));
-        Get.snackbar(T.t('Success'), T.t('Password reset successfully'));
+        Get.offAll(() => AuthPage(api: widget.api, initialEmail: widget.email));
+        Get.snackbar(
+          T.t('Success'),
+          T.t('Password reset successfully'),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xff2d7a55),
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
       }
     } catch (error) {
       if (mounted) _showAuthMessage(context, error);
@@ -792,12 +968,25 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   }
 
   Future<void> resend() async {
+    if (resendCountdown > 0 || busy) return;
     setState(() => busy = true);
     try {
-      await widget.api.requestPasswordReset(widget.email);
+      final res = await widget.api.requestPasswordReset(widget.email);
+      _startCountdown();
+      final newDevOtp = res['devOtp'] as String?;
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(T.t('Reset code sent'))));
+        if (newDevOtp != null) {
+          setState(() {
+            currentDevOtp = newDevOtp;
+            code.text = newDevOtp;
+          });
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(T.t('Reset code sent')),
+            backgroundColor: const Color(0xff2d7a55),
+          ),
+        );
       }
     } catch (error) {
       if (mounted) _showAuthMessage(context, error);
@@ -814,11 +1003,58 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       child: ListView(
         padding: _pagePadding(context),
         children: [
+          Text(
+            '${T.t('Enter the 6-digit code sent to')} ${widget.email}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (currentDevOtp != null && currentDevOtp!.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.info, size: 18, color: Colors.amber),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Dev OTP: $currentDevOtp',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => code.text = currentDevOtp!),
+                    child: const Text('Fill OTP'),
+                  ),
+                ],
+              ),
+            ),
+          ],
           TextFormField(
             controller: code,
             keyboardType: TextInputType.number,
             maxLength: 6,
-            decoration: InputDecoration(labelText: T.t('6-digit reset code')),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 8,
+            ),
+            decoration: InputDecoration(
+              labelText: T.t('6-digit reset code'),
+              hintText: '123456',
+            ),
             validator: (value) => value?.trim().length == 6
                 ? null
                 : T.t('Enter the 6-digit reset code'),
@@ -826,11 +1062,18 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           const SizedBox(height: 14),
           TextFormField(
             controller: password,
-            obscureText: true,
+            obscureText: obscurePassword,
             decoration: InputDecoration(
               labelText: T.t('New password'),
               helperText: T.t(
                 'Minimum 6 characters, 1 number, 1 special character',
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                ),
+                onPressed: () =>
+                    setState(() => obscurePassword = !obscurePassword),
               ),
             ),
             validator: _strongPasswordError,
@@ -838,17 +1081,34 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           const SizedBox(height: 14),
           TextFormField(
             controller: confirmation,
-            obscureText: true,
-            decoration: InputDecoration(labelText: T.t('Confirm new password')),
+            obscureText: obscureConfirm,
+            decoration: InputDecoration(
+              labelText: T.t('Confirm new password'),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscureConfirm ? LucideIcons.eye : LucideIcons.eyeOff,
+                ),
+                onPressed: () =>
+                    setState(() => obscureConfirm = !obscureConfirm),
+              ),
+            ),
             validator: (value) =>
                 value == password.text ? null : T.t('Passwords do not match'),
           ),
-          const SizedBox(height: 14),
-          TextButton(
-            onPressed: busy ? null : resend,
-            child: Text(T.t('Resend code')),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: resendCountdown > 0 || busy ? null : resend,
+              icon: const Icon(LucideIcons.refreshCw, size: 14),
+              label: Text(
+                resendCountdown > 0
+                    ? '${T.t('Resend code')} (${resendCountdown}s)'
+                    : T.t('Resend code'),
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           FilledButton(
             onPressed: busy ? null : reset,
             child: busy
@@ -926,7 +1186,15 @@ class _DashboardState extends State<Dashboard> {
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<AppController>()) {
+      final appCtrl = Get.find<AppController>();
+      final latest = appCtrl.updateService.latestInfo.value;
+      if (appCtrl.updateService.hasUpdate.value && latest != null) {
+        appCtrl.updateService.navigateToUpdateScreen(latest);
+      }
+    }
     controller = Get.put(DashboardController(widget.api));
+    controller.goToToday();
   }
 
   Future<void> _openAddCustomer(
@@ -1103,7 +1371,7 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
               if (controller.loading.value && controller.customers.isEmpty)
-                    const Center(
+                    Center(
                       child: Padding(
                         padding: EdgeInsets.all(30),
                         child: DairyMilkLoader(
@@ -2504,6 +2772,38 @@ class _SettingsPageState extends State<SettingsPage> {
     Get.offAll(() => AuthPage(api: widget.api));
   }
 
+  Future<void> _checkForUpdates(BuildContext context) async {
+    if (!Get.isRegistered<AppController>()) return;
+    final appCtrl = Get.find<AppController>();
+    Get.snackbar(
+      T.t('App Updates'),
+      T.t('Checking for latest version...'),
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 2),
+      margin: const EdgeInsets.all(16),
+    );
+    final info = await appCtrl.updateService.checkForUpdate(silent: false);
+    if (info != null && info.isUpdateAvailable) {
+      appCtrl.updateService.navigateToUpdateScreen(info);
+    } else if (info != null && !info.isUpdateAvailable) {
+      Get.snackbar(
+        T.t('Up to Date'),
+        '${T.t("You are using the latest version")} (v${AppUpdateService.currentVersion})',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xff1b4d36),
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+    } else {
+      Get.snackbar(
+        T.t('App Updates'),
+        T.t('Unable to reach update server. Please check internet.'),
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(16),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xfff1f5f9),
@@ -2689,6 +2989,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: T.t('Help us improve Dairy Desk'),
                 onTap: () => _showFeedbackDialog(context),
               ),
+              const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
+              _SettingsListTile(
+                icon: LucideIcons.downloadCloud,
+                iconBg: const Color(0xffe0f2fe),
+                iconColor: const Color(0xff0284c7),
+                title: T.t('Check for updates'),
+                subtitle: 'v${AppUpdateService.currentVersion} • ${T.t("Tap to check")}',
+                onTap: () => _checkForUpdates(context),
+              ),
             ],
           ),
         ),
@@ -2713,27 +3022,54 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         const SizedBox(height: 28),
 
-        // App Footer & Version Info
+        // App Footer & Dynamic Version Info
         Center(
-          child: Column(
-            children: [
-              Text(
-                'Dairy Desk • v1.0.0',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade500,
-                ),
+          child: InkWell(
+            onLongPress: () {
+              // Allows owner to preview and test the update screen lockout
+              if (Get.isRegistered<AppController>()) {
+                final appCtrl = Get.find<AppController>();
+                appCtrl.updateService.navigateToUpdateScreen(
+                  AppVersionInfo(
+                    latestVersion: '1.0.2',
+                    buildNumber: 3,
+                    minSupportedVersion: '1.0.2',
+                    forceUpdate: true,
+                    title: 'New Version Available! 🚀',
+                    releaseNotes: '• Dynamic version tracking in Settings\n• Full-screen update lockout preview\n• Direct OTA update installation',
+                    downloadUrl: '/app/download-latest',
+                    apkSize: '59.7 MB',
+                    publishedAt: DateTime.now().toIso8601String(),
+                    isUpdateAvailable: true,
+                    mustForceUpdate: true,
+                  ),
+                );
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                children: [
+                  Text(
+                    'Dairy Desk • v${AppUpdateService.currentVersion} (Build ${AppUpdateService.currentBuildNumber})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Smart Dairy Management Solution',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Smart Dairy Management Solution',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade400,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],

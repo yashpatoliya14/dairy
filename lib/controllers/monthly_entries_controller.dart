@@ -72,11 +72,27 @@ class MonthlyEntriesController extends GetxController {
   int get zeroDeliveryDays =>
       entries.where((e) => _asDouble(e['liters'], -1) == 0).length;
 
+  /// Effective rate used for billing.
+  /// If customer has a default price set (> 0), that price is used by default.
+  /// Otherwise, falls back to the calculated average rate (totalAmount / totalLiters).
   double get effectiveRate {
+    if (customerDefaultPrice > 0) {
+      return customerDefaultPrice;
+    }
     if (totalLiters.value > 0 && totalAmount.value > 0) {
       return totalAmount.value / totalLiters.value;
     }
     return customerDefaultPrice;
+  }
+
+  /// Total bill amount.
+  /// If customer has a default price set (> 0), calculates as (totalLiters * defaultPrice).
+  /// Otherwise, uses the sum of entry totals from the server.
+  double get billTotalAmount {
+    if (customerDefaultPrice > 0) {
+      return totalLiters.value * customerDefaultPrice;
+    }
+    return totalAmount.value;
   }
 
   double get averageDailyLiters {
@@ -110,6 +126,20 @@ class MonthlyEntriesController extends GetxController {
   }
 
   /// Load distributor / dairy profile if session is present.
+  /// Reload latest customer details (default price/liters) from server.
+  Future<void> refreshCustomer() async {
+    if (customerId.isEmpty) return;
+    try {
+      final list = await api.getCustomers();
+      for (final c in list) {
+        if ('${c['id']}'.trim() == customerId) {
+          customer.value = c;
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> loadProfile() async {
     if (!api.hasSession) return;
     try {
@@ -179,8 +209,9 @@ class MonthlyEntriesController extends GetxController {
             .map((e) => Map<String, dynamic>.from(e))
             .toList(),
       );
-      // Load payment data for this month
+      // Load payment and refresh latest customer profile (e.g. edited default price)
       await loadPayment();
+      await refreshCustomer();
     } catch (e) {
       error.value = e.toString();
       developer.log('Failed to load month: $e', name: 'MonthlyEntries');
@@ -342,7 +373,7 @@ class MonthlyEntriesController extends GetxController {
         customerId: customerId,
         year: selectedYear.value,
         month: selectedMonth.value,
-        billAmount: totalAmount.value,
+        billAmount: billTotalAmount,
         receivedAmount: receivedAmount,
         note: note,
         receivedDate: receivedDate,
@@ -384,15 +415,15 @@ class MonthlyEntriesController extends GetxController {
 
   /// Outstanding balance for the current month.
   double get balanceDue =>
-      totalAmount.value - paymentReceived.value;
+      billTotalAmount - paymentReceived.value;
 
   /// Whether the bill is fully paid.
   bool get isFullyPaid =>
-      hasPayment.value && paymentReceived.value >= totalAmount.value;
+      hasPayment.value && paymentReceived.value >= billTotalAmount;
 
   /// Whether the bill is partially paid.
   bool get isPartiallyPaid =>
-      hasPayment.value && paymentReceived.value > 0 && paymentReceived.value < totalAmount.value;
+      hasPayment.value && paymentReceived.value > 0 && paymentReceived.value < billTotalAmount;
 
   /// Whether we're viewing a future month (shouldn't allow entries).
   bool get isFutureMonth {

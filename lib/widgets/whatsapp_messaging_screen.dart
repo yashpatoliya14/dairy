@@ -63,6 +63,16 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
   String get _formattedDate =>
       _selectedDate.toIso8601String().substring(0, 10);
 
+  String get _formattedDateDisplay {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final weekday = weekdays[_selectedDate.weekday - 1];
+    return '$weekday, ${_selectedDate.day} ${months[_selectedDate.month - 1]} ${_selectedDate.year}';
+  }
+
   Future<void> _loadData({bool silent = false}) async {
     if (!silent) {
       setState(() {
@@ -138,6 +148,12 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     if (digits.length == 10) return '91$digits';
     return digits;
+  }
+
+  bool _hasValidPhone(Map customer) {
+    final raw = '${customer['phoneNumber'] ?? customer['phone'] ?? ''}'.trim();
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    return digits.length >= 10;
   }
 
   String _buildQuickMessage(Map<String, dynamic> item) {
@@ -517,7 +533,10 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     final customers = _filteredCustomers();
     final eligibleSelected = customers.where((c) {
       final cid = '${c['customer']['id']}';
-      return _selectedCustomerIds.contains(cid) && c['hasEntry'] == true;
+      final customer = c['customer'] as Map? ?? {};
+      return _selectedCustomerIds.contains(cid) &&
+          c['hasEntry'] == true &&
+          _hasValidPhone(customer);
     }).toList();
 
     final isToday = _formattedDate ==
@@ -594,7 +613,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isToday ? '${T.t('Today')} ($_formattedDate)' : _formattedDate,
+                            _formattedDateDisplay,
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
@@ -605,18 +624,29 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                       ),
                     ),
                   ),
-                  if (!isToday)
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        visualDensity: VisualDensity.compact,
-                        minimumSize: const Size(0, 32),
+                  if (isToday)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xffdcefe3),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      onPressed: _goToToday,
                       child: Text(
                         T.t('Today'),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xff2d7a55),
+                        ),
                       ),
+                    )
+                  else
+                    IconButton(
+                      icon: const Icon(LucideIcons.calendarCheck, size: 18, color: Color(0xff2d7a55)),
+                      tooltip: T.t('Today'),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      onPressed: _goToToday,
                     ),
                   IconButton(
                     tooltip: T.t('Select date'),
@@ -1020,8 +1050,10 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                         TextButton(
                           onPressed: () {
                             setState(() {
-                              final eligibleCustomers =
-                                  customers.where((c) => c['hasEntry'] == true).toList();
+                              final eligibleCustomers = customers.where((c) {
+                                final cust = c['customer'] as Map? ?? {};
+                                return c['hasEntry'] == true && _hasValidPhone(cust);
+                              }).toList();
                               final eligibleIds = eligibleCustomers
                                   .map((c) => '${c['customer']['id']}')
                                   .toSet();
@@ -1038,9 +1070,15 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                             });
                           },
                           child: Text(
-                            customers.where((c) => c['hasEntry'] == true).isNotEmpty &&
+                            customers.where((c) {
+                                      final cust = c['customer'] as Map? ?? {};
+                                      return c['hasEntry'] == true && _hasValidPhone(cust);
+                                    }).isNotEmpty &&
                                     customers
-                                        .where((c) => c['hasEntry'] == true)
+                                        .where((c) {
+                                          final cust = c['customer'] as Map? ?? {};
+                                          return c['hasEntry'] == true && _hasValidPhone(cust);
+                                        })
                                         .every(
                                           (c) => _selectedCustomerIds.contains(
                                             '${c['customer']['id']}',
@@ -1056,7 +1094,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 2, bottom: 8),
                         child: Text(
-                          '⚠️ ${_selectedCustomerIds.length - eligibleSelected.length} ${T.t('customer(s) have no entry for today and are not eligible to receive entry SMS.')}',
+                          '⚠️ ${_selectedCustomerIds.length - eligibleSelected.length} ${T.t('selected customer(s) skipped (missing today’s milk entry or valid phone number).')}',
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.amber.shade900,
@@ -1280,18 +1318,55 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 3),
-                                  Text(
-                                    phone.isNotEmpty
-                                        ? phone
-                                        : T.t('No phone number available'),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: phone.isNotEmpty
-                                          ? Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant
-                                          : Colors.red.shade400,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _hasValidPhone(customer) ? LucideIcons.phone : LucideIcons.phoneOff,
+                                        size: 13,
+                                        color: _hasValidPhone(customer)
+                                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                                            : Colors.amber.shade900,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          phone.isNotEmpty
+                                              ? phone
+                                              : T.t('No phone number available'),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _hasValidPhone(customer)
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurfaceVariant
+                                                : Colors.amber.shade900,
+                                            fontWeight: _hasValidPhone(customer)
+                                                ? FontWeight.normal
+                                                : FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (!_hasValidPhone(customer)) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            T.t('No Phone'),
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.amber.shade900,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   const SizedBox(height: 5),
                                   Row(
@@ -1368,9 +1443,11 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                 IconButton(
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
-                                  tooltip: hasEntry
-                                      ? T.t('Send WhatsApp message')
-                                      : T.t('No milk entry for today'),
+                                  tooltip: !hasEntry
+                                      ? T.t('No milk entry for today')
+                                      : (!_hasValidPhone(customer)
+                                          ? T.t('No valid phone number')
+                                          : T.t('Send WhatsApp message')),
                                   icon: _sendingCustomerId == cid
                                       ? DairyMilkLoader.mini(
                                           color: const Color(0xff2d7a55),
@@ -1378,12 +1455,15 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                         )
                                       : Icon(
                                           LucideIcons.send,
-                                          color: hasEntry
+                                          color: (hasEntry && _hasValidPhone(customer))
                                               ? const Color(0xff2d7a55)
                                               : Colors.grey.shade400,
                                           size: 20,
                                         ),
-                                  onPressed: _sendingCustomerId != null || _bulkSending
+                                  onPressed: !hasEntry ||
+                                          !_hasValidPhone(customer) ||
+                                          _sendingCustomerId != null ||
+                                          _bulkSending
                                       ? null
                                       : () => _sendSingleWhatsApp(item),
                                 ),

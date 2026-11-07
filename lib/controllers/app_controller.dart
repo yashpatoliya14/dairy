@@ -6,14 +6,20 @@ import 'package:get/get.dart';
 
 import '../services/api_service.dart';
 import '../services/app_language.dart';
+import '../services/app_update_service.dart';
 import '../widgets/dairy_milk_loader.dart';
 import 'dashboard_controller.dart';
 
 class AppController extends GetxController with WidgetsBindingObserver {
-  AppController(this.api, {this.authPageBuilder});
+  AppController(
+    this.api, {
+    this.authPageBuilder,
+    AppUpdateService? updateService,
+  }) : updateService = updateService ?? AppUpdateService(api: api);
 
   final ApiService api;
   final Widget Function(ApiService api)? authPageBuilder;
+  final AppUpdateService updateService;
   final ready = false.obs;
 
   Timer? _sessionCheckTimer;
@@ -25,11 +31,20 @@ class AppController extends GetxController with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     api.onSessionExpired = handleSessionExpired;
     _restoreSession();
+
     // Periodically verify session validity when running in production
     if (!Platform.environment.containsKey('FLUTTER_TEST')) {
       _sessionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         checkSessionValidity();
       });
+
+      // Watch continuously for version updates in the background
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        updateService.checkForUpdate(silent: true);
+      });
+      updateService.startPeriodicBackgroundChecks(
+        interval: const Duration(minutes: 15),
+      );
     }
   }
 
@@ -37,6 +52,7 @@ class AppController extends GetxController with WidgetsBindingObserver {
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
     _sessionCheckTimer?.cancel();
+    updateService.stopPeriodicChecks();
     super.onClose();
   }
 
@@ -44,6 +60,9 @@ class AppController extends GetxController with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       checkSessionValidity();
+      if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+        updateService.checkForUpdate(silent: true);
+      }
     }
   }
 
@@ -51,6 +70,10 @@ class AppController extends GetxController with WidgetsBindingObserver {
     if (ready.value && api.hasSession && api.isTokenExpired) {
       handleSessionExpired(reason: 'Session expired. Please log in again.');
     }
+  }
+
+  Future<void> checkForUpdatesManual() async {
+    await updateService.checkForUpdate(silent: false);
   }
 
   Future<void> handleSessionExpired({String? reason}) async {

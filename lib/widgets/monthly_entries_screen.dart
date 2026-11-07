@@ -405,7 +405,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
     );
     final daysInMonth = controller.daysInMonth.value;
     final totalLiters = controller.totalLiters.value;
-    final totalAmount = controller.totalAmount.value;
+    final totalAmount = controller.billTotalAmount;
     final activeDays = controller.activeDeliveryDays;
     final effectiveRate = controller.effectiveRate;
     final invoiceNumber =
@@ -828,7 +828,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
     );
     final daysInMonth = controller.daysInMonth.value;
     final totalLiters = controller.totalLiters.value;
-    final totalAmount = controller.totalAmount.value;
+    final totalAmount = controller.billTotalAmount;
     final effectiveRate = controller.effectiveRate;
     final activeDays = controller.activeDeliveryDays;
     final dairy = controller.dairyName.value.isNotEmpty
@@ -891,7 +891,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
     );
     final daysInMonth = controller.daysInMonth.value;
     final totalLiters = controller.totalLiters.value;
-    final totalAmount = controller.totalAmount.value;
+    final totalAmount = controller.billTotalAmount;
     final effectiveRate = controller.effectiveRate;
     final activeDays = controller.activeDeliveryDays;
     final offDays = controller.zeroDeliveryDays + controller.missingDays;
@@ -1195,9 +1195,11 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
     final litersValue = existingEntry != null
         ? _asDouble(existingEntry['liters'])
         : controller.customerDefaultLiters;
-    final priceValue = existingEntry != null
-        ? _asDouble(existingEntry['price'])
-        : controller.customerDefaultPrice;
+    final priceValue = (controller.customerDefaultPrice > 0)
+        ? controller.customerDefaultPrice
+        : (existingEntry != null
+            ? _asDouble(existingEntry['price'])
+            : controller.customerDefaultPrice);
 
     final result = await showModalBottomSheet<Map<String, double>>(
       context: context,
@@ -1306,7 +1308,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
         monthName: monthName,
         totalLiters: controller.totalLiters.value,
         effectiveRate: controller.effectiveRate,
-        totalAmount: controller.totalAmount.value,
+        totalAmount: controller.billTotalAmount,
         daysInMonth: controller.daysInMonth.value,
         activeDeliveryDays: controller.activeDeliveryDays,
         initialReceived: controller.hasPayment.value
@@ -1533,8 +1535,10 @@ class _DayRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasEntry = entry != null;
     final liters = hasEntry ? _asDouble(entry!['liters']) : 0.0;
-    final price = hasEntry ? _asDouble(entry!['price']) : defaultPrice;
-    final total = hasEntry ? _asDouble(entry!['total'], fallback: liters * price) : 0.0;
+    final price = defaultPrice > 0
+        ? defaultPrice
+        : (hasEntry ? _asDouble(entry!['price']) : defaultPrice);
+    final total = hasEntry ? (liters * price) : 0.0;
     final isZero = hasEntry && liters == 0;
 
     final entryDate = DateTime(year, month, day);

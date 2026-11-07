@@ -14,6 +14,9 @@ class PaymentEntrySheet extends StatefulWidget {
     required this.totalLiters,
     required this.effectiveRate,
     required this.totalAmount,
+    this.previousDue = 0.0,
+    this.previousAdvance = 0.0,
+    this.pastMonthsBreakdown = const [],
     required this.daysInMonth,
     required this.activeDeliveryDays,
     required this.initialReceived,
@@ -32,6 +35,9 @@ class PaymentEntrySheet extends StatefulWidget {
   final double totalLiters;
   final double effectiveRate;
   final double totalAmount;
+  final double previousDue;
+  final double previousAdvance;
+  final List<String> pastMonthsBreakdown;
   final int daysInMonth;
   final int activeDeliveryDays;
   final double? initialReceived;
@@ -58,10 +64,15 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
 
   final _formKey = GlobalKey<FormState>();
 
+  double get _totalPayable {
+    final net = widget.totalAmount + widget.previousDue - widget.previousAdvance;
+    return net > 0 ? net : 0.0;
+  }
+
   @override
   void initState() {
     super.initState();
-    final initial = widget.initialReceived ?? widget.totalAmount;
+    final initial = widget.initialReceived ?? _totalPayable;
     _receivedController = TextEditingController(
       text: initial > 0
           ? (initial == initial.truncateToDouble()
@@ -94,9 +105,18 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
   double get _currentReceived =>
       double.tryParse(_receivedController.text.trim()) ?? 0.0;
 
-  double get _currentBalance => widget.totalAmount - _currentReceived;
+  double get _currentBalance => _totalPayable - _currentReceived;
 
-  void _fillFullAmount() {
+  void _fillTotalAmount() {
+    setState(() {
+      _receivedController.text =
+          _totalPayable == _totalPayable.truncateToDouble()
+              ? _totalPayable.toStringAsFixed(0)
+              : _totalPayable.toStringAsFixed(2);
+    });
+  }
+
+  void _fillThisMonthOnly() {
     setState(() {
       _receivedController.text =
           widget.totalAmount == widget.totalAmount.truncateToDouble()
@@ -106,7 +126,7 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
   }
 
   void _fillHalfAmount() {
-    final half = widget.totalAmount / 2;
+    final half = _totalPayable / 2;
     setState(() {
       _receivedController.text = half == half.truncateToDouble()
           ? half.toStringAsFixed(0)
@@ -161,10 +181,12 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final received = _currentReceived;
-    final balance = _currentBalance;
-    final isFullyPaid = received >= widget.totalAmount && widget.totalAmount > 0;
-    final isPartiallyPaid = received > 0 && received < widget.totalAmount;
-    final isOverPaid = received > widget.totalAmount;
+    final target = _totalPayable;
+    final balance = target - received;
+    final isFullyPaid = received >= target && target > 0;
+    final isPartiallyPaid = received > 0 && received < target;
+    final isOverPaid = received > target;
+    final hasCombinedDebt = widget.previousDue > 0 || widget.previousAdvance > 0;
 
     return Container(
       decoration: const BoxDecoration(
@@ -254,7 +276,7 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
 
                   const SizedBox(height: 14),
 
-                  // ─── MONTHLY BILL SUMMARY CARD ─────────────────────────────
+                  // ─── MONTHLY BILL & COMBINED BALANCE SUMMARY CARD ──────────
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -284,7 +306,7 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  T.t('Monthly Bill'),
+                                  hasCombinedDebt ? T.t('Customer Bills') : T.t('Monthly Bill'),
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
@@ -319,46 +341,169 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                           ],
                         ),
                         const SizedBox(height: 8),
+
+                        // Deliveries row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${widget.totalLiters.toStringAsFixed(1)} L  @  ₹${widget.effectiveRate.toStringAsFixed(2)}/L',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  T.t('Bill Amount'),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              hasCombinedDebt
+                                  ? '${T.t('This Month Bill')} (${widget.totalLiters.toStringAsFixed(1)} L @ ₹${widget.effectiveRate.toStringAsFixed(2)})'
+                                  : '${widget.totalLiters.toStringAsFixed(1)} L  @  ₹${widget.effectiveRate.toStringAsFixed(2)}/L',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
                             ),
                             Text(
                               '₹${widget.totalAmount.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xff14532d),
-                                letterSpacing: -0.5,
+                              style: TextStyle(
+                                fontSize: hasCombinedDebt ? 14 : 22,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xff14532d),
                               ),
                             ),
                           ],
                         ),
+
+                        // If previousDue > 0
+                        if (widget.previousDue > 0) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    const Icon(LucideIcons.history, size: 12, color: Color(0xffdc2626)),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        widget.pastMonthsBreakdown.isNotEmpty
+                                            ? '${T.t('Past Due')} (${widget.pastMonthsBreakdown.join(', ')})'
+                                            : T.t('Past Due'),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xffb91c1c),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '+₹${widget.previousDue.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xffdc2626),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // If previousAdvance > 0
+                        if (widget.previousAdvance > 0) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(LucideIcons.sparkles, size: 12, color: Color(0xff16a34a)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    T.t('Advance Credit'),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xff166534),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '-₹${widget.previousAdvance.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xff16a34a),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // Net Total Row (if multi-month)
+                        if (hasCombinedDebt) ...[
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 6),
+                            child: Divider(height: 1, color: Color(0xff86efac)),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                T.t('Net Total Due'),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xff14532d),
+                                ),
+                              ),
+                              Text(
+                                '₹${_totalPayable.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xff14532d),
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
+
+                  // Previously Recorded Payment Badge (if any)
+                  if (widget.hasExistingPayment && widget.initialReceived != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xffeff6ff),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xffbfdbfe), width: 0.8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(LucideIcons.history, size: 13, color: Color(0xff2563eb)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${T.t('Previously Recorded')}: ₹${widget.initialReceived!.toStringAsFixed(2)}${widget.initialDate != null ? ' (${widget.initialDate!.day}/${widget.initialDate!.month}/${widget.initialDate!.year})' : ''}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xff1e40af),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 16),
 
@@ -425,18 +570,31 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                       ActionChip(
                         avatar: const Icon(LucideIcons.checkCheck, size: 14),
                         label: Text(
-                          '${T.t('Full Amount')} (₹${widget.totalAmount.toStringAsFixed(0)})',
+                          '${hasCombinedDebt ? T.t('Total Due') : T.t('Full Amount')} (₹${_totalPayable.toStringAsFixed(0)})',
                           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                         ),
-                        onPressed: _fillFullAmount,
+                        onPressed: _fillTotalAmount,
                         backgroundColor: const Color(0xfff0fdf4),
                         side: const BorderSide(color: Color(0xff86efac)),
                       ),
-                      const SizedBox(width: 8),
+                      if (hasCombinedDebt && widget.totalAmount > 0) ...[
+                        const SizedBox(width: 6),
+                        ActionChip(
+                          avatar: const Icon(LucideIcons.calendar, size: 14),
+                          label: Text(
+                            '${T.t('This Month')} (₹${widget.totalAmount.toStringAsFixed(0)})',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: _fillThisMonthOnly,
+                          backgroundColor: const Color(0xfff8fafc),
+                          side: const BorderSide(color: Color(0xffe2e8f0)),
+                        ),
+                      ],
+                      const SizedBox(width: 6),
                       ActionChip(
                         avatar: const Icon(LucideIcons.percent, size: 14),
                         label: Text(
-                          '50% (₹${(widget.totalAmount / 2).toStringAsFixed(0)})',
+                          '50% (₹${(_totalPayable / 2).toStringAsFixed(0)})',
                           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                         ),
                         onPressed: _fillHalfAmount,
@@ -518,8 +676,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                         Text(
                           balance <= 0
                               ? (balance < 0
-                                  ? '+₹${(-balance).toStringAsFixed(2)} Advance'
-                                  : '₹0.00 Due')
+                                  ? "+₹${(-balance).toStringAsFixed(2)} ${T.t('Advance')}"
+                                  : "₹0.00 ${T.t('Due')}")
                               : '${T.t('Balance Due')}: ₹${balance.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 13,

@@ -136,8 +136,9 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
       final entry = _entriesByDate[dateKey];
       if (entry != null) {
         final liters = _asDouble(entry['liters'], 0.0);
-        final price = _asDouble(entry['price'], 0.0);
-        final total = _asDouble(entry['total'], liters * price);
+        final entryPrice = _asDouble(entry['price'], 0.0);
+        final price = _defaultPrice > 0 ? _defaultPrice : (entryPrice > 0 ? entryPrice : _defaultPrice);
+        final total = liters * price;
         totalPay += total;
         totalLiters += liters;
         recordedDays++;

@@ -261,7 +261,42 @@ void main() {
       expect(controller.activeDeliveryDays, 2);
       expect(controller.zeroDeliveryDays, 1);
       expect(controller.effectiveRate, 60.0);
+      expect(controller.billTotalAmount, 300.0);
       expect(controller.averageDailyLiters, 2.5);
+    });
+
+    test('Uses customer default price for bill calculations instead of average price', () async {
+      final mock = MockApiService();
+      final controller = MonthlyEntriesController(mock);
+      // Customer has default price of 60
+      controller.customer.value = {
+        'id': 'c3',
+        'customerNumber': '3',
+        'name': 'Harish Sambad',
+        'price': 60.0,
+        'liters': 2.0,
+      };
+
+      // Server returns entries with older/different prices (e.g. 20.67 average)
+      mock.mockMonthData['c3-2026-11'] = {
+        'year': 2026,
+        'month': 11,
+        'daysInMonth': 30,
+        'entriesCount': 2,
+        'totalLiters': 3.0,
+        'totalAmount': 62.0, // old average was ~20.67
+        'entries': [
+          {'id': 'e1', 'entryDate': '2026-11-01', 'liters': 2.0, 'price': 20.0, 'total': 40.0},
+          {'id': 'e2', 'entryDate': '2026-11-02', 'liters': 1.0, 'price': 22.0, 'total': 22.0},
+        ],
+      };
+
+      controller.setMonthYear(2026, 11);
+      await controller.loadMonth();
+
+      // Must calculate using customerDefaultPrice (60.0), NOT old average (62/3 = 20.67)
+      expect(controller.effectiveRate, 60.0);
+      expect(controller.billTotalAmount, 180.0); // 3.0 L * 60.0
     });
 
     testWidgets('MonthlyEntriesScreen displays small professional bill FIRST, then milk table', (tester) async {
