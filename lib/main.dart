@@ -1030,12 +1030,39 @@ class _DashboardState extends State<Dashboard> {
                 ],
               ),
             ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: FloatingActionButton.extended(
           tooltip: T.t('Add customer'),
           onPressed: controller.loading.value
               ? null
               : () => _openAddCustomer(context, controller),
-          child: const Icon(Icons.person_add_alt_1),
+          backgroundColor: const Color(0xff1b4d36),
+          foregroundColor: Colors.white,
+          elevation: 3,
+          highlightElevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: const BoxDecoration(
+              color: Color(0xff2d7a55),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              LucideIcons.userPlus,
+              size: 18,
+              color: Colors.white,
+            ),
+          ),
+          label: Text(
+            T.t('Add customer'),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.3,
+            ),
+          ),
         ),
       );
     });
@@ -2271,9 +2298,9 @@ class _EmptyState extends StatelessWidget {
     child: Column(
       children: [
         Icon(
-          hasSearch ? Icons.search_off : Icons.people_outline,
-          size: 54,
-          color: Colors.grey,
+          hasSearch ? LucideIcons.searchX : LucideIcons.users,
+          size: 48,
+          color: Colors.grey.shade400,
         ),
         const SizedBox(height: 12),
         Text(
