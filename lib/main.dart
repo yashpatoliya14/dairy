@@ -3365,10 +3365,172 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  Future<void> _openEditProfileDialog(Map<String, dynamic> profile) async {
+    final firstNameCtrl = TextEditingController(text: '${profile['firstName'] ?? ''}'.trim());
+    final lastNameCtrl = TextEditingController(text: '${profile['lastName'] ?? ''}'.trim());
+    final dairyNameCtrl = TextEditingController(text: '${profile['dairyName'] ?? ''}'.trim());
+    final phoneCtrl = TextEditingController(text: '${profile['phoneNumber'] ?? profile['phone'] ?? ''}'.trim());
+    final editFormKey = GlobalKey<FormState>();
+    bool saving = false;
+
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Form(
+            key: editFormKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        T.t('Edit Profile'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xff1b4d36),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(LucideIcons.x, size: 20),
+                        onPressed: () => Navigator.pop(bottomSheetContext, false),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: firstNameCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: InputDecoration(
+                            labelText: T.t('First name'),
+                            prefixIcon: const Icon(LucideIcons.user, size: 18),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? T.t('Required') : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: lastNameCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: InputDecoration(
+                            labelText: T.t('Last name'),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? T.t('Required') : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: dairyNameCtrl,
+                    decoration: InputDecoration(
+                      labelText: T.t('Dairy name'),
+                      prefixIcon: const Icon(LucideIcons.store, size: 18),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty ? T.t('Required') : null,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: T.t('Mobile number'),
+                      prefixIcon: const Icon(LucideIcons.phone, size: 18),
+                      hintText: '9876543210',
+                    ),
+                    validator: (v) {
+                      final val = v?.trim() ?? '';
+                      if (val.isEmpty) return null;
+                      final digits = val.replaceAll(RegExp(r'\D'), '');
+                      if (digits.length < 10 || digits.length > 15) {
+                        return T.t('Enter a valid 10-15 digit mobile number');
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 22),
+                  FilledButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            if (!editFormKey.currentState!.validate()) return;
+                            setModalState(() => saving = true);
+                            try {
+                              await widget.api.updateProfile(
+                                firstName: firstNameCtrl.text.trim(),
+                                lastName: lastNameCtrl.text.trim(),
+                                dairyName: dairyNameCtrl.text.trim(),
+                                phoneNumber: phoneCtrl.text.trim(),
+                              );
+                              if (Get.isRegistered<DashboardController>()) {
+                                final dashCtrl = Get.find<DashboardController>();
+                                dashCtrl.dairyName.value = dairyNameCtrl.text.trim();
+                                dashCtrl.ownerName.value = '${firstNameCtrl.text.trim()} ${lastNameCtrl.text.trim()}'.trim();
+                              }
+                              Navigator.pop(bottomSheetContext, true);
+                            } catch (error) {
+                              setModalState(() => saving = false);
+                              Get.snackbar(
+                                T.t('Update Failed'),
+                                error.toString(),
+                                snackPosition: SnackPosition.BOTTOM,
+                                margin: const EdgeInsets.all(16),
+                              );
+                            }
+                          },
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: saving
+                          ? DairyMilkLoader.mini(color: Colors.white, size: 22)
+                          : Text(T.t('Save Changes')),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (updated == true) {
+      _loadProfile();
+      Get.snackbar(
+        T.t('Profile Updated'),
+        T.t('Your profile details have been saved successfully.'),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xff1b4d36),
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xfff1f5f9),
     appBar: AppBar(
-      title: Text(T.t('Profile')),
+      title: Text(T.t('Distributor Profile')),
       actions: [
         IconButton(
           tooltip: T.t('Refresh'),
@@ -3419,98 +3581,264 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           );
         }
+
         final profile = snapshot.data ?? {};
         final email = '${profile['email'] ?? ''}'.trim();
         final phone = '${profile['phoneNumber'] ?? profile['phone'] ?? ''}'.trim();
+        final dairyName = '${profile['dairyName'] ?? 'Dairy Desk'}'.trim();
+        final fullName = '${profile['name'] ?? '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}'}'.trim();
+
+        // Access dashboard controller observables if registered
+        DashboardController? dashCtrl;
+        if (Get.isRegistered<DashboardController>()) {
+          dashCtrl = Get.find<DashboardController>();
+        }
+
         return ListView(
-          padding: _pagePadding(context),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
           children: [
+            // 1. Hero Profile Card with Edit Button
             Card(
               clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: Color(0xffe2e8f0)),
+              ),
               child: Column(
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 22),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xff2d7a55), Color(0xff55a776)],
+                        colors: [Color(0xff1b4d36), Color(0xff2d7a55)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                     ),
                     child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 38,
-                          backgroundColor: Colors.white,
-                          child: Text(
-                            _profileInitial(profile),
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xff2d7a55),
+                        Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 40,
+                              backgroundColor: Colors.white,
+                              child: Text(
+                                _profileInitial(profile),
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xff1b4d36),
+                                ),
+                              ),
                             ),
-                          ),
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xff22c55e),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                LucideIcons.check,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '${profile['name'] ?? profile['email'] ?? 'Dairy owner'}',
+                          fullName.isEmpty ? T.t('Dairy Owner') : fullName,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 21,
+                            fontSize: 22,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          email.isEmpty ? '—' : email,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: .85),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(LucideIcons.store, color: Color(0xffdcefe3), size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                dairyName,
+                                style: const TextStyle(
+                                  color: Color(0xffdcefe3),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Color(0xffe1f1e8),
-                        child: Icon(
-                          LucideIcons.store,
-                          color: Color(0xff2d7a55),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () => _openEditProfileDialog(profile),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xffe8f5e9),
+                              foregroundColor: const Color(0xff1b4d36),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(LucideIcons.pencil, size: 16),
+                            label: Text(T.t('Edit Profile Details')),
+                          ),
                         ),
-                      ),
-                      title: Text(T.t('Dairy name')),
-                      subtitle: Text('${profile['dairyName'] ?? '—'}'),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            _SettingsSectionTitle(title: T.t('Account information')),
+            const SizedBox(height: 18),
+
+            // 2. Dairy Business Operations Overview
+            _SettingsSectionTitle(
+              title: T.t('Dairy Business Operations'),
+              icon: LucideIcons.barChart3,
+            ),
             Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xffe2e8f0)),
+              ),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildMetricTile(
+                            label: T.t('Default Delivery'),
+                            value: '${dashCtrl?.defaultLiters.value.toStringAsFixed(1) ?? '1.0'} L',
+                            icon: LucideIcons.milk,
+                            color: const Color(0xff0284c7),
+                            bg: const Color(0xffe0f2fe),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildMetricTile(
+                            label: T.t('Default Price'),
+                            value: '₹${dashCtrl?.defaultPrice.value.toStringAsFixed(1) ?? '60.0'}',
+                            icon: LucideIcons.indianRupee,
+                            color: const Color(0xff16a34a),
+                            bg: const Color(0xffdcfce7),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildMetricTile(
+                            label: T.t('Active Customers'),
+                            value: '${dashCtrl?.customers.length ?? 0} ${T.t("Members")}',
+                            icon: LucideIcons.users,
+                            color: const Color(0xff7c3aed),
+                            bg: const Color(0xffede9fe),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // 3. Contact & Account Details
+            _SettingsSectionTitle(
+              title: T.t('Personal & Contact Info'),
+              icon: LucideIcons.circleUser,
+            ),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xffe2e8f0)),
+              ),
+              color: Colors.white,
               child: Column(
                 children: [
                   _DetailRow(
-                    icon: LucideIcons.circleUser,
-                    label: T.t('Name'),
-                    value: '${profile['name'] ?? '—'}',
+                    icon: LucideIcons.user,
+                    label: T.t('Full Name'),
+                    value: fullName.isEmpty ? '—' : fullName,
                   ),
+                  const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
                   _DetailRow(
                     icon: LucideIcons.mail,
-                    label: T.t('Email address'),
+                    label: T.t('Email Address'),
                     value: email.isEmpty ? '—' : email,
                   ),
-                  if (phone.isNotEmpty)
-                    _DetailRow(
-                      icon: LucideIcons.phone,
-                      label: T.t('Phone number'),
-                      value: phone,
-                    ),
+                  const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
+                  _DetailRow(
+                    icon: LucideIcons.phone,
+                    label: T.t('Mobile Number'),
+                    value: phone.isEmpty ? T.t('Not provided') : phone,
+                  ),
+                  const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
+                  _DetailRow(
+                    icon: LucideIcons.store,
+                    label: T.t('Registered Dairy'),
+                    value: dairyName,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // 4. System & Account Status
+            _SettingsSectionTitle(
+              title: T.t('Security & App Status'),
+              icon: LucideIcons.shieldCheck,
+            ),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xffe2e8f0)),
+              ),
+              color: Colors.white,
+              child: Column(
+                children: [
+                  _SettingsListTile(
+                    icon: LucideIcons.keyRound,
+                    iconBg: const Color(0xfffef3c7),
+                    iconColor: const Color(0xffd97706),
+                    title: T.t('Change password'),
+                    subtitle: T.t('Update your login credentials'),
+                    onTap: () => Get.to(() => ChangePasswordPage(api: widget.api)),
+                  ),
+                  const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
+                  _DetailRow(
+                    icon: LucideIcons.checkCheck,
+                    label: T.t('Account Role'),
+                    value: 'Distributor (Administrator)',
+                  ),
+                  const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
+                  _DetailRow(
+                    icon: LucideIcons.sparkles,
+                    label: T.t('Application Version'),
+                    value: 'v${AppUpdateService.currentVersion} (Build ${AppUpdateService.currentBuildNumber})',
+                  ),
                 ],
               ),
             ),
@@ -3519,6 +3847,53 @@ class _ProfilePageState extends State<ProfilePage> {
       },
     ),
   );
+
+  Widget _buildMetricTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required Color bg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xfff8fafc),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xffe2e8f0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xff1f2937)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _profileInitial(Map<String, dynamic> profile) {
