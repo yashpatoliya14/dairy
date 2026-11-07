@@ -247,7 +247,9 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     final cleanPhone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
     if (cleanPhone.length < 10) {
       setState(() {
-        _errorMessage = T.t('Please enter a valid phone number with country code (e.g. 919876543210)');
+        _errorMessage = T.t(
+          'Please enter a valid phone number with country code (e.g. 919876543210 or 12025550123)',
+        );
         _successMessage = null;
       });
       return;
@@ -622,7 +624,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                     labelText: T.t('Recipient WhatsApp Number'),
                     hintText: '919876543210',
                     prefixIcon: const Icon(LucideIcons.phone, size: 18),
-                    helperText: T.t('Include country code (e.g. 91 for India), no + or spaces.'),
+                    helperText: T.t('Include country code (e.g. 91 for India, 1 for US), no + or spaces.'),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),

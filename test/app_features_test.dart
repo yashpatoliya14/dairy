@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dairy/main.dart';
 import 'package:dairy/services/app_language.dart';
 
 bool isValidEmailForTest(String email) {
@@ -58,6 +59,56 @@ void main() {
       expect(isPhoneNumberForTest('12345'), isFalse);
       expect(isPhoneNumberForTest('7043333359999'), isFalse);
       expect(isPhoneNumberForTest('abcdefghij'), isFalse);
+    });
+
+    test('Customer Phone Number Validation - 10-digit and country-wise format (non-specific to India)', () {
+      // Standard 10-digit numbers from any country (Indian starting with 6-9 and US/Canada starting with 2-5)
+      expect(isValidCustomerPhoneNumber('9876543210'), isTrue);
+      expect(isValidCustomerPhoneNumber('7043333359'), isTrue);
+      expect(isValidCustomerPhoneNumber('2025550123'), isTrue);
+      expect(isValidCustomerPhoneNumber('4155552671'), isTrue);
+      expect(isValidCustomerPhoneNumber('98765 43210'), isTrue);
+      expect(isValidCustomerPhoneNumber('(202) 555-0123'), isTrue);
+
+      // Country-wise international format with country codes
+      expect(isValidCustomerPhoneNumber('+91 98765 43210'), isTrue);
+      expect(isValidCustomerPhoneNumber('+1 202 555 0123'), isTrue);
+      expect(isValidCustomerPhoneNumber('+44 7911 123456'), isTrue);
+      expect(isValidCustomerPhoneNumber('+971 50 123 4567'), isTrue);
+      expect(isValidCustomerPhoneNumber('+61 412 345 678'), isTrue);
+      expect(isValidCustomerPhoneNumber('+966 50 123 4567'), isTrue);
+
+      // Strictly rejects numbers < 10 digits
+      expect(isValidCustomerPhoneNumber('12345'), isFalse);
+      expect(isValidCustomerPhoneNumber('1234567'), isFalse);
+      expect(isValidCustomerPhoneNumber('12345678'), isFalse);
+      expect(isValidCustomerPhoneNumber('123456789'), isFalse);
+
+      // Rejects numbers > 15 digits or invalid characters
+      expect(isValidCustomerPhoneNumber('1234567890123456'), isFalse);
+      expect(isValidCustomerPhoneNumber('abc9876543210'), isFalse);
+      expect(isValidCustomerPhoneNumber(''), isFalse);
+      expect(isValidCustomerPhoneNumber(null), isFalse);
+    });
+
+    test('buildCustomerPhoneNumber and parseCustomerPhone work across countries', () {
+      // India
+      expect(buildCustomerPhoneNumber('9876543210', '+91'), '+919876543210');
+      // US
+      expect(buildCustomerPhoneNumber('2025550123', '+1'), '+12025550123');
+      // Direct
+      expect(buildCustomerPhoneNumber('9876543210', ''), '9876543210');
+      // Already typed with +
+      expect(buildCustomerPhoneNumber('+44 7911 123456', '+91'), '+447911123456');
+
+      // Parsing
+      final parsedIndia = parseCustomerPhone('+919876543210');
+      expect(parsedIndia.$1, '+91');
+      expect(parsedIndia.$2, '9876543210');
+
+      final parsedUS = parseCustomerPhone('+12025550123');
+      expect(parsedUS.$1, '+1');
+      expect(parsedUS.$2, '2025550123');
     });
   });
 

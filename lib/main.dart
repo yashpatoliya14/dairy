@@ -3091,6 +3091,7 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
   late final TextEditingController liters;
   late final TextEditingController price;
   late final TextEditingController phone;
+  String selectedCountryCode = '+91';
   String channel = 'whatsapp';
   bool busy = false;
 
@@ -3116,11 +3117,15 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
     if (!formKey.currentState!.validate()) return;
     setState(() => busy = true);
     try {
+      final fullPhone = buildCustomerPhoneNumber(
+        phone.text.trim(),
+        selectedCountryCode,
+      );
       await widget.api.createCustomer({
         'name': name.text.trim(),
         'liters': double.parse(liters.text.trim()),
         'price': double.parse(price.text.trim()),
-        'phoneNumber': phone.text.trim(),
+        'phoneNumber': fullPhone,
         'notificationChannel': channel,
       });
       if (mounted) Get.back(result: true);
@@ -3174,9 +3179,85 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
               labelText: T.t('Customer phone number'),
-              prefixIcon: Icon(Icons.phone_outlined),
+              hintText: selectedCountryCode.isNotEmpty
+                  ? '98765 43210'
+                  : '+91 98765 43210',
+              helperText: T.t(
+                '10-digit number or country-wise format (e.g. +91 98765 43210)',
+              ),
+              helperMaxLines: 2,
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 10, right: 4),
+                child: PopupMenuButton<String>(
+                  tooltip: T.t('Select Country'),
+                  initialValue: selectedCountryCode,
+                  onSelected: (code) {
+                    setState(() {
+                      selectedCountryCode = code;
+                    });
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        kPopularCountries
+                            .firstWhere(
+                              (c) => c.code == selectedCountryCode,
+                              orElse: () =>
+                                  const CountryDialCode('', '', '🌐'),
+                            )
+                            .flag,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        selectedCountryCode.isNotEmpty
+                            ? selectedCountryCode
+                            : '🌐',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const Icon(Icons.arrow_drop_down, size: 18),
+                      Container(
+                        height: 20,
+                        width: 1,
+                        color: const Color(0xffcbd5e1),
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                    ],
+                  ),
+                  itemBuilder: (context) => kPopularCountries
+                      .map(
+                        (c) => PopupMenuItem<String>(
+                          value: c.code,
+                          child: Row(
+                            children: [
+                              Text(
+                                c.flag,
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${c.name} ${c.code.isNotEmpty ? "(${c.code})" : ""}',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
             ),
-            validator: _phone,
+            validator: (val) => _validateCustomerPhone(
+              val,
+              selectedCountryCode,
+              required: true,
+            ),
           ),
           const SizedBox(height: 14),
           _ChoiceSelector<String>(
@@ -3224,6 +3305,7 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
   late final TextEditingController liters;
   late final TextEditingController price;
   late final TextEditingController phone;
+  late String selectedCountryCode;
   late String channel;
   bool busy = false;
 
@@ -3233,9 +3315,10 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
     name = TextEditingController(text: '${widget.customer['name'] ?? ''}');
     liters = TextEditingController(text: '${widget.customer['liters'] ?? 0}');
     price = TextEditingController(text: '${widget.customer['price'] ?? 0}');
-    phone = TextEditingController(
-      text: '${widget.customer['phoneNumber'] ?? ''}',
-    );
+    final rawPhone = '${widget.customer['phoneNumber'] ?? ''}'.trim();
+    final parsed = parseCustomerPhone(rawPhone);
+    selectedCountryCode = parsed.$1;
+    phone = TextEditingController(text: parsed.$2);
     channel = '${widget.customer['notificationChannel'] ?? 'whatsapp'}';
   }
 
@@ -3250,7 +3333,12 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
         'notificationChannel': channel,
       };
       final phoneValue = phone.text.trim();
-      if (phoneValue.isNotEmpty) changes['phoneNumber'] = phoneValue;
+      if (phoneValue.isNotEmpty) {
+        changes['phoneNumber'] = buildCustomerPhoneNumber(
+          phoneValue,
+          selectedCountryCode,
+        );
+      }
       await widget.api.updateCustomer('${widget.customer['id']}', changes);
       if (mounted) Get.back(result: true);
     } catch (error) {
@@ -3296,8 +3384,87 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
           TextFormField(
             controller: phone,
             keyboardType: TextInputType.phone,
-            decoration: InputDecoration(labelText: T.t('Phone number')),
-            validator: _optionalPhone,
+            decoration: InputDecoration(
+              labelText: T.t('Customer phone number'),
+              hintText: selectedCountryCode.isNotEmpty
+                  ? '98765 43210'
+                  : '+91 98765 43210',
+              helperText: T.t(
+                '10-digit number or country-wise format (e.g. +91 98765 43210)',
+              ),
+              helperMaxLines: 2,
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 10, right: 4),
+                child: PopupMenuButton<String>(
+                  tooltip: T.t('Select Country'),
+                  initialValue: selectedCountryCode,
+                  onSelected: (code) {
+                    setState(() {
+                      selectedCountryCode = code;
+                    });
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        kPopularCountries
+                            .firstWhere(
+                              (c) => c.code == selectedCountryCode,
+                              orElse: () =>
+                                  const CountryDialCode('', '', '🌐'),
+                            )
+                            .flag,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        selectedCountryCode.isNotEmpty
+                            ? selectedCountryCode
+                            : '🌐',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const Icon(Icons.arrow_drop_down, size: 18),
+                      Container(
+                        height: 20,
+                        width: 1,
+                        color: const Color(0xffcbd5e1),
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                    ],
+                  ),
+                  itemBuilder: (context) => kPopularCountries
+                      .map(
+                        (c) => PopupMenuItem<String>(
+                          value: c.code,
+                          child: Row(
+                            children: [
+                              Text(
+                                c.flag,
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${c.name} ${c.code.isNotEmpty ? "(${c.code})" : ""}',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
+            validator: (val) => _validateCustomerPhone(
+              val,
+              selectedCountryCode,
+              required: false,
+            ),
           ),
           const SizedBox(height: 14),
           _ChoiceSelector<String>(
@@ -3357,14 +3524,127 @@ String? _number(String? value) {
   return number < 0 ? 'Cannot be negative' : null;
 }
 
-String? _phone(String? value) {
-  if (value == null || value.trim().isEmpty) return T.t('Required');
-  return _optionalPhone(value);
+class CountryDialCode {
+  final String name;
+  final String code;
+  final String flag;
+
+  const CountryDialCode(this.name, this.code, this.flag);
 }
 
-String? _optionalPhone(String? value) {
-  if (value == null || value.trim().isEmpty) return null;
-  return RegExp(r'^[0-9+()\-\s]{7,20}$').hasMatch(value.trim())
-      ? null
-      : 'Enter a valid phone number';
+const List<CountryDialCode> kPopularCountries = [
+  CountryDialCode('India', '+91', '🇮🇳'),
+  CountryDialCode('United States', '+1', '🇺🇸'),
+  CountryDialCode('United Kingdom', '+44', '🇬🇧'),
+  CountryDialCode('Canada', '+1', '🇨🇦'),
+  CountryDialCode('Australia', '+61', '🇦🇺'),
+  CountryDialCode('UAE', '+971', '🇦🇪'),
+  CountryDialCode('Saudi Arabia', '+966', '🇸🇦'),
+  CountryDialCode('New Zealand', '+64', '🇳🇿'),
+  CountryDialCode('Singapore', '+65', '🇸🇬'),
+  CountryDialCode('Germany', '+49', '🇩🇪'),
+  CountryDialCode('France', '+33', '🇫🇷'),
+  CountryDialCode('Kenya', '+254', '🇰🇪'),
+  CountryDialCode('South Africa', '+27', '🇿🇦'),
+  CountryDialCode('Nepal', '+977', '🇳🇵'),
+  CountryDialCode('Bangladesh', '+880', '🇧🇩'),
+  CountryDialCode('Pakistan', '+92', '🇵🇰'),
+  CountryDialCode('Direct (No code)', '', '🌐'),
+];
+
+/// Validates whether a phone input strictly follows:
+/// 1. Exactly 10 digits (national 10-digit format for any country), OR
+/// 2. Country-wise international format (10-15 digits total, E.164 compliant).
+///
+/// Strictly rejects inputs < 10 digits (such as 7 digits), > 15 digits, or invalid characters.
+bool isValidCustomerPhoneNumber(String? value) {
+  if (value == null) return false;
+  final clean = value.trim();
+  if (clean.isEmpty) return false;
+
+  // Only allow digits, optional leading '+', and formatting characters (spaces, hyphens, parentheses)
+  if (!RegExp(r'^\+?[0-9\s\-()]+$').hasMatch(clean)) return false;
+
+  final digits = clean.replaceAll(RegExp(r'\D'), '');
+
+  // Must have between 10 and 15 digits (ITU-T E.164 recommendation)
+  if (digits.length < 10 || digits.length > 15) return false;
+
+  // Case 1: If starts with '+', country code cannot start with '0'
+  if (clean.startsWith('+')) {
+    final withoutPlus = clean.substring(1).replaceAll(RegExp(r'\D'), '');
+    return withoutPlus.length >= 10 && !withoutPlus.startsWith('0');
+  }
+
+  // Case 2: Exactly 10 digits (works for any country's 10-digit numbers, not restricted to India)
+  if (digits.length == 10) {
+    return true;
+  }
+
+  // Case 3: 11-15 digits without '+'
+  return !digits.startsWith('0');
 }
+
+String buildCustomerPhoneNumber(String rawPhone, String countryCode) {
+  final clean = rawPhone.trim();
+  if (clean.isEmpty) return '';
+
+  if (clean.startsWith('+')) {
+    final digits = clean.substring(1).replaceAll(RegExp(r'\D'), '');
+    return '+$digits';
+  }
+
+  final digits = clean.replaceAll(RegExp(r'\D'), '');
+  if (countryCode.isNotEmpty) {
+    final prefixDigits = countryCode.replaceAll(RegExp(r'\D'), '');
+    if (prefixDigits.isNotEmpty &&
+        digits.startsWith(prefixDigits) &&
+        digits.length > 10) {
+      return '+$digits';
+    }
+    return '$countryCode$digits';
+  }
+
+  return digits;
+}
+
+(String, String) parseCustomerPhone(String storedPhone) {
+  final clean = storedPhone.trim();
+  if (clean.isEmpty) return ('+91', '');
+
+  if (clean.startsWith('+')) {
+    for (final c in kPopularCountries) {
+      if (c.code.isNotEmpty && clean.startsWith(c.code)) {
+        return (c.code, clean.substring(c.code.length).trim());
+      }
+    }
+    return ('', clean);
+  }
+
+  if (clean.length == 10) {
+    return ('+91', clean);
+  }
+  if (clean.length == 12 && clean.startsWith('91')) {
+    return ('+91', clean.substring(2));
+  }
+
+  return ('', clean);
+}
+
+String? _validateCustomerPhone(
+  String? value,
+  String countryCode, {
+  bool required = true,
+}) {
+  if (value == null || value.trim().isEmpty) {
+    return required ? T.t('Required') : null;
+  }
+
+  final fullNumber = buildCustomerPhoneNumber(value, countryCode);
+  if (!isValidCustomerPhoneNumber(fullNumber)) {
+    return T.t('Enter a valid 10-digit number or country format');
+  }
+  return null;
+}
+
+
