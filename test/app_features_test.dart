@@ -126,6 +126,12 @@ void main() {
       expect(T.t('Total Amount', language: 'gu'), 'કુલ રકમ');
       expect(T.t('Message Preview', language: 'gu'), 'મેસેજ પૂર્વાવલોકન');
       expect(T.t('Copy Message', language: 'gu'), 'મેસેજ કોપી કરો');
+      expect(T.t('Change password', language: 'gu'), 'પાસવર્ડ બદલો');
+      expect(T.t('Contact support', language: 'gu'), 'સપોર્ટનો સંપર્ક કરો');
+      expect(T.t('Send feedback', language: 'gu'), 'પ્રતિસાદ મોકલો');
+      expect(T.t('Change password', language: 'hi'), 'पासवर्ड बदलें');
+      expect(T.t('Contact support', language: 'hi'), 'सपोर्ट से संपर्क करें');
+      expect(T.t('Send feedback', language: 'hi'), 'प्रतिक्रिया भेजें');
     });
 
     test('Falls back gracefully to English when language is en', () {

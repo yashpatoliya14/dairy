@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'dart:developer' as developer;
@@ -2341,29 +2340,11 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late String language;
-  bool notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
     language = Get.find<AppLanguageController>().language.value;
-    _loadNotificationPreference();
-  }
-
-  Future<void> _loadNotificationPreference() async {
-    final preferences = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(
-        () => notificationsEnabled =
-            preferences.getBool('notifications_enabled') ?? true,
-      );
-    }
-  }
-
-  Future<void> _setNotifications(bool value) async {
-    setState(() => notificationsEnabled = value);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool('notifications_enabled', value);
   }
 
   Future<void> _confirmLogout() async {
@@ -2378,6 +2359,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Text(T.t('Cancel')),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xffdc2626)),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(T.t('Log out')),
           ),
@@ -2393,164 +2375,288 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xfff5f8f6),
+    backgroundColor: const Color(0xfff1f5f9),
     appBar: AppBar(
+      backgroundColor: const Color(0xff1b4d36),
+      foregroundColor: Colors.white,
+      elevation: 0,
       title: Text(
         T.t('Settings'),
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
       ),
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
     ),
-    body: Stack(
-      fit: StackFit.expand,
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        // 1. Soft sky gradient background matching the artwork
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xfff7faf8),
-                Color(0xffeef5f0),
-                Color(0xffe4f0e8),
+        // 1. Dairy Configuration
+        _SettingsSectionTitle(
+          title: T.t('Dairy configuration'),
+          icon: LucideIcons.milk,
+        ),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xffe2e8f0)),
+          ),
+          color: Colors.white,
+          child: _SettingsListTile(
+            icon: LucideIcons.milk,
+            iconBg: const Color(0xffe8f5e9),
+            iconColor: const Color(0xff2d7a55),
+            title: T.t('Default milk & price'),
+            subtitle:
+                '${_formatNumber(widget.defaultLiters)} L • ₹${_formatNumber(widget.defaultPrice)} / L',
+            onTap: () async {
+              final updated = await Get.to<bool>(
+                () => DefaultMilkPricePage(
+                  api: widget.api,
+                  defaultLiters: widget.defaultLiters,
+                  defaultPrice: widget.defaultPrice,
+                ),
+              );
+              if (updated == true && mounted) {
+                Get.back(result: true);
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // 2. Language & Localization
+        _SettingsSectionTitle(
+          title: T.t('Language & localization'),
+          icon: LucideIcons.languages,
+        ),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xffe2e8f0)),
+          ),
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xffe0f2fe),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        LucideIcons.globe,
+                        color: Color(0xff0284c7),
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      T.t('Language'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color(0xff1f2937),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildLanguageChip(
+                      code: 'en',
+                      label: 'English',
+                      subLabel: 'English',
+                    ),
+                    const SizedBox(width: 8),
+                    _buildLanguageChip(
+                      code: 'gu',
+                      label: 'ગુજરાતી',
+                      subLabel: 'Gujarati',
+                    ),
+                    const SizedBox(width: 8),
+                    _buildLanguageChip(
+                      code: 'hi',
+                      label: 'हिन्दी',
+                      subLabel: 'Hindi',
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
-        // 2. Full artwork in the background properly anchored and fitted
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 840),
-                child: Opacity(
-                  opacity: 0.3,
-                  child: ShaderMask(
-                    shaderCallback: (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black,
-                      ],
-                      stops: [0.0, 0.15],
-                    ).createShader(rect),
-                    blendMode: BlendMode.dstIn,
-                    child: Image.asset(
-                      'assets/india_dairy_background.png',
-                      fit: BoxFit.fitWidth,
-                      alignment: Alignment.bottomCenter,
-                    ),
-                  ),
-                ),
+        const SizedBox(height: 18),
+
+        // 3. Account & Security
+        _SettingsSectionTitle(
+          title: T.t('Account & security'),
+          icon: LucideIcons.shieldCheck,
+        ),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xffe2e8f0)),
+          ),
+          color: Colors.white,
+          child: Column(
+            children: [
+              _SettingsListTile(
+                icon: LucideIcons.user,
+                iconBg: const Color(0xffede9fe),
+                iconColor: const Color(0xff7c3aed),
+                title: T.t('View profile'),
+                onTap: () => Get.to(() => ProfilePage(api: widget.api)),
               ),
-            ),
+              const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
+              _SettingsListTile(
+                icon: LucideIcons.keyRound,
+                iconBg: const Color(0xfffef3c7),
+                iconColor: const Color(0xffd97706),
+                title: T.t('Change password'),
+                onTap: () => Get.to(() => ChangePasswordPage(api: widget.api)),
+              ),
+            ],
           ),
         ),
-        // 3. Settings list with glassmorphic cards scrolling smoothly over background
-        ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 220),
-          children: [
-            _SettingsSectionTitle(title: T.t('Dairy')),
-            _SettingsAction(
-              icon: LucideIcons.glassWater,
-              title: T.t('Default milk & price'),
-              onTap: () async {
-                final updated = await Get.to<bool>(
-                  () => DefaultMilkPricePage(
-                    api: widget.api,
-                    defaultLiters: widget.defaultLiters,
-                    defaultPrice: widget.defaultPrice,
-                  ),
-                );
-                if (updated == true && mounted) {
-                  Get.back(result: true);
-                }
-              },
-            ),
-            const SizedBox(height: 24),
-            _SettingsSectionTitle(title: T.t('App language')),
-            Card(
-              color: Colors.white.withValues(alpha: 0.90),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: _ChoiceSelector<String>(
-                  label: T.t('Language'),
-                  value: language,
-                  options: {
-                    'en': T.t('English'),
-                    'hi': T.t('Hindi'),
-                    'gu': T.t('Gujarati'),
-                  },
-                  enabled: true,
-                  onChanged: (value) async {
-                    setState(() => language = value);
-                    await Get.find<AppLanguageController>().setLanguage(value);
-                  },
+        const SizedBox(height: 18),
+
+        // 4. Help & Support
+        _SettingsSectionTitle(
+          title: T.t('Help & support'),
+          icon: LucideIcons.lifeBuoy,
+        ),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xffe2e8f0)),
+          ),
+          color: Colors.white,
+          child: Column(
+            children: [
+              _SettingsListTile(
+                icon: LucideIcons.headphones,
+                iconBg: const Color(0xffccfbf1),
+                iconColor: const Color(0xff0f766e),
+                title: T.t('Contact support'),
+                subtitle: 'support@dairydesk.app',
+                onTap: () => _openSupportEmail(context),
+              ),
+              const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
+              _SettingsListTile(
+                icon: LucideIcons.messageSquareText,
+                iconBg: const Color(0xfff3e8ff),
+                iconColor: const Color(0xff9333ea),
+                title: T.t('Send feedback'),
+                subtitle: T.t('Help us improve Dairy Desk'),
+                onTap: () => _showFeedbackDialog(context),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+
+        // 5. Log Out Action
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xfffee2e2)),
+          ),
+          color: Colors.white,
+          child: _SettingsListTile(
+            icon: LucideIcons.logOut,
+            iconBg: const Color(0xfffee2e2),
+            iconColor: const Color(0xffdc2626),
+            title: T.t('Log out'),
+            titleColor: const Color(0xffdc2626),
+            onTap: _confirmLogout,
+          ),
+        ),
+        const SizedBox(height: 28),
+
+        // App Footer & Version Info
+        Center(
+          child: Column(
+            children: [
+              Text(
+                'Dairy Desk • v1.0.0',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade500,
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _SettingsSectionTitle(title: T.t('Preferences')),
-            Card(
-              color: Colors.white.withValues(alpha: 0.90),
-              child: SwitchListTile.adaptive(
-                secondary: const Icon(LucideIcons.bell, color: Color(0xff2d7a55)),
-                title: Text(
-                  T.t('Notifications'),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+              const SizedBox(height: 4),
+              Text(
+                'Smart Dairy Management Solution',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade400,
                 ),
-                subtitle: Text(
-                  notificationsEnabled
-                      ? T.t('Daily reminders are enabled')
-                      : T.t('Daily reminders are disabled'),
-                ),
-                value: notificationsEnabled,
-                onChanged: _setNotifications,
               ),
-            ),
-            const SizedBox(height: 24),
-            _SettingsSectionTitle(title: T.t('Account')),
-            _SettingsAction(
-              icon: LucideIcons.circleUser,
-              title: T.t('View profile'),
-              onTap: () => Get.to(() => ProfilePage(api: widget.api)),
-            ),
-            _SettingsAction(
-              icon: LucideIcons.keyRound,
-              title: T.t('Change password'),
-              onTap: () => Get.to(() => ChangePasswordPage(api: widget.api)),
-            ),
-            const SizedBox(height: 24),
-            _SettingsSectionTitle(title: T.t('Help & feedback')),
-            _SettingsAction(
-              icon: LucideIcons.headphones,
-              title: T.t('Contact support'),
-              onTap: () => _openSupportEmail(context),
-            ),
-            _SettingsAction(
-              icon: LucideIcons.messageSquareText,
-              title: T.t('Send feedback'),
-              onTap: () => _showFeedbackDialog(context),
-            ),
-            const SizedBox(height: 24),
-            _SettingsAction(
-              icon: LucideIcons.logOut,
-              title: T.t('Log out'),
-              color: Colors.red.shade700,
-              onTap: _confirmLogout,
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     ),
   );
+
+  Widget _buildLanguageChip({
+    required String code,
+    required String label,
+    required String subLabel,
+  }) {
+    final isSelected = language == code;
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          setState(() => language = code);
+          await Get.find<AppLanguageController>().setLanguage(code);
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xff1b4d36) : const Color(0xfff8fafc),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? const Color(0xff1b4d36) : const Color(0xffe2e8f0),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: isSelected ? Colors.white : const Color(0xff1f2937),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subLabel,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isSelected ? const Color(0xffc2e7cf) : Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class DefaultMilkPricePage extends StatefulWidget {
@@ -2609,52 +2715,108 @@ class _DefaultMilkPricePageState extends State<DefaultMilkPricePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(T.t('Default milk & price'))),
+    backgroundColor: const Color(0xfff1f5f9),
+    appBar: AppBar(
+      backgroundColor: const Color(0xff1b4d36),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      title: Text(
+        T.t('Default milk & price'),
+        style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+      ),
+    ),
     body: Form(
       key: formKey,
       child: ListView(
-        padding: _pagePadding(context),
+        padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            T.t('Default milk & price'),
-            style: Theme.of(context).textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            T.t(
-              'These values are filled automatically when you add a customer. '
-              'You can change them for any individual customer.',
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xffe2e8f0)),
             ),
-          ),
-          const SizedBox(height: 24),
-          TextFormField(
-            controller: liters,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: T.t('Default liters'),
-              prefixIcon: const Icon(Icons.local_drink_outlined),
-            ),
-            validator: _number,
-          ),
-          const SizedBox(height: 14),
-          TextFormField(
-            controller: price,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: T.t('Default price per liter'),
-              prefixIcon: const Icon(Icons.payments_outlined),
-            ),
-            validator: _number,
-          ),
-          const SizedBox(height: 28),
-          FilledButton(
-            onPressed: busy ? null : save,
+            color: Colors.white,
             child: Padding(
-              padding: const EdgeInsets.all(13),
-              child: busy
-                  ? DairyMilkLoader.mini(color: Colors.white, size: 22)
-                  : Text(T.t('Save defaults')),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xffe8f5e9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          LucideIcons.milk,
+                          color: Color(0xff2d7a55),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              T.t('Default milk & price'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xff1f2937),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              T.t(
+                                'These values are filled automatically when you add a customer. '
+                                'You can change them for any individual customer.',
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: liters,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: T.t('Default liters'),
+                      prefixIcon: const Icon(LucideIcons.milk, size: 18),
+                    ),
+                    validator: _number,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: price,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: T.t('Default price per liter'),
+                      prefixIcon: const Icon(LucideIcons.indianRupee, size: 18),
+                    ),
+                    validator: _number,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: busy ? null : save,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: busy
+                          ? DairyMilkLoader.mini(color: Colors.white, size: 22)
+                          : Text(T.t('Save defaults')),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -2663,47 +2825,101 @@ class _DefaultMilkPricePageState extends State<DefaultMilkPricePage> {
   );
 }
 
-class _SettingsAction extends StatelessWidget {
-  const _SettingsAction({
+class _SettingsListTile extends StatelessWidget {
+  const _SettingsListTile({
     required this.icon,
+    required this.iconBg,
+    required this.iconColor,
     required this.title,
+    this.subtitle,
     required this.onTap,
-    this.color,
+    this.titleColor,
   });
+
   final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
-  final Color? color;
+  final Color? titleColor;
 
   @override
-  Widget build(BuildContext context) => Card(
-    color: Colors.white.withValues(alpha: 0.90),
-    child: ListTile(
-      leading: Icon(icon, color: color ?? const Color(0xff2d7a55)),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w500,
-          color: color,
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: titleColor ?? const Color(0xff1f2937),
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
+          ],
         ),
       ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
-    ),
-  );
+    );
+  }
 }
 
 class _SettingsSectionTitle extends StatelessWidget {
-  const _SettingsSectionTitle({required this.title});
+  const _SettingsSectionTitle({required this.title, this.icon});
   final String title;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 4, bottom: 4),
-    child: Text(
-      title,
-      style: Theme.of(context).textTheme.titleMedium
-          ?.copyWith(fontWeight: FontWeight.bold),
+    padding: const EdgeInsets.only(left: 4, bottom: 6),
+    child: Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 14, color: const Color(0xff1b4d36)),
+          const SizedBox(width: 6),
+        ],
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+            color: Color(0xff475569),
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -2998,6 +3214,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   final current = TextEditingController();
   final next = TextEditingController();
   final confirm = TextEditingController();
+  bool hideCurrent = true;
+  bool hideNext = true;
+  bool hideConfirm = true;
   bool busy = false;
 
   @override
@@ -3033,43 +3252,146 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(T.t('Change password'))),
+    backgroundColor: const Color(0xfff1f5f9),
+    appBar: AppBar(
+      backgroundColor: const Color(0xff1b4d36),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      title: Text(
+        T.t('Change password'),
+        style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+      ),
+    ),
     body: Form(
       key: formKey,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
-          TextFormField(
-            controller: current,
-            obscureText: true,
-            decoration: InputDecoration(labelText: T.t('Current password')),
-            validator: (value) =>
-                value == null || value.isEmpty ? T.t('Required') : null,
-          ),
-          const SizedBox(height: 14),
-          TextFormField(
-            controller: next,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: T.t('New password'),
-              helperText: T.t(
-                'Minimum 6 characters, 1 number, 1 special character',
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xffe2e8f0)),
+            ),
+            color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xfffef3c7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          LucideIcons.keyRound,
+                          color: Color(0xffd97706),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              T.t('Change password'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xff1f2937),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              T.t(
+                                'Minimum 6 characters, 1 number, 1 special character',
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: current,
+                    obscureText: hideCurrent,
+                    decoration: InputDecoration(
+                      labelText: T.t('Current password'),
+                      prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          hideCurrent ? LucideIcons.eyeOff : LucideIcons.eye,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            setState(() => hideCurrent = !hideCurrent),
+                      ),
+                    ),
+                    validator: (value) =>
+                        value == null || value.isEmpty ? T.t('Required') : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: next,
+                    obscureText: hideNext,
+                    decoration: InputDecoration(
+                      labelText: T.t('New password'),
+                      prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          hideNext ? LucideIcons.eyeOff : LucideIcons.eye,
+                          size: 18,
+                        ),
+                        onPressed: () => setState(() => hideNext = !hideNext),
+                      ),
+                    ),
+                    validator: _strongPasswordError,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: confirm,
+                    obscureText: hideConfirm,
+                    decoration: InputDecoration(
+                      labelText: T.t('Confirm new password'),
+                      prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          hideConfirm ? LucideIcons.eyeOff : LucideIcons.eye,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            setState(() => hideConfirm = !hideConfirm),
+                      ),
+                    ),
+                    validator: (value) =>
+                        value == next.text ? null : T.t('Passwords do not match'),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: busy ? null : save,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: busy
+                          ? DairyMilkLoader.mini(
+                              color: Colors.white,
+                              size: 20,
+                            )
+                          : Text(T.t('Change password')),
+                    ),
+                  ),
+                ],
               ),
             ),
-            validator: _strongPasswordError,
-          ),
-          const SizedBox(height: 14),
-          TextFormField(
-            controller: confirm,
-            obscureText: true,
-            decoration: InputDecoration(labelText: T.t('Confirm new password')),
-            validator: (value) =>
-                value == next.text ? null : T.t('Passwords do not match'),
-          ),
-          const SizedBox(height: 28),
-          FilledButton(
-            onPressed: busy ? null : save,
-            child: Text(T.t('Change password')),
           ),
         ],
       ),
