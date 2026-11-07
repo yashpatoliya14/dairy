@@ -285,12 +285,20 @@ class _CustomerMessageDetailsScreenState
         : null;
 
     return Scaffold(
+      backgroundColor: const Color(0xfff1f5f9),
       appBar: AppBar(
-        title: Text(T.t('Customer Message Details')),
+        backgroundColor: const Color(0xff1b4d36),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          T.t('Customer Message Details'),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         actions: [
           IconButton(
             tooltip: T.t('Copy Message'),
-            icon: const Icon(LucideIcons.copy),
+            icon: const Icon(LucideIcons.copy, color: Colors.white),
             onPressed: _copyMessage,
           ),
         ],

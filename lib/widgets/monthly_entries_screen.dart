@@ -66,24 +66,29 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color(0xff1b4d36),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         title: Obx(() => Text(
           _monthLabel(
             controller.selectedMonth.value,
             controller.selectedYear.value,
           ),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         )),
         actions: [
           Obx(() => controller.undoStack.isNotEmpty
               ? IconButton(
                   tooltip: T.t('Undo'),
                   onPressed: controller.saving.value ? null : _handleUndo,
-                  icon: const Icon(LucideIcons.undo2),
+                  icon: const Icon(LucideIcons.undo2, color: Colors.white),
                 )
               : const SizedBox.shrink()),
           IconButton(
             tooltip: T.t('Select month'),
             onPressed: () => _pickMonthYear(context),
-            icon: const Icon(LucideIcons.calendarDays),
+            icon: const Icon(LucideIcons.calendarDays, color: Colors.white),
           ),
         ],
       ),

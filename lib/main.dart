@@ -152,19 +152,65 @@ class DairyApp extends StatelessWidget {
         title: 'Dairy Desk',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff2d7a55)),
-          scaffoldBackgroundColor: const Color(0xfff7faf8),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xff2d7a55),
+            primary: const Color(0xff1b4d36),
+          ),
+          scaffoldBackgroundColor: const Color(0xfff1f5f9),
           textTheme: _buildTextTheme(currentLang),
           appBarTheme: const AppBarTheme(
             centerTitle: false,
-            surfaceTintColor: Colors.transparent,
-          ),
-          cardTheme: CardThemeData(
             elevation: 0,
-            margin: const EdgeInsets.symmetric(vertical: 5),
+            backgroundColor: Color(0xff1b4d36),
+            foregroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            iconTheme: IconThemeData(color: Colors.white),
+            actionsIconTheme: IconThemeData(color: Colors.white),
+            titleTextStyle: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+            ),
+          ),
+          navigationBarTheme: NavigationBarThemeData(
+            backgroundColor: const Color(0xff1b4d36),
+            surfaceTintColor: Colors.transparent,
+            elevation: 8,
+            indicatorColor: const Color(0xff2d7a55),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const IconThemeData(color: Colors.white, size: 22);
+              }
+              return const IconThemeData(color: Color(0xffc2e7cf), size: 22);
+            }),
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                );
+              }
+              return const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xffc2e7cf),
+              );
+            }),
+          ),
+          cardTheme: const CardThemeData(
+            color: Colors.white,
+            elevation: 0,
+            margin: EdgeInsets.symmetric(vertical: 5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(18)),
-              side: BorderSide(color: Color(0xffe3ebe6)),
+              side: BorderSide(color: Color(0xffe2e8f0)),
             ),
           ),
           filledButtonTheme: FilledButtonThemeData(
@@ -817,37 +863,42 @@ class _DashboardState extends State<Dashboard> {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentTab,
-        onDestinationSelected: (index) {
-          setState(() => _currentTab = index);
-        },
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(LucideIcons.layoutDashboard),
-            selectedIcon:
-                const Icon(LucideIcons.layoutDashboard, color: Color(0xff2d7a55)),
-            label: T.t('Dashboard'),
-          ),
-          NavigationDestination(
-            icon: const Icon(LucideIcons.users),
-            selectedIcon:
-                const Icon(LucideIcons.users, color: Color(0xff2d7a55)),
-            label: T.t('Customers'),
-          ),
-          NavigationDestination(
-            icon: const Icon(LucideIcons.messageCircle),
-            selectedIcon:
-                const Icon(LucideIcons.messageCircle, color: Color(0xff25D366)),
-            label: T.t('Messages'),
-          ),
-          NavigationDestination(
-            icon: const Icon(LucideIcons.settings),
-            selectedIcon:
-                const Icon(LucideIcons.settings, color: Color(0xff2d7a55)),
-            label: T.t('Settings'),
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xff1b4d36),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 10,
+              offset: Offset(0, -3),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          backgroundColor: const Color(0xff1b4d36),
+          selectedIndex: _currentTab,
+          onDestinationSelected: (index) {
+            setState(() => _currentTab = index);
+          },
+          destinations: [
+            NavigationDestination(
+              icon: const Icon(LucideIcons.layoutDashboard),
+              label: T.t('Dashboard'),
+            ),
+            NavigationDestination(
+              icon: const Icon(LucideIcons.users),
+              label: T.t('Customers'),
+            ),
+            NavigationDestination(
+              icon: const Icon(LucideIcons.messageCircle),
+              label: T.t('Messages'),
+            ),
+            NavigationDestination(
+              icon: const Icon(LucideIcons.settings),
+              label: T.t('Settings'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -866,8 +917,10 @@ class _DashboardState extends State<Dashboard> {
       }).toList();
 
       return Scaffold(
+        backgroundColor: const Color(0xfff1f5f9),
         appBar: AppBar(
           automaticallyImplyLeading: false,
+          backgroundColor: const Color(0xff1b4d36),
           title: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -882,6 +935,7 @@ class _DashboardState extends State<Dashboard> {
                   fontSize: 19,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -.2,
+                  color: Colors.white,
                 ),
               ),
               if (controller.ownerName.value.isNotEmpty)
@@ -889,8 +943,8 @@ class _DashboardState extends State<Dashboard> {
                   'Hello, ${controller.ownerName.value}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  style: const TextStyle(
+                    color: Color(0xffdcefe3),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -901,7 +955,7 @@ class _DashboardState extends State<Dashboard> {
             IconButton(
               tooltip: T.t('Refresh customers'),
               onPressed: controller.loading.value ? null : controller.load,
-              icon: const Icon(LucideIcons.refreshCw),
+              icon: const Icon(LucideIcons.refreshCw, color: Colors.white),
             ),
           ],
         ),
@@ -1696,8 +1750,14 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: const Color(0xfff1f5f9),
       appBar: AppBar(
-        title: Text(T.t('Customer details')),
+        title: Text(
+          T.t('Customer details'),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        backgroundColor: const Color(0xff1b4d36),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             tooltip: T.t('Bill & Entries'),
@@ -1709,7 +1769,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             ),
             icon: const Icon(
               LucideIcons.receiptText,
-              color: Color(0xff2d7a55),
+              color: Colors.white,
             ),
           ),
           IconButton(
@@ -1721,13 +1781,13 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             ),
             icon: const Icon(
               LucideIcons.messageCircle,
-              color: Color(0xff25D366),
+              color: Color(0xff4ade80),
             ),
           ),
           IconButton(
             tooltip: T.t('Edit customer'),
             onPressed: _editCustomer,
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(Icons.edit_outlined, color: Colors.white),
           ),
         ],
       ),

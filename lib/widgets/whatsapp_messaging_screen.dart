@@ -512,9 +512,13 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color(0xff1b4d36),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           dairyName.isNotEmpty ? '$dairyName • ${T.t('Messages')}' : T.t('Send Messages'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
         ),
         actions: [
           IconButton(

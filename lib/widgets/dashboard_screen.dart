@@ -67,22 +67,22 @@ class DashboardScreen extends StatelessWidget {
       }).toList();
 
       return Scaffold(
-        backgroundColor: const Color(0xfff7faf8),
+        backgroundColor: const Color(0xfff1f5f9),
         appBar: AppBar(
           automaticallyImplyLeading: false,
           elevation: 0,
-          backgroundColor: Colors.white,
+          backgroundColor: const Color(0xff1b4d36),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: const Color(0xffdcefe3),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   LucideIcons.milk,
-                  color: Color(0xff2d7a55),
+                  color: Colors.white,
                   size: 20,
                 ),
               ),
@@ -101,6 +101,7 @@ class DashboardScreen extends StatelessWidget {
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -.3,
+                        color: Colors.white,
                       ),
                     ),
                     if (controller.ownerName.value.isNotEmpty)
@@ -108,8 +109,8 @@ class DashboardScreen extends StatelessWidget {
                         '${T.t("Welcome back")}, ${controller.ownerName.value}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        style: const TextStyle(
+                          color: Color(0xffdcefe3),
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),
