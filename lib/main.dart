@@ -254,7 +254,7 @@ class DairyApp extends StatelessWidget {
         ],
         home: Obx(
           () => !appController.ready.value
-              ? const _Loading()
+              ? const DairySplashScreen()
               : appController.api.hasSession
               ? Dashboard(api: api)
               : AuthPage(api: api),
@@ -264,19 +264,123 @@ class DairyApp extends StatelessWidget {
   }
 }
 
-class _Loading extends StatelessWidget {
-  const _Loading();
+class DairySplashScreen extends StatelessWidget {
+  const DairySplashScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xfff7faf8),
-      body: Center(
-        child: DairyMilkLoader(
-          size: 54,
-          message: 'Starting Dairy Desk...',
-          subtitle: 'Pure & Fresh Dairy Management',
-        ),
+    final media = MediaQuery.sizeOf(context);
+    final shortest = media.shortestSide;
+    // Responsive loader icon size scaling with screen width/height:
+    // Small phones (~320-360px): ~100-108px
+    // Standard phones (~390-430px): ~120-130px
+    // Tablets / Large screens (>600px): ~160-180px
+    final loaderSize = (shortest * 0.30).clamp(100.0, 180.0);
+
+    return Scaffold(
+      backgroundColor: const Color(0xfff7faf8),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xfff8fbf9),
+                  Color(0xffedf5f0),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Spacer(flex: 3),
+                    DairyMilkLoader(
+                      size: loaderSize,
+                      showText: false,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Dairy Desk',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: (shortest * 0.07).clamp(24.0, 34.0),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: const Color(0xff1b4d36),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      T.t('Pure & Fresh Dairy Management'),
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.dmSans(
+                        fontSize: (shortest * 0.035).clamp(13.0, 16.0),
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xff2d7a55),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xffdcefe3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xff1b4d36).withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xff2d7a55),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            T.t('Starting Dairy Desk...'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xff1b4d36),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(flex: 4),
+                    Text(
+                      'Smart & Simple Milk Accounting',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade500,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3613,17 +3717,6 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
               selectedCountryCode,
               required: true,
             ),
-          ),
-          const SizedBox(height: 14),
-          _ChoiceSelector<String>(
-            label: T.t('Send daily message using'),
-            value: channel,
-            options: {
-              'whatsapp': T.t('WhatsApp'),
-              'sms': T.t('SMS / Messages'),
-            },
-            enabled: !busy,
-            onChanged: (value) => setState(() => channel = value),
           ),
           const SizedBox(height: 28),
           FilledButton(

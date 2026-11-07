@@ -455,7 +455,7 @@ class _DairyMilkPainter extends CustomPainter {
     // --- Wave 1: Back Cream Wave (slight cream/greenish-cream tint) ---
     final backWavePath = Path();
     final phase1 = animationProgress * 2 * math.pi;
-    final amp1 = (w * 0.075).clamp(2.0, 4.0);
+    final amp1 = (w * 0.075).clamp(2.0, 9.0);
     backWavePath.moveTo(cx - bodyWidth, botY + 10);
     backWavePath.lineTo(cx - bodyWidth, liquidBaseY);
     for (double x = cx - bodyWidth; x <= cx + bodyWidth; x += 2.5) {
@@ -474,7 +474,7 @@ class _DairyMilkPainter extends CustomPainter {
     // --- Wave 2: Front Rich Milk Wave (pure white creamy milk) ---
     final frontWavePath = Path();
     final phase2 = -animationProgress * 2 * math.pi * 1.35;
-    final amp2 = (w * 0.085).clamp(2.5, 4.5);
+    final amp2 = (w * 0.085).clamp(2.5, 10.5);
     frontWavePath.moveTo(cx - bodyWidth, botY + 10);
     frontWavePath.lineTo(cx - bodyWidth, liquidBaseY);
     for (double x = cx - bodyWidth; x <= cx + bodyWidth; x += 2.5) {
@@ -510,6 +510,8 @@ class _DairyMilkPainter extends CustomPainter {
       {'xRel': -0.05, 'speed': 0.85, 'size': 1.4, 'offset': 0.70},
     ];
 
+    final scaleFactor = (w / 38.0).clamp(0.8, 3.5);
+
     for (final b in bubbleSeeds) {
       final bProgress =
           (animationProgress * (b['speed'] as double) + (b['offset'] as double)) %
@@ -523,7 +525,11 @@ class _DairyMilkPainter extends CustomPainter {
         final bubblePaint = Paint()
           ..color = Colors.white.withValues(alpha: bAlpha)
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(Offset(bx, by), (b['size'] as double), bubblePaint);
+        canvas.drawCircle(
+          Offset(bx, by),
+          (b['size'] as double) * (scaleFactor * 0.65).clamp(0.8, 3.0),
+          bubblePaint,
+        );
       }
     }
 
@@ -537,7 +543,7 @@ class _DairyMilkPainter extends CustomPainter {
 
       final ripplePaint = Paint()
         ..color = bottleColor.withValues(alpha: rippleAlpha * 0.5)
-        ..strokeWidth = 1.2
+        ..strokeWidth = (w * 0.025).clamp(1.2, 3.2)
         ..style = PaintingStyle.stroke;
 
       canvas.drawOval(
@@ -551,18 +557,18 @@ class _DairyMilkPainter extends CustomPainter {
 
       // Splash micro-droplets bouncing up
       if (rippleP <= 0.5) {
-        final splashH = math.sin(rippleP * math.pi * 2) * 6;
+        final splashH = math.sin(rippleP * math.pi * 2) * (h * 0.06).clamp(5.0, 18.0);
         final splashDropPaint = Paint()
           ..color = Colors.white
           ..style = PaintingStyle.fill;
         canvas.drawCircle(
-          Offset(cx - 4 - rippleP * 8, liquidBaseY - splashH),
-          1.2,
+          Offset(cx - 4 - rippleP * (w * 0.15), liquidBaseY - splashH),
+          (w * 0.025).clamp(1.1, 3.2),
           splashDropPaint,
         );
         canvas.drawCircle(
-          Offset(cx + 4 + rippleP * 8, liquidBaseY - splashH * 0.8),
-          1.1,
+          Offset(cx + 4 + rippleP * (w * 0.15), liquidBaseY - splashH * 0.8),
+          (w * 0.022).clamp(1.0, 2.8),
           splashDropPaint,
         );
       }
@@ -629,18 +635,19 @@ class _DairyMilkPainter extends CustomPainter {
     // =========================================================
     final outlinePaint = Paint()
       ..color = bottleColor.withValues(alpha: 0.75)
-      ..strokeWidth = 1.8
+      ..strokeWidth = (w * 0.038).clamp(1.8, 4.0)
       ..style = PaintingStyle.stroke;
     canvas.drawPath(bottlePath, outlinePaint);
 
     // Bottle mouth collar / golden lip ring
+    final rimHeight = (h * 0.038).clamp(4.0, 10.0);
     final rimRect = RRect.fromRectAndRadius(
       Rect.fromCenter(
         center: Offset(cx, topY),
-        width: neckWidth + 5,
-        height: 4.5,
+        width: neckWidth + (w * 0.12).clamp(4.0, 12.0),
+        height: rimHeight,
       ),
-      const Radius.circular(2.5),
+      Radius.circular((rimHeight * 0.5).clamp(2.0, 5.0)),
     );
     final rimPaint = Paint()
       ..color = accentColor
@@ -649,15 +656,16 @@ class _DairyMilkPainter extends CustomPainter {
 
     final rimBorder = Paint()
       ..color = bottleColor.withValues(alpha: 0.8)
-      ..strokeWidth = 1.2
+      ..strokeWidth = (w * 0.025).clamp(1.1, 2.5)
       ..style = PaintingStyle.stroke;
     canvas.drawRRect(rimRect, rimBorder);
 
     // Golden Dairy band below collar
+    final bandHeight = (h * 0.026).clamp(2.5, 7.0);
     final bandRect = Rect.fromCenter(
-      center: Offset(cx, topY + 5),
+      center: Offset(cx, topY + rimHeight * 1.1),
       width: neckWidth - 2,
-      height: 3.0,
+      height: bandHeight,
     );
     final bandPaint = Paint()
       ..color = accentColor.withValues(alpha: 0.9)
@@ -675,7 +683,7 @@ class _DairyMilkPainter extends CustomPainter {
       final currentY = startY + (targetY - startY) * easedP;
 
       if (currentY < liquidBaseY) {
-        final dropScale = (w / 40).clamp(0.8, 1.2);
+        final dropScale = (w / 38.0).clamp(0.8, 3.2);
         final dropPath = Path();
         dropPath.moveTo(cx, currentY - 5 * dropScale);
         dropPath.cubicTo(
@@ -703,7 +711,7 @@ class _DairyMilkPainter extends CustomPainter {
 
         final dropStroke = Paint()
           ..color = bottleColor.withValues(alpha: 0.3)
-          ..strokeWidth = 0.8
+          ..strokeWidth = (w * 0.018).clamp(0.8, 2.0)
           ..style = PaintingStyle.stroke;
         canvas.drawPath(dropPath, dropStroke);
       }
