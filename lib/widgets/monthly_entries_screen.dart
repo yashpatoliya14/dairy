@@ -151,9 +151,12 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
             radius: 20,
             backgroundColor: const Color(0xffdcefe3),
             child: Text(
-              controller.customerName.isEmpty
-                  ? '?'
-                  : controller.customerName[0].toUpperCase(),
+              controller.customerNumber.isNotEmpty &&
+                      controller.customerNumber != '—'
+                  ? controller.customerNumber
+                  : (controller.customerName.isEmpty
+                      ? '?'
+                      : controller.customerName[0].toUpperCase()),
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Color(0xff2d7a55),
