@@ -435,7 +435,7 @@ class _AuthPageState extends State<AuthPage> {
     setState(() => busy = true);
     try {
       if (signup) {
-        final res = await widget.api.signup(
+        await widget.api.signup(
           firstName.text.trim(),
           lastName.text.trim(),
           email.text.trim(),
@@ -443,12 +443,10 @@ class _AuthPageState extends State<AuthPage> {
           dairyName.text.trim(),
         );
         if (!mounted) return;
-        final devOtp = res['devOtp'] as String?;
         await Get.to(
           () => VerifyEmailPage(
             api: widget.api,
             email: email.text.trim(),
-            devOtp: devOtp,
           ),
         );
         return;
@@ -656,28 +654,23 @@ class VerifyEmailPage extends StatefulWidget {
     super.key,
     required this.api,
     required this.email,
-    this.devOtp,
   });
   final ApiService api;
   final String email;
-  final String? devOtp;
 
   @override
   State<VerifyEmailPage> createState() => _VerifyEmailPageState();
 }
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
-  late final TextEditingController code;
+  final code = TextEditingController();
   bool busy = false;
   int resendCountdown = 30;
   Timer? resendTimer;
-  String? currentDevOtp;
 
   @override
   void initState() {
     super.initState();
-    currentDevOtp = widget.devOtp;
-    code = TextEditingController(text: widget.devOtp ?? '');
     _startCountdown();
   }
 
@@ -718,16 +711,9 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     if (resendCountdown > 0 || busy) return;
     setState(() => busy = true);
     try {
-      final res = await widget.api.resendVerification(widget.email);
+      await widget.api.resendVerification(widget.email);
       _startCountdown();
-      final newDevOtp = res['devOtp'] as String?;
       if (mounted) {
-        if (newDevOtp != null && newDevOtp.isNotEmpty) {
-          setState(() {
-            currentDevOtp = newDevOtp;
-            code.text = newDevOtp;
-          });
-        }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(
@@ -750,7 +736,6 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     buttonText: T.t('Verify email'),
     busy: busy,
     resendCountdown: resendCountdown,
-    devOtp: currentDevOtp,
     onSubmit: verify,
     onResend: resend,
   );
@@ -787,14 +772,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final targetEmail = email.text.trim();
     setState(() => busy = true);
     try {
-      final res = await widget.api.requestPasswordReset(targetEmail);
+      await widget.api.requestPasswordReset(targetEmail);
       if (!mounted) return;
-      final devOtp = res['devOtp'] as String?;
       await Get.to(
         () => ResetPasswordPage(
           api: widget.api,
           email: targetEmail,
-          devOtp: devOtp,
         ),
       );
     } catch (error) {
@@ -854,11 +837,9 @@ class ResetPasswordPage extends StatefulWidget {
     super.key,
     required this.api,
     required this.email,
-    this.devOtp,
   });
   final ApiService api;
   final String email;
-  final String? devOtp;
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -866,7 +847,7 @@ class ResetPasswordPage extends StatefulWidget {
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final formKey = GlobalKey<FormState>();
-  late final TextEditingController code;
+  final code = TextEditingController();
   final password = TextEditingController();
   final confirmation = TextEditingController();
   bool busy = false;
@@ -874,13 +855,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool obscureConfirm = true;
   int resendCountdown = 30;
   Timer? resendTimer;
-  String? currentDevOtp;
 
   @override
   void initState() {
     super.initState();
-    currentDevOtp = widget.devOtp;
-    code = TextEditingController(text: widget.devOtp ?? '');
     _startCountdown();
   }
 
@@ -937,16 +915,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     if (resendCountdown > 0 || busy) return;
     setState(() => busy = true);
     try {
-      final res = await widget.api.requestPasswordReset(widget.email);
+      await widget.api.requestPasswordReset(widget.email);
       _startCountdown();
-      final newDevOtp = res['devOtp'] as String?;
       if (mounted) {
-        if (newDevOtp != null) {
-          setState(() {
-            currentDevOtp = newDevOtp;
-            code.text = newDevOtp;
-          });
-        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(T.t('Reset code sent')),
@@ -976,37 +947,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             ),
           ),
           const SizedBox(height: 16),
-          if (currentDevOtp != null && currentDevOtp!.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.shade300),
-              ),
-              child: Row(
-                children: [
-                  const Icon(LucideIcons.info, size: 18, color: Colors.amber),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'OTP: $currentDevOtp',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.amber.shade900,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => setState(() => code.text = currentDevOtp!),
-                    child: const Text('Fill OTP'),
-                  ),
-                ],
-              ),
-            ),
-          ],
           TextFormField(
             controller: code,
             keyboardType: TextInputType.number,
@@ -1098,7 +1038,6 @@ class _CodePage extends StatelessWidget {
     required this.onSubmit,
     required this.onResend,
     this.resendCountdown = 0,
-    this.devOtp,
   });
   final String title;
   final String description;
@@ -1108,7 +1047,6 @@ class _CodePage extends StatelessWidget {
   final VoidCallback onSubmit;
   final VoidCallback onResend;
   final int resendCountdown;
-  final String? devOtp;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -1122,38 +1060,7 @@ class _CodePage extends StatelessWidget {
             color: Colors.grey.shade700,
           ),
         ),
-        const SizedBox(height: 16),
-        if (devOtp != null && devOtp!.isNotEmpty) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade300),
-            ),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.info, size: 18, color: Colors.amber),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'OTP: $devOtp',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.amber.shade900,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => controller.text = devOtp!,
-                  child: const Text('Fill OTP'),
-                ),
-              ],
-            ),
-          ),
-        ],
+        const SizedBox(height: 20),
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,

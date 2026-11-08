@@ -38,15 +38,12 @@ void main() {
         home: ResetPasswordPage(
           api: api,
           email: 'test@example.com',
-          devOtp: '654321',
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Reset password'), findsWidgets);
-    expect(find.text('OTP: 654321'), findsOneWidget);
-    expect(find.text('654321'), findsOneWidget);
     expect(find.text('New password'), findsOneWidget);
     expect(find.text('Confirm new password'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Reset password'), findsOneWidget);
