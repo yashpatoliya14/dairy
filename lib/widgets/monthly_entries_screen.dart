@@ -919,6 +919,14 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              tooltip: T.t('Close'),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -1352,7 +1360,26 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (dCtx) => AlertDialog(
-                    title: Text(T.t('Delete Payment?')),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            T.t('Delete Payment?'),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          tooltip: T.t('Close'),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => Navigator.of(dCtx).pop(false),
+                        ),
+                      ],
+                    ),
                     content: Text(
                       T.t('This will remove the payment record for this month.'),
                     ),

@@ -1109,7 +1109,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xff075e54),
+                          color: Color(0xff075e54),
                         ),
                       ),
                     ],

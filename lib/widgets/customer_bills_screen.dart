@@ -290,7 +290,26 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(T.t('Select month')),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  T.t('Select month'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                tooltip: T.t('Close'),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => Navigator.of(ctx).pop(false),
+              ),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

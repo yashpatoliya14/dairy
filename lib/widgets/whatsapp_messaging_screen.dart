@@ -297,7 +297,26 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: Text(T.t('Send WhatsApp Messages')),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                T.t('Send WhatsApp Messages'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              tooltip: T.t('Close'),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+            ),
+          ],
+        ),
         content: Text(
           '${T.t('Send milk delivery messages to')} ${eligibleList.length} ${T.t('customers with today’s entry via WhatsApp Business API?')}',
         ),

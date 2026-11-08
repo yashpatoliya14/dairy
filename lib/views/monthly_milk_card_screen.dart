@@ -992,11 +992,26 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
         title: Row(
           children: [
             const Icon(Icons.warning_amber_rounded, color: Color(0xffdc2626)),
             const SizedBox(width: 8),
-            Text(T.t('Delete Entry?')),
+            Expanded(
+              child: Text(
+                T.t('Delete Entry?'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              tooltip: T.t('Close'),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => Navigator.pop(dialogCtx, false),
+            ),
           ],
         ),
         content: Text(

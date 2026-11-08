@@ -110,8 +110,13 @@ class AppController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _restoreSession() async {
+    final splashWait = Future.delayed(
+      Platform.environment.containsKey('FLUTTER_TEST')
+          ? Duration.zero
+          : const Duration(milliseconds: 1800),
+    );
     try {
-      await api.loadSession();
+      await Future.wait([api.loadSession(), splashWait]);
     } finally {
       ready.value = true;
     }

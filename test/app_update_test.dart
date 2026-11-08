@@ -101,7 +101,6 @@ void main() {
 
     test('AppUpdateService resolves relative download URLs with baseUrl', () async {
       final api = ApiService(baseUrl: 'https://test-dairy.com');
-      final service = AppUpdateService(api: api);
 
       // Verify URL prefix logic
       String resolve(String url) {

@@ -238,6 +238,17 @@ class DairyApp extends StatelessWidget {
               borderSide: const BorderSide(color: Color(0xff2d7a55)),
             ),
           ),
+          dialogTheme: DialogThemeData(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 8,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            titleTextStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xff192342),
+            ),
+          ),
           useMaterial3: true,
         ),
         defaultTransition: Transition.cupertino,
@@ -647,9 +658,31 @@ class VerifyEmailPage extends StatefulWidget {
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
   final code = TextEditingController();
   bool busy = false;
+  int resendCountdown = 30;
+  Timer? resendTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    resendTimer?.cancel();
+    if (mounted) setState(() => resendCountdown = 30);
+    resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (resendCountdown <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => resendCountdown = 0);
+      } else {
+        if (mounted) setState(() => resendCountdown--);
+      }
+    });
+  }
 
   @override
   void dispose() {
+    resendTimer?.cancel();
     code.dispose();
     super.dispose();
   }
@@ -668,13 +701,18 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   }
 
   Future<void> resend() async {
+    if (resendCountdown > 0 || busy) return;
     setState(() => busy = true);
     try {
       await widget.api.resendVerification(widget.email);
+      _startCountdown();
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(T.t('Verification code sent'))));
+        ).showSnackBar(SnackBar(
+          content: Text(T.t('Verification code sent')),
+          backgroundColor: const Color(0xff2d7a55),
+        ));
       }
     } catch (error) {
       if (mounted) _showAuthMessage(context, error);
@@ -690,6 +728,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     controller: code,
     buttonText: T.t('Verify email'),
     busy: busy,
+    resendCountdown: resendCountdown,
     onSubmit: verify,
     onResend: resend,
   );
@@ -811,7 +850,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool busy = false;
   bool obscurePassword = true;
   bool obscureConfirm = true;
-  int resendCountdown = 60;
+  int resendCountdown = 30;
   Timer? resendTimer;
   String? currentDevOtp;
 
@@ -825,7 +864,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   void _startCountdown() {
     resendTimer?.cancel();
-    if (mounted) setState(() => resendCountdown = 60);
+    if (mounted) setState(() => resendCountdown = 30);
     resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (resendCountdown <= 1) {
         timer.cancel();
@@ -1036,6 +1075,7 @@ class _CodePage extends StatelessWidget {
     required this.busy,
     required this.onSubmit,
     required this.onResend,
+    this.resendCountdown = 0,
   });
   final String title;
   final String description;
@@ -1044,6 +1084,7 @@ class _CodePage extends StatelessWidget {
   final bool busy;
   final VoidCallback onSubmit;
   final VoidCallback onResend;
+  final int resendCountdown;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -1051,22 +1092,47 @@ class _CodePage extends StatelessWidget {
     body: ListView(
       padding: _pagePadding(context),
       children: [
-        Text(description),
+        Text(
+          description,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Colors.grey.shade700,
+          ),
+        ),
         const SizedBox(height: 20),
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           maxLength: 6,
-          decoration: InputDecoration(labelText: T.t('6-digit code')),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 8,
+          ),
+          decoration: InputDecoration(
+            labelText: T.t('6-digit code'),
+            hintText: '123456',
+          ),
         ),
         const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: resendCountdown > 0 || busy ? null : onResend,
+            icon: const Icon(LucideIcons.refreshCw, size: 14),
+            label: Text(
+              resendCountdown > 0
+                  ? '${T.t('Resend code')} (${resendCountdown}s)'
+                  : T.t('Resend code'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
         FilledButton(
           onPressed: busy ? null : onSubmit,
-          child: Text(buttonText),
-        ),
-        TextButton(
-          onPressed: busy ? null : onResend,
-          child: Text(T.t('Resend code')),
+          child: busy
+              ? DairyMilkLoader.mini(color: Colors.white, size: 22)
+              : Text(buttonText),
         ),
       ],
     ),
@@ -2664,7 +2730,26 @@ class _SettingsPageState extends State<SettingsPage> {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(T.t('Log out?')),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                T.t('Log out?'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              tooltip: T.t('Close'),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+            ),
+          ],
+        ),
         content: Text(T.t('Are you sure you want to log out?')),
         actions: [
           TextButton(
@@ -3487,7 +3572,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 dashCtrl.dairyName.value = dairyNameCtrl.text.trim();
                                 dashCtrl.ownerName.value = '${firstNameCtrl.text.trim()} ${lastNameCtrl.text.trim()}'.trim();
                               }
-                              Navigator.pop(bottomSheetContext, true);
+                              if (bottomSheetContext.mounted) {
+                                Navigator.pop(bottomSheetContext, true);
+                              }
                             } catch (error) {
                               setModalState(() => saving = false);
                               Get.snackbar(
@@ -3920,7 +4007,26 @@ Future<void> _showFeedbackDialog(BuildContext context) async {
   final submitted = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: Text(T.t('Send feedback')),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              T.t('Send feedback'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            tooltip: T.t('Close'),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => Navigator.pop(dialogContext, false),
+          ),
+        ],
+      ),
       content: TextField(
         controller: feedback,
         maxLines: 5,

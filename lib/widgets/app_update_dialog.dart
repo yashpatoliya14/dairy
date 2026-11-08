@@ -45,73 +45,92 @@ class AppUpdateDialog extends StatelessWidget {
                   end: Alignment.bottomRight,
                 ),
               ),
-              child: Column(
+              child: Stack(
                 children: [
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.35),
-                        width: 2,
+                  if (!isForced)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                        tooltip: T.t('Close'),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: onDismiss,
                       ),
                     ),
-                    child: const Center(
-                      child: Icon(
-                        LucideIcons.rocket,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    T.t('New Version Available!'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Center(
+                    child: Column(
                       children: [
-                        Text(
-                          'v$currentVersion',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              width: 2,
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              LucideIcons.rocket,
+                              color: Colors.white,
+                              size: 30,
+                            ),
                           ),
                         ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 6),
-                          child: Icon(
-                            LucideIcons.arrowRight,
-                            size: 13,
-                            color: Colors.white,
-                          ),
-                        ),
+                        const SizedBox(height: 12),
                         Text(
-                          'v${info.latestVersion}',
+                          T.t('New Version Available!'),
                           style: const TextStyle(
-                            color: Color(0xff86efac),
-                            fontSize: 13,
+                            color: Colors.white,
+                            fontSize: 19,
                             fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'v$currentVersion',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6),
+                                child: Icon(
+                                  LucideIcons.arrowRight,
+                                  size: 13,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                'v${info.latestVersion}',
+                                style: const TextStyle(
+                                  color: Color(0xff86efac),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

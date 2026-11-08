@@ -105,8 +105,6 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
   double get _currentReceived =>
       double.tryParse(_receivedController.text.trim()) ?? 0.0;
 
-  double get _currentBalance => _totalPayable - _currentReceived;
-
   void _fillTotalAmount() {
     setState(() {
       _receivedController.text =
