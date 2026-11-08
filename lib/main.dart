@@ -435,7 +435,7 @@ class _AuthPageState extends State<AuthPage> {
     setState(() => busy = true);
     try {
       if (signup) {
-        await widget.api.signup(
+        final res = await widget.api.signup(
           firstName.text.trim(),
           lastName.text.trim(),
           email.text.trim(),
@@ -443,8 +443,13 @@ class _AuthPageState extends State<AuthPage> {
           dairyName.text.trim(),
         );
         if (!mounted) return;
+        final devOtp = res['devOtp'] as String?;
         await Get.to(
-          () => VerifyEmailPage(api: widget.api, email: email.text.trim()),
+          () => VerifyEmailPage(
+            api: widget.api,
+            email: email.text.trim(),
+            devOtp: devOtp,
+          ),
         );
         return;
       } else {
@@ -647,23 +652,32 @@ class _AuthPageState extends State<AuthPage> {
 }
 
 class VerifyEmailPage extends StatefulWidget {
-  const VerifyEmailPage({super.key, required this.api, required this.email});
+  const VerifyEmailPage({
+    super.key,
+    required this.api,
+    required this.email,
+    this.devOtp,
+  });
   final ApiService api;
   final String email;
+  final String? devOtp;
 
   @override
   State<VerifyEmailPage> createState() => _VerifyEmailPageState();
 }
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
-  final code = TextEditingController();
+  late final TextEditingController code;
   bool busy = false;
   int resendCountdown = 30;
   Timer? resendTimer;
+  String? currentDevOtp;
 
   @override
   void initState() {
     super.initState();
+    currentDevOtp = widget.devOtp;
+    code = TextEditingController(text: widget.devOtp ?? '');
     _startCountdown();
   }
 
@@ -704,9 +718,16 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     if (resendCountdown > 0 || busy) return;
     setState(() => busy = true);
     try {
-      await widget.api.resendVerification(widget.email);
+      final res = await widget.api.resendVerification(widget.email);
       _startCountdown();
+      final newDevOtp = res['devOtp'] as String?;
       if (mounted) {
+        if (newDevOtp != null && newDevOtp.isNotEmpty) {
+          setState(() {
+            currentDevOtp = newDevOtp;
+            code.text = newDevOtp;
+          });
+        }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(
@@ -729,6 +750,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     buttonText: T.t('Verify email'),
     busy: busy,
     resendCountdown: resendCountdown,
+    devOtp: currentDevOtp,
     onSubmit: verify,
     onResend: resend,
   );
@@ -969,7 +991,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Dev OTP: $currentDevOtp',
+                      'OTP: $currentDevOtp',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -1076,6 +1098,7 @@ class _CodePage extends StatelessWidget {
     required this.onSubmit,
     required this.onResend,
     this.resendCountdown = 0,
+    this.devOtp,
   });
   final String title;
   final String description;
@@ -1085,6 +1108,7 @@ class _CodePage extends StatelessWidget {
   final VoidCallback onSubmit;
   final VoidCallback onResend;
   final int resendCountdown;
+  final String? devOtp;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -1098,7 +1122,38 @@ class _CodePage extends StatelessWidget {
             color: Colors.grey.shade700,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        if (devOtp != null && devOtp!.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.info, size: 18, color: Colors.amber),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'OTP: $devOtp',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => controller.text = devOtp!,
+                  child: const Text('Fill OTP'),
+                ),
+              ],
+            ),
+          ),
+        ],
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,

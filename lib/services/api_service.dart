@@ -142,8 +142,8 @@ class ApiService {
     );
   }
 
-  Future<void> resendVerification(String email) async {
-    await _postAuth(
+  Future<Map<String, dynamic>> resendVerification(String email) {
+    return _postAuth(
       '/auth/resend-verification',
       {'email': email},
       loaderMessage: 'Sending verification code...',

@@ -45,7 +45,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Reset password'), findsWidgets);
-    expect(find.text('Dev OTP: 654321'), findsOneWidget);
+    expect(find.text('OTP: 654321'), findsOneWidget);
     expect(find.text('654321'), findsOneWidget);
     expect(find.text('New password'), findsOneWidget);
     expect(find.text('Confirm new password'), findsOneWidget);
