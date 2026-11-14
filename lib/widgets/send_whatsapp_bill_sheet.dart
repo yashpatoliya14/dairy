@@ -348,6 +348,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'distributorName': distributorName,
           'distributorPhone': distributorPhone,
           'useTemplate': true,
+          'templateName': 'daily_milk_delivery_update',
+          'languageCode': 'en',
         });
       } else {
         final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
@@ -372,6 +374,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'distributorName': distributorName,
           'distributorPhone': distributorPhone,
           'useTemplate': true,
+          'templateName': 'monthly_milk_bill_settlement',
+          'languageCode': 'en',
         });
       }
 
