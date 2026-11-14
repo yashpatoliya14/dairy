@@ -38,10 +38,13 @@ class AppController extends GetxController with WidgetsBindingObserver {
         checkSessionValidity();
       });
 
-      // Periodic background checks for updates (initial check is triggered on Dashboard load)
+      // Periodic background checks for updates
       updateService.startPeriodicBackgroundChecks(
         interval: const Duration(minutes: 15),
       );
+
+      // Actively trigger check for updates immediately on application startup
+      updateService.checkForUpdate(silent: true);
     }
   }
 

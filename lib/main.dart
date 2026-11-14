@@ -13,6 +13,7 @@ import 'controllers/dashboard_controller.dart';
 import 'services/app_language.dart';
 import 'services/app_update_service.dart';
 import 'services/api_service.dart';
+import 'views/app_update_screen.dart';
 import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
 import 'widgets/monthly_entries_screen.dart';
@@ -265,13 +266,21 @@ class DairyApp extends StatelessWidget {
             page: () => Dashboard(api: api),
           ),
         ],
-        home: Obx(
-          () => !appController.ready.value
-              ? const DairySplashScreen()
-              : appController.api.hasSession
+        home: Obx(() {
+          if (!appController.ready.value) {
+            return const DairySplashScreen();
+          }
+          final latest = appController.updateService.latestInfo.value;
+          if (appController.updateService.hasUpdate.value && latest != null) {
+            return AppUpdateScreen(
+              info: latest,
+              updateService: appController.updateService,
+            );
+          }
+          return appController.api.hasSession
               ? Dashboard(api: api)
-              : AuthPage(api: api),
-        ),
+              : AuthPage(api: api);
+        }),
       );
     });
   }
@@ -1119,14 +1128,18 @@ class _DashboardState extends State<Dashboard> {
   @override
   void initState() {
     super.initState();
+    controller = Get.isRegistered<DashboardController>()
+        ? Get.find<DashboardController>()
+        : Get.put(DashboardController(widget.api));
+
     if (Get.isRegistered<AppController>()) {
       final appCtrl = Get.find<AppController>();
       final latest = appCtrl.updateService.latestInfo.value;
       if (appCtrl.updateService.hasUpdate.value && latest != null) {
         appCtrl.updateService.navigateToUpdateScreen(latest);
+        return;
       }
     }
-    controller = Get.put(DashboardController(widget.api));
     controller.goToToday();
   }
 
@@ -1148,72 +1161,75 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
-    if (Get.isRegistered<AppController>()) {
-      final appCtrl = Get.find<AppController>();
-      if (appCtrl.updateService.hasUpdate.value) {
-        return const Scaffold(
-          backgroundColor: Color(0xff09281a),
-          body: SizedBox.shrink(),
-        );
+    return Obx(() {
+      if (Get.isRegistered<AppController>()) {
+        final appCtrl = Get.find<AppController>();
+        final updateInfo = appCtrl.updateService.latestInfo.value;
+        if (appCtrl.updateService.hasUpdate.value && updateInfo != null) {
+          return AppUpdateScreen(
+            info: updateInfo,
+            updateService: appCtrl.updateService,
+          );
+        }
       }
-    }
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentTab,
-        children: [
-          DashboardScreen(
-            api: widget.api,
-            controller: controller,
-            onNavigateTab: (tabIndex) => setState(() => _currentTab = tabIndex),
-            onOpenAddCustomer: () => _openAddCustomer(context, controller),
-          ),
-          _buildCustomersView(context, controller),
-          WhatsAppMessagingScreen(api: widget.api),
-          SettingsPage(
-            api: widget.api,
-            defaultLiters: controller.defaultLiters.value,
-            defaultPrice: controller.defaultPrice.value,
-          ),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xff1b4d36),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 10,
-              offset: Offset(0, -3),
+      return Scaffold(
+        body: IndexedStack(
+          index: _currentTab,
+          children: [
+            DashboardScreen(
+              api: widget.api,
+              controller: controller,
+              onNavigateTab: (tabIndex) => setState(() => _currentTab = tabIndex),
+              onOpenAddCustomer: () => _openAddCustomer(context, controller),
+            ),
+            _buildCustomersView(context, controller),
+            WhatsAppMessagingScreen(api: widget.api),
+            SettingsPage(
+              api: widget.api,
+              defaultLiters: controller.defaultLiters.value,
+              defaultPrice: controller.defaultPrice.value,
             ),
           ],
         ),
-        child: NavigationBar(
-          backgroundColor: const Color(0xff1b4d36),
-          selectedIndex: _currentTab,
-          onDestinationSelected: (index) {
-            setState(() => _currentTab = index);
-          },
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(LucideIcons.layoutDashboard),
-              label: T.t('Dashboard'),
-            ),
-            NavigationDestination(
-              icon: const Icon(LucideIcons.users),
-              label: T.t('Customers'),
-            ),
-            NavigationDestination(
-              icon: const Icon(LucideIcons.messageCircle),
-              label: T.t('Messages'),
-            ),
-            NavigationDestination(
-              icon: const Icon(LucideIcons.settings),
-              label: T.t('Settings'),
-            ),
-          ],
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xff1b4d36),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x33000000),
+                blurRadius: 10,
+                offset: Offset(0, -3),
+              ),
+            ],
+          ),
+          child: NavigationBar(
+            backgroundColor: const Color(0xff1b4d36),
+            selectedIndex: _currentTab,
+            onDestinationSelected: (index) {
+              setState(() => _currentTab = index);
+            },
+            destinations: [
+              NavigationDestination(
+                icon: const Icon(LucideIcons.layoutDashboard),
+                label: T.t('Dashboard'),
+              ),
+              NavigationDestination(
+                icon: const Icon(LucideIcons.users),
+                label: T.t('Customers'),
+              ),
+              NavigationDestination(
+                icon: const Icon(LucideIcons.messageCircle),
+                label: T.t('Messages'),
+              ),
+              NavigationDestination(
+                icon: const Icon(LucideIcons.settings),
+                label: T.t('Settings'),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget _buildCustomersView(

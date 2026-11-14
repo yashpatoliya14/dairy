@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -123,8 +124,8 @@ class AppUpdateService {
       }
 
       return info;
-    } catch (_) {
-      // Fail silently without disrupting user
+    } catch (e, stack) {
+      developer.log('Update check error: $e', name: 'AppUpdateService', error: e, stackTrace: stack);
       return null;
     } finally {
       _isChecking = false;
@@ -149,6 +150,9 @@ class AppUpdateService {
   /// Replaces the current navigation stack completely with AppUpdateScreen.
   /// The user cannot access the dashboard or any other screen until they update.
   void navigateToUpdateScreen(AppVersionInfo info) {
+    hasUpdate.value = true;
+    latestInfo.value = info;
+
     if (_isScreenOpened) return;
     _isScreenOpened = true;
 
@@ -170,13 +174,15 @@ class AppUpdateService {
 
     final uri = Uri.parse(resolvedUrl);
     try {
-      if (await canLaunchUrl(uri)) {
-        return await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (launched) return true;
+      return await launchUrl(uri, mode: LaunchMode.platformDefault);
+    } catch (e) {
+      try {
         return await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {
+        return false;
       }
-    } catch (_) {
-      return false;
     }
   }
 }

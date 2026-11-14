@@ -50,6 +50,13 @@ class DashboardController extends GetxController {
     return '$y-$m-$day';
   }
 
+  bool get _isUpdatePending {
+    if (Get.isRegistered<AppController>()) {
+      return Get.find<AppController>().updateService.hasUpdate.value;
+    }
+    return false;
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -71,6 +78,11 @@ class DashboardController extends GetxController {
       }
     }
 
+    if (_isUpdatePending) {
+      loading.value = false;
+      return;
+    }
+
     await Future.wait([
       loadCustomers(),
       loadSettings(),
@@ -85,23 +97,28 @@ class DashboardController extends GetxController {
   }
 
   Future<void> setSelectedDate(DateTime date) async {
+    if (_isUpdatePending) return;
     selectedDate.value = date;
     await loadTodaySummary();
   }
 
   Future<void> previousDay() async {
+    if (_isUpdatePending) return;
     await setSelectedDate(selectedDate.value.subtract(const Duration(days: 1)));
   }
 
   Future<void> nextDay() async {
+    if (_isUpdatePending) return;
     await setSelectedDate(selectedDate.value.add(const Duration(days: 1)));
   }
 
   Future<void> goToToday() async {
+    if (_isUpdatePending) return;
     await setSelectedDate(DateTime.now());
   }
 
   Future<void> loadTodaySummary() async {
+    if (_isUpdatePending) return;
     try {
       final summaryRes = await api.getDailySummary(date: formattedSelectedDate);
       todaySummary.assignAll(summaryRes);
@@ -130,6 +147,7 @@ class DashboardController extends GetxController {
   }
 
   Future<void> loadProfile() async {
+    if (_isUpdatePending) return;
     try {
       final profile = await api.getProfile();
       dairyName.value = '${profile['dairyName'] ?? ''}'.trim();
@@ -141,6 +159,7 @@ class DashboardController extends GetxController {
   }
 
   Future<void> loadCustomers() async {
+    if (_isUpdatePending) return;
     try {
       customers.assignAll(await api.getCustomers());
     } catch (exception) {
@@ -149,6 +168,7 @@ class DashboardController extends GetxController {
   }
 
   Future<void> loadSettings() async {
+    if (_isUpdatePending) return;
     try {
       final settings = await api.getSettings();
       defaultLiters.value = _asDouble(settings['defaultLiters'], 1);

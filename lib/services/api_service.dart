@@ -759,7 +759,7 @@ class ApiService {
       '/app/version$query',
       includeAuth: false,
       showLoader: false,
-      timeout: const Duration(seconds: 10),
+      timeout: const Duration(seconds: 45),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
