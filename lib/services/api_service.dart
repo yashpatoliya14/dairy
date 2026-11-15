@@ -20,6 +20,7 @@ class ApiService {
 
   final String baseUrl;
   String? _token;
+  final http.Client _client = http.Client();
 
   static String _normalizeBaseUrl(String value) {
     final normalized = value
@@ -210,6 +211,7 @@ class ApiService {
       path,
       body: body,
       includeAuth: false,
+      showLoader: true,
       loaderMessage: loaderMessage,
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
@@ -240,8 +242,35 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> deleteCustomer(String customerId) async {
-    final response = await _send('DELETE', '/customers/$customerId');
+    final response = await _send(
+      'DELETE',
+      '/customers/$customerId',
+      showLoader: true,
+      loaderMessage: 'Deleting customer...',
+    );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> getBootstrapData({String? date}) async {
+    final query = date != null && date.trim().isNotEmpty ? '?date=$date' : '';
+    final response = await _send('GET', '/customers/bootstrap$query');
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> getMonthlyBillsSummary({
+    required int year,
+    required int month,
+  }) async {
+    final response = await _send(
+      'GET',
+      '/customers/monthly-bills?year=$year&month=$month',
+    );
+    final data = jsonDecode(response.body);
+    final list = data is List ? data : <dynamic>[];
+    return list
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   Future<Map<String, dynamic>> getSettings() async {
@@ -262,6 +291,8 @@ class ApiService {
       'PATCH',
       '/auth/password',
       body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      showLoader: true,
+      loaderMessage: 'Updating password...',
     );
   }
 
@@ -273,6 +304,8 @@ class ApiService {
       'PATCH',
       '/settings',
       body: {'defaultLiters': defaultLiters, 'defaultPrice': defaultPrice},
+      showLoader: true,
+      loaderMessage: 'Saving settings...',
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -280,7 +313,13 @@ class ApiService {
   Future<Map<String, dynamic>> createCustomer(
     Map<String, dynamic> customer,
   ) async {
-    final response = await _send('POST', '/customers', body: customer);
+    final response = await _send(
+      'POST',
+      '/customers',
+      body: customer,
+      showLoader: true,
+      loaderMessage: 'Adding customer...',
+    );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
@@ -292,6 +331,8 @@ class ApiService {
       'PATCH',
       '/customers/$customerId',
       body: customer,
+      showLoader: true,
+      loaderMessage: 'Updating customer...',
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -313,6 +354,8 @@ class ApiService {
         'liters': liters,
         'price': price,
       },
+      showLoader: true,
+      loaderMessage: 'Saving milk entry...',
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -388,6 +431,8 @@ class ApiService {
     final response = await _send(
       'DELETE',
       '/customers/$customerId/entries/$entryId',
+      showLoader: true,
+      loaderMessage: 'Deleting milk entry...',
     );
     final body = response.body.trim();
     if (body.isEmpty) return {'success': true};
@@ -407,6 +452,8 @@ class ApiService {
       'POST',
       '/whatsapp/send-bill',
       body: payload,
+      showLoader: true,
+      loaderMessage: 'Sending WhatsApp bill...',
       timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
@@ -420,6 +467,8 @@ class ApiService {
       'POST',
       '/whatsapp/send-text',
       body: {'to': to, 'message': message},
+      showLoader: true,
+      loaderMessage: 'Sending message...',
       timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
@@ -441,6 +490,8 @@ class ApiService {
       'POST',
       '/whatsapp/send-daily-entry',
       body: body,
+      showLoader: true,
+      loaderMessage: 'Sending daily entry...',
       timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
@@ -457,6 +508,8 @@ class ApiService {
         'customerIds': customerIds,
         'date': date,
       },
+      showLoader: true,
+      loaderMessage: 'Sending bulk entries...',
       timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
@@ -476,7 +529,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getDailySummary({
     String? date,
-    bool showLoader = true,
+    bool showLoader = false,
   }) async {
     final query = date != null ? '?date=$date' : '';
     final response = await _send(
@@ -507,6 +560,7 @@ class ApiService {
       'POST',
       '/whatsapp/daily-message-status',
       body: body,
+      showLoader: false,
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -517,6 +571,7 @@ class ApiService {
     final response = await _send(
       'GET',
       '/whatsapp/customers/$customerId/history',
+      showLoader: false,
     );
     final data = jsonDecode(response.body);
     final list = data is List ? data : <dynamic>[];
@@ -538,7 +593,13 @@ class ApiService {
     if (phoneNumber != null) body['phoneNumber'] = phoneNumber;
     if (dairyName != null) body['dairyName'] = dairyName;
 
-    final response = await _send('PATCH', '/auth/profile', body: body);
+    final response = await _send(
+      'PATCH',
+      '/auth/profile',
+      body: body,
+      showLoader: true,
+      loaderMessage: 'Saving profile...',
+    );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
@@ -560,6 +621,7 @@ class ApiService {
       path,
       body: body,
       includeAuth: false,
+      showLoader: true,
       loaderMessage: loaderMessage,
     );
     final data = Map<String, dynamic>.from(jsonDecode(response.body) as Map);
@@ -594,7 +656,7 @@ class ApiService {
     String path, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
-    bool showLoader = true,
+    bool showLoader = false,
     String? loaderMessage,
     Duration timeout = const Duration(seconds: 60),
   }) async {
@@ -626,19 +688,19 @@ class ApiService {
     try {
       response = switch (method) {
         'GET' =>
-          await http
+          await _client
               .get(uri, headers: headers)
               .timeout(timeout),
         'POST' =>
-          await http
+          await _client
               .post(uri, headers: headers, body: jsonEncode(body))
               .timeout(timeout),
         'PATCH' =>
-          await http
+          await _client
               .patch(uri, headers: headers, body: jsonEncode(body))
               .timeout(timeout),
         'DELETE' =>
-          await http
+          await _client
               .delete(uri, headers: headers)
               .timeout(timeout),
         _ => throw UnsupportedError('Unsupported HTTP method: $method'),
@@ -743,6 +805,8 @@ class ApiService {
             'note': note ?? '',
             'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
           },
+          showLoader: true,
+          loaderMessage: 'Recording payment...',
         );
       } catch (_) {
         // Cached locally for offline access
@@ -803,6 +867,8 @@ class ApiService {
         await _send(
           'DELETE',
           '/customers/$customerId/payments?year=$year&month=$month',
+          showLoader: true,
+          loaderMessage: 'Deleting payment...',
         );
       } catch (_) {}
     }

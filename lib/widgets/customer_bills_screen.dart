@@ -59,6 +59,48 @@ class CustomerBillItem {
     if (val is num) return val.toDouble();
     return double.tryParse('$val') ?? fallback;
   }
+
+  factory CustomerBillItem.fromSummaryMap(Map<String, dynamic> map) {
+    final customerData = Map<String, dynamic>.from(
+      map['customer'] is Map ? map['customer'] as Map : {},
+    );
+    if (!customerData.containsKey('id')) {
+      customerData['id'] = map['customerId'];
+      customerData['name'] = map['name'];
+      customerData['uniqueNumber'] = map['number'];
+      customerData['phoneNumber'] = map['phone'];
+      customerData['price'] = map['defaultPrice'];
+      customerData['liters'] = map['defaultLiters'];
+    }
+
+    final rawBreakdown = map['pastMonthsBreakdown'] as List? ?? [];
+    final breakdown = rawBreakdown.map((e) => '$e').toList();
+
+    DateTime? payDate;
+    if (map['paymentDate'] != null && '${map['paymentDate']}'.isNotEmpty) {
+      payDate = DateTime.tryParse('${map['paymentDate']}');
+    }
+
+    return CustomerBillItem(
+      customer: customerData,
+      thisMonthLiters: _asDouble(map['thisMonthLiters']),
+      defaultPrice: _asDouble(map['defaultPrice']),
+      thisMonthBill: _asDouble(map['thisMonthBill']),
+      thisMonthPaid: _asDouble(map['thisMonthPaid']),
+      thisMonthDue: _asDouble(map['thisMonthDue']),
+      activeDays: (map['activeDays'] as num?)?.toInt() ?? 0,
+      grossPastDue: _asDouble(map['grossPastDue']),
+      grossPastAdvance: _asDouble(map['grossPastAdvance']),
+      pastMonthsDue: _asDouble(map['pastMonthsDue']),
+      pastMonthsAdvance: _asDouble(map['pastMonthsAdvance']),
+      pastMonthsBreakdown: breakdown,
+      netBalanceDue: _asDouble(map['netBalanceDue']),
+      netAdvance: _asDouble(map['netAdvance']),
+      paymentNote: '${map['paymentNote'] ?? ''}',
+      paymentDate: payDate,
+      hasPayment: map['hasPayment'] == true,
+    );
+  }
 }
 
 class CustomerBillsScreen extends StatefulWidget {
@@ -111,6 +153,24 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
 
   Future<void> _loadBills() async {
     _loading.value = true;
+    try {
+      final summaryList = await widget.api.getMonthlyBillsSummary(
+        year: _selectedYear,
+        month: _selectedMonth,
+      );
+      if (summaryList.isNotEmpty) {
+        final items = summaryList.map((m) => CustomerBillItem.fromSummaryMap(m)).toList();
+        items.sort((a, b) {
+          final aNum = int.tryParse(a.number) ?? 999999;
+          final bNum = int.tryParse(b.number) ?? 999999;
+          return aNum.compareTo(bNum);
+        });
+        _billItems.assignAll(items);
+        _loading.value = false;
+        return;
+      }
+    } catch (_) {}
+
     try {
       final customers = await widget.api.getCustomers();
       final items = <CustomerBillItem>[];

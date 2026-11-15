@@ -1140,7 +1140,6 @@ class _DashboardState extends State<Dashboard> {
         return;
       }
     }
-    controller.goToToday();
   }
 
   Future<void> _openAddCustomer(

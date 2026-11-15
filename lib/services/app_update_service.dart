@@ -87,11 +87,11 @@ class AppUpdateService {
   final ApiService api;
 
   // The client installed version and build number
-  static const String currentVersion = '1.0.7';
-  static const int currentBuildNumber = 9;
+  static const String currentVersion = '1.0.8';
+  static const int currentBuildNumber = 10;
 
   Timer? _checkTimer;
-  bool _isChecking = false;
+  Future<AppVersionInfo?>? _inFlightCheck;
   bool _isScreenOpened = false;
 
   final Rxn<AppVersionInfo> latestInfo = Rxn<AppVersionInfo>();
@@ -101,8 +101,12 @@ class AppUpdateService {
   Future<AppVersionInfo?> checkForUpdate({
     bool silent = true,
   }) async {
-    if (_isChecking) return latestInfo.value;
-    _isChecking = true;
+    if (_inFlightCheck != null) {
+      return _inFlightCheck;
+    }
+
+    final completer = Completer<AppVersionInfo?>();
+    _inFlightCheck = completer.future;
 
     try {
       final res = await api.checkAppVersion(
@@ -123,12 +127,14 @@ class AppUpdateService {
         navigateToUpdateScreen(info);
       }
 
+      completer.complete(info);
       return info;
     } catch (e, stack) {
       developer.log('Update check error: $e', name: 'AppUpdateService', error: e, stackTrace: stack);
+      completer.complete(null);
       return null;
     } finally {
-      _isChecking = false;
+      _inFlightCheck = null;
     }
   }
 

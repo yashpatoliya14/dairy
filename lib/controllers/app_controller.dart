@@ -42,9 +42,6 @@ class AppController extends GetxController with WidgetsBindingObserver {
       updateService.startPeriodicBackgroundChecks(
         interval: const Duration(minutes: 15),
       );
-
-      // Actively trigger check for updates immediately on application startup
-      updateService.checkForUpdate(silent: true);
     }
   }
 
@@ -116,10 +113,18 @@ class AppController extends GetxController with WidgetsBindingObserver {
     final splashWait = Future.delayed(
       Platform.environment.containsKey('FLUTTER_TEST')
           ? Duration.zero
-          : const Duration(milliseconds: 1800),
+          : const Duration(milliseconds: 350),
     );
     try {
-      await Future.wait([api.loadSession(), splashWait]);
+      await Future.wait([
+        api.loadSession(),
+        splashWait,
+        if (!Platform.environment.containsKey('FLUTTER_TEST'))
+          updateService.checkForUpdate(silent: true).timeout(
+            const Duration(seconds: 4),
+            onTimeout: () => null,
+          ),
+      ]);
     } finally {
       ready.value = true;
     }
