@@ -14,7 +14,7 @@ class ApiService {
         baseUrl ??
             const String.fromEnvironment(
               'API_BASE_URL',
-              defaultValue: 'https://dairy-backend-eemp.onrender.com',
+              defaultValue: 'https://iaj4y-3000.aiccloud.online',
             ),
       );
 

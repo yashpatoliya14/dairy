@@ -11,7 +11,7 @@ The app calls these JSON endpoints:
 - `GET /customers` and `POST /customers`
 - `POST /whatsapp/send-bill`
 
-The default API URL is `https://dairy-backend-eemp.onrender.com`. Override it for another environment:
+The default API URL is `https://iaj4y-3000.aiccloud.online`. Override it for another environment:
 
 ```shell
 flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api
