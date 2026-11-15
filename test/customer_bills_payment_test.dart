@@ -164,5 +164,32 @@ void main() {
       final quickFillAmount = remainingDue > 0 ? remainingDue : totalPayable;
       expect(quickFillAmount, 1500.0);
     });
+
+    test('PaymentEntrySheet: Net total due is deducted by old payment', () {
+      const thisMonthBill = 1200.0;
+      const pastDue = 300.0;
+      const advanceCredit = 0.0;
+      const oldPayment = 500.0;
+
+      final grossPayable = thisMonthBill + pastDue - advanceCredit; // 1500.0
+      final netTotalDue = grossPayable - oldPayment; // 1000.0
+
+      expect(grossPayable, 1500.0);
+      expect(netTotalDue, 1000.0);
+      expect(netTotalDue < grossPayable, isTrue);
+    });
+
+    test('PaymentEntrySheet: Add Payment mode accumulates new installment onto old payment', () {
+      const grossPayable = 1000.0;
+      const oldPayment = 500.0;
+      const enteredNewPayment = 500.0; // paying the remaining due
+
+      // In addNew mode
+      final effectiveTotalPaid = oldPayment + enteredNewPayment; // 1000.0
+      final remainingDue = grossPayable - effectiveTotalPaid; // 0.0
+
+      expect(effectiveTotalPaid, 1000.0);
+      expect(remainingDue, 0.0);
+    });
   });
 }

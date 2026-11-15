@@ -3,6 +3,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/app_language.dart';
 
+enum PaymentEntryMode {
+  addNew,
+  replace,
+}
+
 class PaymentEntrySheet extends StatefulWidget {
   const PaymentEntrySheet({
     super.key,
@@ -56,6 +61,7 @@ class PaymentEntrySheet extends StatefulWidget {
 }
 
 class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
+  late PaymentEntryMode _entryMode;
   late final TextEditingController _receivedController;
   late final TextEditingController _noteController;
   late DateTime _selectedDate;
@@ -64,26 +70,40 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
 
   final _formKey = GlobalKey<FormState>();
 
-  double get _totalPayable {
+  /// Gross bill + past overdue - advance credit
+  double get _grossPayable {
     final net = widget.totalAmount + widget.previousDue - widget.previousAdvance;
     return net > 0 ? net : 0.0;
   }
 
-  double get _remainingDue {
-    final prev = widget.hasExistingPayment ? (widget.initialReceived ?? 0.0) : 0.0;
-    final rem = _totalPayable - prev;
+  /// Old recorded payment for this month (if any)
+  double get _oldPayment =>
+      (widget.hasExistingPayment && widget.initialReceived != null)
+          ? widget.initialReceived!
+          : 0.0;
+
+  /// Net Total Due DEDUCTED by old payment!
+  double get _netTotalDue {
+    final rem = _grossPayable - _oldPayment;
     return rem > 0 ? rem : 0.0;
   }
 
   @override
   void initState() {
     super.initState();
-    final initial = widget.initialReceived ?? _totalPayable;
+    _entryMode =
+        _oldPayment > 0 ? PaymentEntryMode.addNew : PaymentEntryMode.replace;
+
+    final defaultAmount =
+        (_oldPayment > 0 && _entryMode == PaymentEntryMode.addNew)
+            ? _netTotalDue
+            : _grossPayable;
+
     _receivedController = TextEditingController(
-      text: initial > 0
-          ? (initial == initial.truncateToDouble()
-              ? initial.toStringAsFixed(0)
-              : initial.toStringAsFixed(2))
+      text: defaultAmount > 0
+          ? (defaultAmount == defaultAmount.truncateToDouble()
+              ? defaultAmount.toStringAsFixed(0)
+              : defaultAmount.toStringAsFixed(2))
           : '',
     );
     _noteController = TextEditingController(text: widget.initialNote);
@@ -108,24 +128,42 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     super.dispose();
   }
 
-  double get _currentReceived =>
+  double get _currentEntered =>
       double.tryParse(_receivedController.text.trim()) ?? 0.0;
 
-  void _fillTotalAmount() {
-    setState(() {
-      _receivedController.text =
-          _totalPayable == _totalPayable.truncateToDouble()
-              ? _totalPayable.toStringAsFixed(0)
-              : _totalPayable.toStringAsFixed(2);
-    });
+  /// Effective total paid that will be stored on the backend
+  double get _effectiveTotalPaid {
+    if (_oldPayment > 0 && _entryMode == PaymentEntryMode.addNew) {
+      return _oldPayment + _currentEntered;
+    }
+    return _currentEntered;
+  }
+
+  double get _effectiveRemainingDue {
+    final rem = _grossPayable - _effectiveTotalPaid;
+    return rem > 0 ? rem : 0.0;
+  }
+
+  double get _effectiveAdvance {
+    final diff = _effectiveTotalPaid - _grossPayable;
+    return diff > 0 ? diff : 0.0;
   }
 
   void _fillRemainingDue() {
     setState(() {
       _receivedController.text =
-          _remainingDue == _remainingDue.truncateToDouble()
-              ? _remainingDue.toStringAsFixed(0)
-              : _remainingDue.toStringAsFixed(2);
+          _netTotalDue == _netTotalDue.truncateToDouble()
+              ? _netTotalDue.toStringAsFixed(0)
+              : _netTotalDue.toStringAsFixed(2);
+    });
+  }
+
+  void _fillGrossTotal() {
+    setState(() {
+      _receivedController.text =
+          _grossPayable == _grossPayable.truncateToDouble()
+              ? _grossPayable.toStringAsFixed(0)
+              : _grossPayable.toStringAsFixed(2);
     });
   }
 
@@ -138,8 +176,11 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     });
   }
 
-  void _fillHalfAmount() {
-    final half = _totalPayable / 2;
+  void _fillHalfDue() {
+    final target = (_oldPayment > 0 && _entryMode == PaymentEntryMode.addNew)
+        ? _netTotalDue
+        : _grossPayable;
+    final half = target / 2;
     setState(() {
       _receivedController.text = half == half.truncateToDouble()
           ? half.toStringAsFixed(0)
@@ -176,14 +217,15 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
-    final received = double.parse(_receivedController.text.trim());
+
+    final totalToSave = _effectiveTotalPaid;
     final note = _noteController.text.trim();
     final finalNote = note.isNotEmpty
         ? note
         : (_selectedMode.isNotEmpty ? _selectedMode : '');
     try {
       await widget.onSave(
-        receivedAmount: received,
+        receivedAmount: totalToSave,
         note: finalNote,
         receivedDate: _selectedDate,
       );
@@ -197,16 +239,52 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     }
   }
 
+  Widget _buildBillRow({
+    required String label,
+    required String value,
+    required Color color,
+    IconData? icon,
+    bool isBold = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 13, color: color),
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
+                    color: isBold ? color : const Color(0xff4b5563),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isBold ? FontWeight.w800 : FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final received = _currentReceived;
-    final target = _totalPayable;
-    final balance = target - received;
-    final isFullyPaid = received >= target && target > 0;
-    final isPartiallyPaid = received > 0 && received < target;
-    final isOverPaid = received > target;
-    final hasCombinedDebt = widget.previousDue > 0 || widget.previousAdvance > 0;
 
     return Container(
       decoration: const BoxDecoration(
@@ -296,256 +374,309 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
 
                   const SizedBox(height: 14),
 
-                  // ─── MONTHLY BILL & COMBINED BALANCE SUMMARY CARD ──────────
+                  // ─── UNIFIED NEAT & CLEAN SUMMARY CARD ──────────
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xfff0fdf4), Color(0xffdcfce7)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: const Color(0xfff8fafc),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xff86efac),
+                        color: const Color(0xffe2e8f0),
                         width: 1,
                       ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Card Top Row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
                               children: [
-                                const Icon(
-                                  LucideIcons.receipt,
-                                  size: 15,
-                                  color: Color(0xff166534),
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xffecfdf5),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(
+                                    LucideIcons.receipt,
+                                    size: 14,
+                                    color: Color(0xff059669),
+                                  ),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  hasCombinedDebt ? T.t('Customer Bills') : T.t('Monthly Bill'),
+                                  '${widget.monthName} ${T.t('Bill Summary')}',
                                   style: const TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 12.5,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xff166534),
-                                    letterSpacing: 0.3,
+                                    color: Color(0xff1e293b),
                                   ),
                                 ),
                               ],
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
+                                horizontal: 8,
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: const Color(0xff86efac),
+                                  color: const Color(0xffcbd5e1),
                                   width: 0.8,
                                 ),
                               ),
                               child: Text(
-                                '${widget.activeDeliveryDays}/${widget.daysInMonth} ${T.t('Days')}',
+                                '${widget.activeDeliveryDays}/${widget.daysInMonth} ${T.t('Days')} • ${widget.totalLiters.toStringAsFixed(1)}L',
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xff166534),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xff475569),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
 
-                        // Deliveries row
+                        // Line 1: Milk Bill
+                        _buildBillRow(
+                          label: T.t('This Month Bill'),
+                          value: '₹${widget.totalAmount.toStringAsFixed(2)}',
+                          color: const Color(0xff1e293b),
+                        ),
+
+                        // Line 2: Past Due (if > 0)
+                        if (widget.previousDue > 0) ...[
+                          const SizedBox(height: 5),
+                          _buildBillRow(
+                            label: widget.pastMonthsBreakdown.isNotEmpty
+                                ? '${T.t('Past Due')} (${widget.pastMonthsBreakdown.join(', ')})'
+                                : T.t('Past Due'),
+                            value: '+₹${widget.previousDue.toStringAsFixed(2)}',
+                            color: const Color(0xffdc2626),
+                            icon: LucideIcons.history,
+                          ),
+                        ],
+
+                        // Line 3: Advance Credit (if > 0)
+                        if (widget.previousAdvance > 0) ...[
+                          const SizedBox(height: 5),
+                          _buildBillRow(
+                            label: T.t('Advance Credit'),
+                            value: '-₹${widget.previousAdvance.toStringAsFixed(2)}',
+                            color: const Color(0xff16a34a),
+                            icon: LucideIcons.sparkles,
+                          ),
+                        ],
+
+                        // Line 4: Already Paid (Old Payment) (if > 0)
+                        if (_oldPayment > 0) ...[
+                          const SizedBox(height: 5),
+                          _buildBillRow(
+                            label:
+                                '${T.t('Already Paid')}${widget.initialDate != null ? ' (${widget.initialDate!.day}/${widget.initialDate!.month})' : ''}',
+                            value: '-₹${_oldPayment.toStringAsFixed(2)}',
+                            color: const Color(0xff2563eb),
+                            icon: LucideIcons.checkCheck,
+                            isBold: true,
+                          ),
+                        ],
+
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Divider(height: 1, color: Color(0xffe2e8f0)),
+                        ),
+
+                        // Line 5: NET TOTAL DUE (DEDUCTED BY OLD PAYMENT!)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
                           children: [
-                            Text(
-                              hasCombinedDebt
-                                  ? '${T.t('This Month Bill')} (${widget.totalLiters.toStringAsFixed(1)} L)'
-                                  : '${widget.totalLiters.toStringAsFixed(1)} L (${widget.activeDeliveryDays} ${T.t('Days')})',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Net Total Due'),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xff0f172a),
+                                  ),
+                                ),
+                                if (_oldPayment > 0)
+                                  Text(
+                                    T.t('Remaining balance to clear'),
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                              ],
                             ),
                             Text(
-                              '₹${widget.totalAmount.toStringAsFixed(2)}',
+                              _netTotalDue <= 0
+                                  ? '₹0.00'
+                                  : '₹${_netTotalDue.toStringAsFixed(2)}',
                               style: TextStyle(
-                                fontSize: hasCombinedDebt ? 14 : 22,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xff14532d),
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: _netTotalDue <= 0
+                                    ? const Color(0xff16a34a)
+                                    : const Color(0xff047857),
+                                letterSpacing: -0.5,
                               ),
                             ),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
 
-                        // If previousDue > 0
-                        if (widget.previousDue > 0) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
+                  // ─── OPTIONAL PAYMENT MODE TOGGLE (When Old Payment Exists) ───
+                  if (_oldPayment > 0) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xfff1f5f9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _entryMode = PaymentEntryMode.addNew;
+                                  _fillRemainingDue();
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: _entryMode == PaymentEntryMode.addNew
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: _entryMode == PaymentEntryMode.addNew
+                                      ? const [
+                                          BoxShadow(
+                                            color: Color(0x0f000000),
+                                            blurRadius: 4,
+                                            offset: Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
                                 child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(LucideIcons.history, size: 12, color: Color(0xffdc2626)),
+                                    Icon(
+                                      LucideIcons.plus,
+                                      size: 13,
+                                      color: _entryMode == PaymentEntryMode.addNew
+                                          ? const Color(0xff059669)
+                                          : Colors.grey.shade600,
+                                    ),
                                     const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        widget.pastMonthsBreakdown.isNotEmpty
-                                            ? '${T.t('Past Due')} (${widget.pastMonthsBreakdown.join(', ')})'
-                                            : T.t('Past Due'),
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xffb91c1c),
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                    Text(
+                                      T.t('Add Payment'),
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight:
+                                            _entryMode == PaymentEntryMode.addNew
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                        color:
+                                            _entryMode == PaymentEntryMode.addNew
+                                                ? const Color(0xff059669)
+                                                : Colors.grey.shade700,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              Text(
-                                '+₹${widget.previousDue.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xffdc2626),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ],
-
-                        // If previousAdvance > 0
-                        if (widget.previousAdvance > 0) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(LucideIcons.sparkles, size: 12, color: Color(0xff16a34a)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    T.t('Advance Credit'),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xff166534),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _entryMode = PaymentEntryMode.replace;
+                                  _receivedController.text =
+                                      _oldPayment == _oldPayment.truncateToDouble()
+                                          ? _oldPayment.toStringAsFixed(0)
+                                          : _oldPayment.toStringAsFixed(2);
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: _entryMode == PaymentEntryMode.replace
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: _entryMode == PaymentEntryMode.replace
+                                      ? const [
+                                          BoxShadow(
+                                            color: Color(0x0f000000),
+                                            blurRadius: 4,
+                                            offset: Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      LucideIcons.pencil,
+                                      size: 13,
+                                      color: _entryMode == PaymentEntryMode.replace
+                                          ? const Color(0xff2563eb)
+                                          : Colors.grey.shade600,
                                     ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                '-₹${widget.previousAdvance.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xff16a34a),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      T.t('Edit Payment'),
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight:
+                                            _entryMode == PaymentEntryMode.replace
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                        color:
+                                            _entryMode == PaymentEntryMode.replace
+                                                ? const Color(0xff2563eb)
+                                                : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-
-                        // Net Total Row (if multi-month)
-                        if (hasCombinedDebt) ...[
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 6),
-                            child: Divider(height: 1, color: Color(0xff86efac)),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                T.t('Net Total Due'),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xff14532d),
-                                ),
-                              ),
-                              Text(
-                                '₹${_totalPayable.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xff14532d),
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // Previously Recorded Payment Badge (if any)
-                  if (widget.hasExistingPayment && widget.initialReceived != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xffeff6ff),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xffbfdbfe), width: 1),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(LucideIcons.history, size: 14, color: Color(0xff2563eb)),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  '${T.t('Recorded Payment')}: ₹${widget.initialReceived!.toStringAsFixed(2)}${widget.initialDate != null ? ' (${widget.initialDate!.day}/${widget.initialDate!.month}/${widget.initialDate!.year})' : ''}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xff1e40af),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_remainingDue > 0) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              '${T.t('Remaining Balance to Clear')}: ₹${_remainingDue.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xffdc2626),
                               ),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
                   ],
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   // ─── AMOUNT RECEIVED INPUT ─────────────────────────────────
                   Text(
-                    T.t('Amount Received'),
+                    (_oldPayment > 0 && _entryMode == PaymentEntryMode.addNew)
+                        ? T.t('Amount Received Today')
+                        : T.t('Amount Received'),
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -556,7 +687,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                   TextFormField(
                     controller: _receivedController,
                     autofocus: true,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -564,7 +696,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                     ),
                     decoration: InputDecoration(
                       prefixIcon: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         child: Text(
                           '₹',
                           style: TextStyle(
@@ -574,7 +707,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                           ),
                         ),
                       ),
-                      prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                      prefixIconConstraints:
+                          const BoxConstraints(minWidth: 0, minHeight: 0),
                       hintText: '0.00',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -582,7 +716,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xff166534), width: 2),
+                        borderSide: const BorderSide(
+                            color: Color(0xff166534), width: 2),
                       ),
                     ),
                     onChanged: (_) => setState(() {}),
@@ -605,137 +740,170 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      if (widget.hasExistingPayment && _remainingDue > 0)
-                        ActionChip(
-                          avatar: const Icon(LucideIcons.checkCheck, size: 14, color: Color(0xff16a34a)),
-                          label: Text(
-                            '${T.t('Pay Remaining')} (₹${_remainingDue.toStringAsFixed(0)})',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xff166534)),
+                      if (_oldPayment > 0 && _entryMode == PaymentEntryMode.addNew) ...[
+                        if (_netTotalDue > 0)
+                          ActionChip(
+                            avatar: const Icon(LucideIcons.checkCheck,
+                                size: 14, color: Color(0xff16a34a)),
+                            label: Text(
+                              '${T.t('Pay Remaining')} (₹${_netTotalDue.toStringAsFixed(0)})',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff166534)),
+                            ),
+                            onPressed: _fillRemainingDue,
+                            backgroundColor: const Color(0xfff0fdf4),
+                            side: const BorderSide(color: Color(0xff86efac)),
                           ),
-                          onPressed: _fillRemainingDue,
+                        ActionChip(
+                          avatar: const Icon(LucideIcons.percent, size: 14),
+                          label: Text(
+                            '50% (₹${(_netTotalDue / 2).toStringAsFixed(0)})',
+                            style: const TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: _fillHalfDue,
+                          backgroundColor: const Color(0xfff8fafc),
+                          side: const BorderSide(color: Color(0xffe2e8f0)),
+                        ),
+                      ] else ...[
+                        ActionChip(
+                          avatar: const Icon(LucideIcons.checkCheck, size: 14),
+                          label: Text(
+                            '${T.t('Full Amount')} (₹${_grossPayable.toStringAsFixed(0)})',
+                            style: const TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: _fillGrossTotal,
                           backgroundColor: const Color(0xfff0fdf4),
                           side: const BorderSide(color: Color(0xff86efac)),
                         ),
-                      ActionChip(
-                        avatar: const Icon(LucideIcons.checkCheck, size: 14),
-                        label: Text(
-                          '${hasCombinedDebt ? T.t('Total Due') : T.t('Full Amount')} (₹${_totalPayable.toStringAsFixed(0)})',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: _fillTotalAmount,
-                        backgroundColor: const Color(0xfff0fdf4),
-                        side: const BorderSide(color: Color(0xff86efac)),
-                      ),
-                      if (hasCombinedDebt && widget.totalAmount > 0) ...[
-                        ActionChip(
-                          avatar: const Icon(LucideIcons.calendar, size: 14),
-                          label: Text(
-                            '${T.t('This Month')} (₹${widget.totalAmount.toStringAsFixed(0)})',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                        if (widget.previousDue > 0 && widget.totalAmount > 0)
+                          ActionChip(
+                            avatar: const Icon(LucideIcons.calendar, size: 14),
+                            label: Text(
+                              '${T.t('This Month')} (₹${widget.totalAmount.toStringAsFixed(0)})',
+                              style: const TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                            onPressed: _fillThisMonthOnly,
+                            backgroundColor: const Color(0xfff8fafc),
+                            side: const BorderSide(color: Color(0xffe2e8f0)),
                           ),
-                          onPressed: _fillThisMonthOnly,
+                        ActionChip(
+                          avatar: const Icon(LucideIcons.percent, size: 14),
+                          label: Text(
+                            '50% (₹${(_grossPayable / 2).toStringAsFixed(0)})',
+                            style: const TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: _fillHalfDue,
                           backgroundColor: const Color(0xfff8fafc),
                           side: const BorderSide(color: Color(0xffe2e8f0)),
                         ),
                       ],
-                      ActionChip(
-                        avatar: const Icon(LucideIcons.percent, size: 14),
-                        label: Text(
-                          '50% (₹${(_totalPayable / 2).toStringAsFixed(0)})',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: _fillHalfAmount,
-                        backgroundColor: const Color(0xfff8fafc),
-                        side: const BorderSide(color: Color(0xffe2e8f0)),
-                      ),
                     ],
                   ),
 
                   const SizedBox(height: 12),
 
                   // ─── LIVE BALANCE INDICATOR BANNER ────────────────────────
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: isFullyPaid
-                          ? const Color(0xfff0fdf4)
-                          : isPartiallyPaid
-                              ? const Color(0xfffffbeb)
-                              : isOverPaid
-                                  ? const Color(0xffeff6ff)
-                                  : const Color(0xfff8fafc),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isFullyPaid
-                            ? const Color(0xff86efac)
-                            : isPartiallyPaid
-                                ? const Color(0xfffde047)
-                                : isOverPaid
-                                    ? const Color(0xff93c5fd)
-                                    : const Color(0xffe2e8f0),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
+                  Builder(
+                    builder: (context) {
+                      final rem = _effectiveRemainingDue;
+                      final adv = _effectiveAdvance;
+                      final isSettled = rem <= 0 && adv <= 0 && _effectiveTotalPaid > 0;
+                      final isOver = adv > 0;
+                      final isPartial = rem > 0 && _effectiveTotalPaid > 0;
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSettled
+                              ? const Color(0xfff0fdf4)
+                              : isPartial
+                                  ? const Color(0xfffffbeb)
+                                  : isOver
+                                      ? const Color(0xffeff6ff)
+                                      : const Color(0xfff8fafc),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSettled
+                                ? const Color(0xff86efac)
+                                : isPartial
+                                    ? const Color(0xfffde047)
+                                    : isOver
+                                        ? const Color(0xff93c5fd)
+                                        : const Color(0xffe2e8f0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(
-                              isFullyPaid
-                                  ? LucideIcons.circleCheck
-                                  : isPartiallyPaid
-                                      ? LucideIcons.circleAlert
-                                      : isOverPaid
-                                          ? LucideIcons.info
-                                          : LucideIcons.circleDot,
-                              size: 16,
-                              color: isFullyPaid
-                                  ? const Color(0xff16a34a)
-                                  : isPartiallyPaid
-                                      ? const Color(0xffd97706)
-                                      : isOverPaid
-                                          ? const Color(0xff2563eb)
-                                          : Colors.grey.shade600,
+                            Row(
+                              children: [
+                                Icon(
+                                  isSettled
+                                      ? LucideIcons.circleCheck
+                                      : isPartial
+                                          ? LucideIcons.circleAlert
+                                          : isOver
+                                              ? LucideIcons.info
+                                              : LucideIcons.circleDot,
+                                  size: 15,
+                                  color: isSettled
+                                      ? const Color(0xff16a34a)
+                                      : isPartial
+                                          ? const Color(0xffd97706)
+                                          : isOver
+                                              ? const Color(0xff2563eb)
+                                              : Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isSettled
+                                      ? T.t('Fully Paid')
+                                      : isOver
+                                          ? T.t('Advance / Overpaid')
+                                          : isPartial
+                                              ? T.t('Partially Paid')
+                                              : T.t('Unpaid'),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: isSettled
+                                        ? const Color(0xff166534)
+                                        : isPartial
+                                            ? const Color(0xff92400e)
+                                            : isOver
+                                                ? const Color(0xff1e40af)
+                                                : Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
                             Text(
-                              isFullyPaid
-                                  ? T.t('Fully Paid')
-                                  : isOverPaid
-                                      ? T.t('Advance / Overpaid')
-                                      : isPartiallyPaid
-                                          ? T.t('Partially Paid')
-                                          : T.t('Unpaid'),
+                              isSettled
+                                  ? '₹0.00 ${T.t('Due')}'
+                                  : isOver
+                                      ? '+₹${adv.toStringAsFixed(2)} ${T.t('Advance')}'
+                                      : '${T.t('Due')}: ₹${rem.toStringAsFixed(2)}',
                               style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: isFullyPaid
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSettled
                                     ? const Color(0xff166534)
-                                    : isPartiallyPaid
-                                        ? const Color(0xff92400e)
-                                        : isOverPaid
-                                            ? const Color(0xff1e40af)
-                                            : Colors.grey.shade700,
+                                    : isOver
+                                        ? const Color(0xff1e40af)
+                                        : const Color(0xffdc2626),
                               ),
                             ),
                           ],
                         ),
-                        Text(
-                          balance <= 0
-                              ? (balance < 0
-                                  ? "+₹${(-balance).toStringAsFixed(2)} ${T.t('Advance')}"
-                                  : "₹0.00 ${T.t('Due')}")
-                              : '${T.t('Balance Due')}: ₹${balance.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: balance <= 0
-                                ? const Color(0xff166534)
-                                : const Color(0xffdc2626),
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 14),
@@ -753,7 +921,12 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                   Wrap(
                     spacing: 8,
                     children: [
-                      for (final mode in ['Cash', 'UPI', 'Bank Transfer', 'Cheque'])
+                      for (final mode in [
+                        'Cash',
+                        'UPI',
+                        'Bank Transfer',
+                        'Cheque'
+                      ])
                         ChoiceChip(
                           label: Text(T.t(mode)),
                           selected: _selectedMode == mode,
@@ -828,7 +1001,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                   // ─── SAVE / DELETE BUTTONS ─────────────────────────────────
                   Row(
                     children: [
-                      if (widget.hasExistingPayment && widget.onDelete != null) ...[
+                      if (widget.hasExistingPayment &&
+                          widget.onDelete != null) ...[
                         OutlinedButton.icon(
                           onPressed: _saving
                               ? null
@@ -839,7 +1013,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(16),
                                       ),
-                                      titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                                      titlePadding: const EdgeInsets.fromLTRB(
+                                          20, 16, 12, 0),
                                       title: Row(
                                         children: [
                                           Expanded(
@@ -852,27 +1027,34 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                                             ),
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.close, size: 20),
+                                            icon: const Icon(Icons.close,
+                                                size: 20),
                                             tooltip: T.t('Close'),
-                                            visualDensity: VisualDensity.compact,
+                                            visualDensity:
+                                                VisualDensity.compact,
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(),
-                                            onPressed: () => Navigator.of(dCtx).pop(false),
+                                            onPressed: () =>
+                                                Navigator.of(dCtx).pop(false),
                                           ),
                                         ],
                                       ),
                                       content: Text(
-                                        T.t('This will remove the recorded payment and reset the customer dues to unpaid.'),
+                                        T.t(
+                                            'This will remove the recorded payment and reset the customer dues to unpaid.'),
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.of(dCtx).pop(false),
+                                          onPressed: () =>
+                                              Navigator.of(dCtx).pop(false),
                                           child: Text(T.t('Cancel')),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.of(dCtx).pop(true),
+                                          onPressed: () =>
+                                              Navigator.of(dCtx).pop(true),
                                           style: FilledButton.styleFrom(
-                                            backgroundColor: Colors.red.shade700,
+                                            backgroundColor:
+                                                Colors.red.shade700,
                                           ),
                                           child: Text(T.t('Delete')),
                                         ),
@@ -945,4 +1127,3 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     );
   }
 }
-

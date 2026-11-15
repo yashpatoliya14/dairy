@@ -391,6 +391,13 @@ class T {
       'This Month': 'इस महीने का',
       'This Month Bill': 'इस महीने का बिल',
       'Due': 'देय',
+      'Already Paid': 'पहले से भुगतान',
+      'Add Payment': 'नया भुगतान जोड़ें',
+      'Edit Payment': 'भुगतान बदलें',
+      'Bill Summary': 'बिल सारांश',
+      'Amount Received Today': 'आज प्राप्त राशि',
+      'Pay Remaining': 'शेष भुगतान करें',
+      'Remaining balance to clear': 'चुकता करने हेतु शेष बकाया',
     },
     'gu': {
       'Loading dashboard...': 'ડેશબોર્ડ લોડ થઈ રહ્યું છે...',
@@ -759,6 +766,13 @@ class T {
       'This Month': 'આ મહિનાનું',
       'This Month Bill': 'આ મહિનાનું બિલ',
       'Due': 'બાકી',
+      'Already Paid': 'અગાઉ ચૂકવેલ રકમ',
+      'Add Payment': 'નવી ચૂકવણી ઉમેરો',
+      'Edit Payment': 'ચૂકવણી સુધારો',
+      'Bill Summary': 'બિલ સારાંશ',
+      'Amount Received Today': 'આજે મળેલ રકમ',
+      'Pay Remaining': 'બાકી રકમ ચૂકવો',
+      'Remaining balance to clear': 'બાકી નીકળતી રકમ',
     },
   };
 
