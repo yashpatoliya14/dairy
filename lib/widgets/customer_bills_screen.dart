@@ -141,6 +141,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
   @override
   void initState() {
     super.initState();
+    widget.api.addPaymentChangeListener(_handlePaymentChanged);
     final now = DateTime.now();
     _selectedYear = now.year;
     _selectedMonth = now.month;
@@ -165,8 +166,15 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
 
   @override
   void dispose() {
+    widget.api.removePaymentChangeListener(_handlePaymentChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handlePaymentChanged(String customerId, int year, int month) {
+    if (year == _selectedYear && month == _selectedMonth && mounted) {
+      _loadBills();
+    }
   }
 
   String _monthLabel(int month, int year) {
@@ -699,19 +707,22 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
       initialMonthlyLiters: item.thisMonthLiters,
       initialRate: item.defaultPrice,
       initialMonthlyAmount: item.thisMonthBill,
+      initialPaidAmount: item.thisMonthPaid,
       initialPreviousDue: item.pastMonthsDue > 0 ? item.pastMonthsDue : 0.0,
       initialAdvanceCredit: item.netAdvance > 0 ? item.netAdvance : 0.0,
     );
   }
 
   Future<void> _openMonthlyEntries(CustomerBillItem item) async {
-    await Get.to(
+    final changed = await Get.to<bool>(
       () => MonthlyEntriesScreen(
         api: widget.api,
         customer: item.customer,
       ),
     );
-    _loadBills();
+    if (changed == true || mounted) {
+      await _loadBills();
+    }
   }
 
   @override

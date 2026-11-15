@@ -768,8 +768,66 @@ class ApiService {
   static String _paymentKey(String customerId, int year, int month) =>
       'payment_${customerId}_${year}_$month';
 
+  final List<void Function(String customerId, int year, int month)>
+      _paymentListeners = [];
+
+  void addPaymentChangeListener(
+      void Function(String customerId, int year, int month) listener) {
+    if (!_paymentListeners.contains(listener)) {
+      _paymentListeners.add(listener);
+    }
+  }
+
+  void removePaymentChangeListener(
+      void Function(String customerId, int year, int month) listener) {
+    _paymentListeners.remove(listener);
+  }
+
+  void notifyPaymentChanged(String customerId, int year, int month) {
+    for (final cb in List.of(_paymentListeners)) {
+      try {
+        cb(customerId, year, month);
+      } catch (_) {}
+    }
+  }
+
+  /// Fetch single customer's consolidated bill and debt ledger summary.
+  Future<Map<String, dynamic>> getCustomerBillSummary({
+    required String customerId,
+    required int year,
+    required int month,
+  }) async {
+    if (customerId.isEmpty) return <String, dynamic>{};
+    if (hasSession) {
+      try {
+        final response = await _send(
+          'GET',
+          '/customers/$customerId/bill-summary?year=$year&month=$month',
+        );
+        if (response.statusCode >= 200 &&
+            response.statusCode < 300 &&
+            response.body.trim().isNotEmpty) {
+          final decoded = jsonDecode(response.body);
+          if (decoded != null && decoded is Map) {
+            return Map<String, dynamic>.from(decoded);
+          }
+        }
+      } catch (_) {}
+    }
+
+    try {
+      final list = await getMonthlyBillsSummary(year: year, month: month);
+      for (final m in list) {
+        final cid = '${m['customerId'] ?? m['customer']?['id']}'.trim();
+        if (cid == customerId) return m;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{};
+  }
+
   /// Save a payment entry for a customer for a specific month.
-  Future<void> savePaymentEntry({
+  Future<Map<String, dynamic>> savePaymentEntry({
     required String customerId,
     required int year,
     required int month,
@@ -780,7 +838,7 @@ class ApiService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final key = _paymentKey(customerId, year, month);
-    final data = jsonEncode({
+    final paymentData = {
       'customerId': customerId,
       'year': year,
       'month': month,
@@ -789,29 +847,38 @@ class ApiService {
       'note': note ?? '',
       'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
       'updatedAt': DateTime.now().toIso8601String(),
-    });
-    await prefs.setString(key, data);
+    };
+    await prefs.setString(key, jsonEncode(paymentData));
 
     if (hasSession && customerId.isNotEmpty) {
-      try {
-        await _send(
-          'POST',
-          '/customers/$customerId/payments',
-          body: {
-            'year': year,
-            'month': month,
-            'billAmount': billAmount,
-            'receivedAmount': receivedAmount,
-            'note': note ?? '',
-            'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
-          },
-          showLoader: true,
-          loaderMessage: 'Recording payment...',
-        );
-      } catch (_) {
-        // Cached locally for offline access
+      final response = await _send(
+        'POST',
+        '/customers/$customerId/payments',
+        body: {
+          'year': year,
+          'month': month,
+          'billAmount': billAmount,
+          'receivedAmount': receivedAmount,
+          'note': note ?? '',
+          'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
+        },
+        showLoader: true,
+        loaderMessage: 'Recording payment...',
+      );
+      if (response.statusCode >= 200 &&
+          response.statusCode < 300 &&
+          response.body.trim().isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded != null && decoded is Map) {
+          final serverMap = Map<String, dynamic>.from(decoded);
+          await prefs.setString(key, jsonEncode(serverMap));
+          notifyPaymentChanged(customerId, year, month);
+          return serverMap;
+        }
       }
     }
+    notifyPaymentChanged(customerId, year, month);
+    return paymentData;
   }
 
   /// Get a payment entry for a customer for a specific month.
@@ -820,18 +887,24 @@ class ApiService {
     required int year,
     required int month,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _paymentKey(customerId, year, month);
+
     if (hasSession && customerId.isNotEmpty) {
       try {
         final response = await _send(
           'GET',
           '/customers/$customerId/payments?year=$year&month=$month',
         );
-        if (response.statusCode == 200 && response.body.trim().isNotEmpty) {
-          final decoded = jsonDecode(response.body);
+        if (response.statusCode == 200) {
+          final trimmed = response.body.trim();
+          if (trimmed.isEmpty || trimmed == 'null') {
+            await prefs.remove(key);
+            return null;
+          }
+          final decoded = jsonDecode(trimmed);
           if (decoded != null && decoded is Map) {
             final map = Map<String, dynamic>.from(decoded);
-            final prefs = await SharedPreferences.getInstance();
-            final key = _paymentKey(customerId, year, month);
             await prefs.setString(key, jsonEncode(map));
             return map;
           }
@@ -841,8 +914,6 @@ class ApiService {
       }
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final key = _paymentKey(customerId, year, month);
     final data = prefs.getString(key);
     if (data == null) return null;
     try {
@@ -863,15 +934,14 @@ class ApiService {
     await prefs.remove(key);
 
     if (hasSession && customerId.isNotEmpty) {
-      try {
-        await _send(
-          'DELETE',
-          '/customers/$customerId/payments?year=$year&month=$month',
-          showLoader: true,
-          loaderMessage: 'Deleting payment...',
-        );
-      } catch (_) {}
+      await _send(
+        'DELETE',
+        '/customers/$customerId/payments?year=$year&month=$month',
+        showLoader: true,
+        loaderMessage: 'Deleting payment...',
+      );
     }
+    notifyPaymentChanged(customerId, year, month);
   }
 
   Future<Map<String, dynamic>> checkAppVersion({

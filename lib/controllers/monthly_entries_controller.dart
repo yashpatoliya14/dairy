@@ -135,6 +135,33 @@ class MonthlyEntriesController extends GetxController {
   final paymentDate = Rxn<DateTime>();
   final hasPayment = false.obs;
 
+  // Past months ledger & net settlement state
+  final grossPastDue = 0.0.obs;
+  final grossPastAdvance = 0.0.obs;
+  final pastMonthsDue = 0.0.obs;
+  final pastMonthsBreakdown = <String>[].obs;
+  final netBalanceDue = 0.0.obs;
+  final netAdvance = 0.0.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    api.addPaymentChangeListener(_handleExternalPaymentChange);
+  }
+
+  @override
+  void onClose() {
+    api.removePaymentChangeListener(_handleExternalPaymentChange);
+    super.onClose();
+  }
+
+  void _handleExternalPaymentChange(String cid, int y, int m) {
+    if (cid == customerId && y == selectedYear.value && m == selectedMonth.value) {
+      loadPayment();
+      loadBillSummary();
+    }
+  }
+
   /// Set the customer and load the current month's data.
   void setCustomer(Map<String, dynamic> c) {
     customer.value = c;
@@ -228,8 +255,9 @@ class MonthlyEntriesController extends GetxController {
             .map((e) => Map<String, dynamic>.from(e))
             .toList(),
       );
-      // Load payment and refresh latest customer profile (e.g. edited default price)
+      // Load payment, past ledger summary, and refresh latest customer profile (e.g. edited default price)
       await loadPayment();
+      await loadBillSummary();
       await refreshCustomer();
     } catch (e) {
       error.value = e.toString();
@@ -380,6 +408,41 @@ class MonthlyEntriesController extends GetxController {
     }
   }
 
+  /// Load past months overdue ledger breakdown and overall net due from backend.
+  Future<void> loadBillSummary() async {
+    if (customerId.isEmpty) return;
+    try {
+      final summary = await api.getCustomerBillSummary(
+        customerId: customerId,
+        year: selectedYear.value,
+        month: selectedMonth.value,
+      );
+      if (summary.isNotEmpty) {
+        grossPastDue.value = _asDouble(summary['grossPastDue'], 0.0);
+        grossPastAdvance.value = _asDouble(summary['grossPastAdvance'], 0.0);
+        pastMonthsDue.value = _asDouble(summary['pastMonthsDue'], 0.0);
+        final rawBreakdown = summary['pastMonthsBreakdown'] as List? ?? [];
+        pastMonthsBreakdown.assignAll(rawBreakdown.map((e) => '$e').toList());
+        netBalanceDue.value = _asDouble(summary['netBalanceDue'], 0.0);
+        netAdvance.value = _asDouble(summary['netAdvance'], 0.0);
+
+        if (summary.containsKey('thisMonthPaid')) {
+          final paid = _asDouble(summary['thisMonthPaid'], 0.0);
+          paymentReceived.value = paid;
+          hasPayment.value = summary['hasPayment'] == true || paid > 0;
+          if (summary['paymentNote'] != null) {
+            paymentNote.value = '${summary['paymentNote']}';
+          }
+          if (summary['paymentDate'] != null) {
+            paymentDate.value = DateTime.tryParse('${summary['paymentDate']}');
+          }
+        }
+      }
+    } catch (e) {
+      developer.log('Failed to load bill summary: $e', name: 'MonthlyEntries');
+    }
+  }
+
   /// Save a payment entry for the current month.
   Future<bool> savePayment({
     required double receivedAmount,
@@ -388,6 +451,27 @@ class MonthlyEntriesController extends GetxController {
   }) async {
     if (customerId.isEmpty) return false;
     try {
+      paymentReceived.value = receivedAmount;
+      paymentNote.value = (note ?? '').trim();
+      paymentDate.value = receivedDate ?? DateTime.now();
+      hasPayment.value = true;
+
+      final curDue = billTotalAmount > receivedAmount
+          ? double.parse((billTotalAmount - receivedAmount).toStringAsFixed(2))
+          : 0.0;
+      final excess = receivedAmount > billTotalAmount
+          ? double.parse((receivedAmount - billTotalAmount).toStringAsFixed(2))
+          : 0.0;
+      final totalCredits = grossPastAdvance.value + excess;
+      final remPast = grossPastDue.value > totalCredits
+          ? double.parse((grossPastDue.value - totalCredits).toStringAsFixed(2))
+          : 0.0;
+      pastMonthsDue.value = remPast;
+      netBalanceDue.value = double.parse((remPast + curDue).toStringAsFixed(2));
+      netAdvance.value = totalCredits > grossPastDue.value
+          ? double.parse((totalCredits - grossPastDue.value).toStringAsFixed(2))
+          : 0.0;
+
       await api.savePaymentEntry(
         customerId: customerId,
         year: selectedYear.value,
@@ -397,13 +481,12 @@ class MonthlyEntriesController extends GetxController {
         note: note,
         receivedDate: receivedDate,
       );
-      paymentReceived.value = receivedAmount;
-      paymentNote.value = (note ?? '').trim();
-      paymentDate.value = receivedDate ?? DateTime.now();
-      hasPayment.value = true;
+
+      await loadBillSummary();
       return true;
     } catch (e) {
       developer.log('Failed to save payment: $e', name: 'MonthlyEntries');
+      await loadBillSummary();
       return false;
     }
   }
@@ -412,15 +495,24 @@ class MonthlyEntriesController extends GetxController {
   Future<bool> deletePayment() async {
     if (customerId.isEmpty) return false;
     try {
+      _resetPayment();
+      final remPast = grossPastDue.value > grossPastAdvance.value
+          ? double.parse((grossPastDue.value - grossPastAdvance.value).toStringAsFixed(2))
+          : 0.0;
+      pastMonthsDue.value = remPast;
+      netBalanceDue.value = double.parse((remPast + billTotalAmount).toStringAsFixed(2));
+
       await api.deletePaymentEntry(
         customerId: customerId,
         year: selectedYear.value,
         month: selectedMonth.value,
       );
-      _resetPayment();
+
+      await loadBillSummary();
       return true;
     } catch (e) {
       developer.log('Failed to delete payment: $e', name: 'MonthlyEntries');
+      await loadBillSummary();
       return false;
     }
   }
@@ -432,17 +524,32 @@ class MonthlyEntriesController extends GetxController {
     hasPayment.value = false;
   }
 
-  /// Outstanding balance for the current month.
-  double get balanceDue =>
-      double.parse((billTotalAmount - paymentReceived.value).toStringAsFixed(2));
+  /// Balance due for the current month only.
+  double get currentMonthDue {
+    final diff = billTotalAmount - paymentReceived.value;
+    return diff > 0 ? double.parse(diff.toStringAsFixed(2)) : 0.0;
+  }
 
-  /// Whether the bill is fully paid.
+  /// Outstanding balance for this month (backward compatible).
+  double get balanceDue => currentMonthDue;
+
+  /// Overall net total payable across all periods (past overdue + current month due - credits).
+  double get netTotalPayable {
+    if (netBalanceDue.value > 0) return netBalanceDue.value;
+    final past = pastMonthsDue.value;
+    final cur = currentMonthDue;
+    final adv = netAdvance.value;
+    final net = cur + past - adv;
+    return net > 0 ? double.parse(net.toStringAsFixed(2)) : 0.0;
+  }
+
+  /// Whether all dues for this customer are fully paid.
   bool get isFullyPaid =>
-      hasPayment.value && paymentReceived.value >= billTotalAmount;
+      hasPayment.value && paymentReceived.value >= billTotalAmount && pastMonthsDue.value == 0;
 
   /// Whether the bill is partially paid.
   bool get isPartiallyPaid =>
-      hasPayment.value && paymentReceived.value > 0 && paymentReceived.value < billTotalAmount;
+      hasPayment.value && paymentReceived.value > 0 && !isFullyPaid;
 
   /// Whether we're viewing a future month (shouldn't allow entries).
   bool get isFutureMonth {

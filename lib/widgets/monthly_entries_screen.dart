@@ -783,10 +783,11 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                               initialMonthlyLiters: totalLiters,
                               initialRate: effectiveRate,
                               initialMonthlyAmount: totalAmount,
-                              initialPreviousDue: 0.0,
-                              initialAdvanceCredit: controller.hasPayment.value
+                              initialPaidAmount: controller.hasPayment.value
                                   ? controller.paymentReceived.value
                                   : 0.0,
+                              initialPreviousDue: controller.pastMonthsDue.value,
+                              initialAdvanceCredit: controller.netAdvance.value,
                             );
                           },
                           icon: const Icon(LucideIcons.messageCircle, size: 15),
@@ -1023,6 +1024,16 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                 label: T.t('Subtotal'),
                 value: '₹${totalAmount.toStringAsFixed(2)}',
               ),
+              if (controller.pastMonthsDue.value > 0) ...[
+                const SizedBox(height: 6),
+                _BillDetailRow(
+                  label: controller.pastMonthsBreakdown.isNotEmpty
+                      ? '${T.t('Past Overdue')} (${controller.pastMonthsBreakdown.join(', ')})'
+                      : T.t('Past Overdue'),
+                  value: '₹${controller.pastMonthsDue.value.toStringAsFixed(2)}',
+                  isBold: true,
+                ),
+              ],
               if (controller.hasPayment.value) ...[
                 const SizedBox(height: 6),
                 _BillDetailRow(
@@ -1036,9 +1047,14 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                   value: '₹${controller.balanceDue.toStringAsFixed(2)}',
                   isBold: true,
                 ),
-              ] else ...[
+              ],
+              if (controller.netAdvance.value > 0) ...[
                 const SizedBox(height: 6),
-                _BillDetailRow(label: T.t('Previous Due'), value: '₹0.00'),
+                _BillDetailRow(
+                  label: T.t('Advance Credit'),
+                  value: '₹${controller.netAdvance.value.toStringAsFixed(2)}',
+                  isBold: true,
+                ),
               ],
               const Divider(height: 20),
               Container(
@@ -1061,7 +1077,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                           controller.hasPayment.value
                               ? (controller.isFullyPaid
                                   ? '${T.t('Total Amount Payable')} (${T.t('Fully Paid')})'
-                                  : T.t('Balance Due'))
+                                  : T.t('Net Total Due'))
                               : T.t('Total Amount Payable'),
                           style: TextStyle(
                             color: controller.isPartiallyPaid
@@ -1072,9 +1088,13 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                           ),
                         ),
                         Text(
-                          controller.hasPayment.value && !controller.isFullyPaid
-                              ? '₹${controller.balanceDue.toStringAsFixed(2)}'
-                              : '₹${totalAmount.toStringAsFixed(2)}',
+                          controller.isFullyPaid
+                              ? '₹0.00'
+                              : (controller.hasPayment.value
+                                  ? '₹${controller.netTotalPayable.toStringAsFixed(2)}'
+                                  : (controller.pastMonthsDue.value > 0
+                                      ? '₹${controller.netTotalPayable.toStringAsFixed(2)}'
+                                      : '₹${totalAmount.toStringAsFixed(2)}')),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -1338,6 +1358,9 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
         totalLiters: controller.totalLiters.value,
         effectiveRate: controller.effectiveRate,
         totalAmount: controller.billTotalAmount,
+        previousDue: controller.grossPastDue.value,
+        previousAdvance: controller.grossPastAdvance.value,
+        pastMonthsBreakdown: controller.pastMonthsBreakdown,
         daysInMonth: controller.daysInMonth.value,
         activeDeliveryDays: controller.activeDeliveryDays,
         initialReceived: controller.hasPayment.value

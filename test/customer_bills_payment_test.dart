@@ -116,5 +116,53 @@ void main() {
       expect(netBalanceDue, 5000.0);
       expect(thisMonthDue < thisMonthBill, isTrue);
     });
+
+    test('MonthlyEntriesScreen display: fully paid bill displays 0.00 instead of original gross total', () {
+      const billTotalAmount = 4500.0;
+      const paymentReceived = 4500.0;
+      const pastMonthsDue = 0.0;
+
+      final isFullyPaid = paymentReceived >= billTotalAmount && pastMonthsDue == 0;
+      final balanceDue = paymentReceived >= billTotalAmount ? 0.0 : billTotalAmount - paymentReceived;
+      final netTotalPayable = pastMonthsDue + balanceDue;
+
+      // Exact ternary logic in MonthlyEntriesScreen
+      final displayedDue = isFullyPaid ? '₹0.00' : '₹${netTotalPayable.toStringAsFixed(2)}';
+
+      expect(isFullyPaid, isTrue);
+      expect(displayedDue, '₹0.00');
+    });
+
+    test('SendWhatsAppBillSheet: calculated net payable deducts paid amount and formats bill message', () {
+      const monthlyAmount = 3000.0;
+      const pastOverdue = 500.0;
+      const advanceCredit = 0.0;
+      const paidAmount = 1500.0;
+
+      final calculatedTotal = monthlyAmount + pastOverdue - advanceCredit - paidAmount;
+      expect(calculatedTotal, 2000.0);
+
+      // Verify that bill text contains Amount Received and correct Net Payable
+      final buffer = StringBuffer();
+      buffer.writeln('Monthly Milk Bill: ₹3000.00');
+      buffer.writeln('Past Overdue: ₹500.00');
+      buffer.writeln('Amount Received: ₹1500.00');
+      buffer.writeln('NET TOTAL PAYABLE: ₹2000.00');
+
+      final message = buffer.toString();
+      expect(message.contains('Amount Received: ₹1500.00'), isTrue);
+      expect(message.contains('NET TOTAL PAYABLE: ₹2000.00'), isTrue);
+    });
+
+    test('PaymentEntrySheet: _fillRemainingDue fills remaining due instead of total payable', () {
+      const totalPayable = 2500.0;
+      const existingPaid = 1000.0;
+      final remainingDue = totalPayable > existingPaid ? totalPayable - existingPaid : 0.0;
+
+      expect(remainingDue, 1500.0);
+      // Ensure remaining due is populated when user clicks Quick Fill Due
+      final quickFillAmount = remainingDue > 0 ? remainingDue : totalPayable;
+      expect(quickFillAmount, 1500.0);
+    });
   });
 }

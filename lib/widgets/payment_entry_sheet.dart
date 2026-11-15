@@ -123,9 +123,9 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
   void _fillRemainingDue() {
     setState(() {
       _receivedController.text =
-          _totalPayable == _totalPayable.truncateToDouble()
-              ? _totalPayable.toStringAsFixed(0)
-              : _totalPayable.toStringAsFixed(2);
+          _remainingDue == _remainingDue.truncateToDouble()
+              ? _remainingDue.toStringAsFixed(0)
+              : _remainingDue.toStringAsFixed(2);
     });
   }
 
@@ -173,6 +173,7 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
   }
 
   Future<void> _handleSave() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final received = double.parse(_receivedController.text.trim());
@@ -180,13 +181,19 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     final finalNote = note.isNotEmpty
         ? note
         : (_selectedMode.isNotEmpty ? _selectedMode : '');
-    await widget.onSave(
-      receivedAmount: received,
-      note: finalNote,
-      receivedDate: _selectedDate,
-    );
-    if (mounted) {
-      Navigator.of(context).pop();
+    try {
+      await widget.onSave(
+        receivedAmount: received,
+        note: finalNote,
+        receivedDate: _selectedDate,
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 

@@ -23,6 +23,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
     this.initialMonthlyLiters,
     this.initialRate,
     this.initialMonthlyAmount,
+    this.initialPaidAmount,
     this.initialPreviousDue,
     this.initialMonthToDateBill,
     this.initialAdvanceCredit,
@@ -36,6 +37,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
   final double? initialMonthlyLiters;
   final double? initialRate;
   final double? initialMonthlyAmount;
+  final double? initialPaidAmount;
   final double? initialPreviousDue;
   final double? initialMonthToDateBill;
   final double? initialAdvanceCredit;
@@ -50,6 +52,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
     double? initialMonthlyLiters,
     double? initialRate,
     double? initialMonthlyAmount,
+    double? initialPaidAmount,
     double? initialPreviousDue,
     double? initialMonthToDateBill,
     double? initialAdvanceCredit,
@@ -67,6 +70,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
         initialMonthlyLiters: initialMonthlyLiters,
         initialRate: initialRate,
         initialMonthlyAmount: initialMonthlyAmount,
+        initialPaidAmount: initialPaidAmount,
         initialPreviousDue: initialPreviousDue,
         initialMonthToDateBill: initialMonthToDateBill,
         initialAdvanceCredit: initialAdvanceCredit,
@@ -93,6 +97,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
   late final TextEditingController _totalDaysController;
   late final TextEditingController _monthlyLitersController;
   late final TextEditingController _monthlyAmountController;
+  late final TextEditingController _paidAmountController;
   late final TextEditingController _advanceCreditController;
 
   DateTime _selectedDate = DateTime.now();
@@ -165,6 +170,10 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
             : 0.0);
     _monthlyAmountController = TextEditingController(
       text: initialMonthAmt.toStringAsFixed(2),
+    );
+    final initialPaid = widget.initialPaidAmount ?? 0.0;
+    _paidAmountController = TextEditingController(
+      text: initialPaid > 0 ? initialPaid.toStringAsFixed(2) : '0.00',
     );
     _advanceCreditController = TextEditingController(
       text: widget.initialAdvanceCredit != null
@@ -242,6 +251,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     _totalDaysController.dispose();
     _monthlyLitersController.dispose();
     _monthlyAmountController.dispose();
+    _paidAmountController.dispose();
     _advanceCreditController.dispose();
     super.dispose();
   }
@@ -355,9 +365,22 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
       final monthlyAmount = double.tryParse(_monthlyAmountController.text) ??
           (widget.initialMonthlyAmount ?? (totalLiters * rate));
+      final paidAmount = double.tryParse(_paidAmountController.text) ?? 0.0;
       final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
       final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
-      final netPayable = (monthlyAmount + pastOverdue) - advanceCredit;
+
+      final currentDue = monthlyAmount >= paidAmount ? (monthlyAmount - paidAmount) : 0.0;
+      final excess = paidAmount > monthlyAmount ? (paidAmount - monthlyAmount) : 0.0;
+      final credit = advanceCredit + excess;
+      final remainingPastDue = pastOverdue > credit ? (pastOverdue - credit) : 0.0;
+      final netPayable = currentDue + remainingPastDue;
+
+      final paidRow = paidAmount > 0
+          ? '• Amount Received: ₹${paidAmount.toStringAsFixed(2)}\n'
+          : '';
+      final currentDueRow = (paidAmount > 0 && currentDue > 0)
+          ? '• Current Month Balance: ₹${currentDue.toStringAsFixed(2)}\n'
+          : '';
 
       return '🧾 *MILK BILL STATEMENT* 🧾\n'
           '━━━━━━━━━━━━━━━━━━━━\n'
@@ -369,10 +392,11 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           '• Rate per Liter: ₹${rate.toStringAsFixed(2)}/L\n\n'
           '💰 *BILL BREAKDOWN:*\n'
           '• Monthly Milk Bill: ₹${monthlyAmount.toStringAsFixed(2)}\n'
+          '$paidRow$currentDueRow'
           '• Past Overdue: ₹${pastOverdue.toStringAsFixed(2)}\n'
           '• Advance / Credits: ₹${advanceCredit.toStringAsFixed(2)}\n'
           '━━━━━━━━━━━━━━━━━━━━\n'
-          '⭐ *NET TOTAL PAYABLE: ₹${(netPayable > 0 ? netPayable : 0.0).toStringAsFixed(2)}*\n'
+          '⭐ *NET TOTAL PAYABLE: ₹${(netPayable > 0 ? netPayable : 0.0).toStringAsFixed(2)}${netPayable == 0 && (monthlyAmount > 0 || pastOverdue > 0) ? ' (Fully Settled)' : ''}*\n'
           '━━━━━━━━━━━━━━━━━━━━\n\n'
           '📲 *Payment Options:*\n'
           'Cash, UPI (GPay / PhonePe / Paytm), or Bank Transfer.\n\n'
@@ -437,9 +461,17 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
         final monthlyAmount =
             double.tryParse(_monthlyAmountController.text) ??
                 (widget.initialMonthlyAmount ?? (totalLiters * rate));
+        final paidAmount = double.tryParse(_paidAmountController.text) ?? 0.0;
         final advanceCredit =
             double.tryParse(_advanceCreditController.text) ?? 0.0;
-        final netPayable = (monthlyAmount + pastOverdue) - advanceCredit;
+        final currentDue =
+            monthlyAmount >= paidAmount ? (monthlyAmount - paidAmount) : 0.0;
+        final excess =
+            paidAmount > monthlyAmount ? (paidAmount - monthlyAmount) : 0.0;
+        final credit = advanceCredit + excess;
+        final remainingPastDue =
+            pastOverdue > credit ? (pastOverdue - credit) : 0.0;
+        final netPayable = currentDue + remainingPastDue;
 
         await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
@@ -451,6 +483,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'liters': totalLiters,
           'ratePerLiter': rate,
           'monthlyAmount': monthlyAmount,
+          'paidAmount': paidAmount,
           'totalAmount': netPayable > 0 ? netPayable : monthlyAmount,
           'previousDue': pastOverdue,
           'advanceCredit': advanceCredit,
@@ -531,8 +564,13 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
       final monthlyAmount = double.tryParse(_monthlyAmountController.text) ??
           (widget.initialMonthlyAmount ?? (totalLiters * rate));
+      final paidAmount = double.tryParse(_paidAmountController.text) ?? 0.0;
       final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
-      final net = (monthlyAmount + pastOverdue) - advanceCredit;
+      final curDue = monthlyAmount >= paidAmount ? (monthlyAmount - paidAmount) : 0.0;
+      final excess = paidAmount > monthlyAmount ? (paidAmount - monthlyAmount) : 0.0;
+      final credit = advanceCredit + excess;
+      final remPast = pastOverdue > credit ? (pastOverdue - credit) : 0.0;
+      final net = curDue + remPast;
       calculatedTotal = net > 0 ? net : 0.0;
     }
 
@@ -1121,6 +1159,25 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                             labelText: T.t('Monthly Milk Bill'),
                             prefixIcon:
                                 const Icon(LucideIcons.receiptText, size: 18),
+                            prefixText: '₹',
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _paidAmountController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: T.t('Amount Received'),
+                            prefixIcon:
+                                const Icon(LucideIcons.circleCheck, size: 18),
                             prefixText: '₹',
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 12),
