@@ -518,18 +518,21 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
       // Category filter
       final status = '${item['messageLog']?['status'] ?? 'not_sent'}';
       final hasEntry = item['hasEntry'] == true;
+      final isSent = status == 'sent' || status == 'opened_in_whatsapp';
 
       switch (_selectedFilter) {
         case 'entry_done':
-          return hasEntry;
-        case 'pending':
-          return status == 'pending' || status == 'not_sent';
+          // Entries done should NOT display sent message customers
+          return hasEntry && !isSent;
         case 'sent':
-          return status == 'sent' || status == 'opened_in_whatsapp';
+          return isSent;
+        case 'pending':
+          return !isSent;
         case 'failed':
           return status == 'failed';
         case 'no_entry':
           return !hasEntry;
+        case 'all':
         default:
           return true;
       }
@@ -550,13 +553,60 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
         ? dashboardCtrl.ownerName.value
         : '${_dailyData?['ownerName'] ?? ''}'.trim();
     final customers = _filteredCustomers();
+
+    // Calculate dynamic counts across all customers
+    final allCustomersRaw = (_dailyData?['customers'] as List? ?? [])
+        .whereType<Map>()
+        .map((c) => Map<String, dynamic>.from(c))
+        .toList();
+
+    int countReadyToSend = 0;
+    int countSent = 0;
+    int countPending = 0;
+    int countFailed = 0;
+    int countNoEntry = 0;
+    final int countAll = allCustomersRaw.length;
+
+    for (final item in allCustomersRaw) {
+      final status = '${item['messageLog']?['status'] ?? 'not_sent'}';
+      final hasEntry = item['hasEntry'] == true;
+      final isSent = status == 'sent' || status == 'opened_in_whatsapp';
+
+      if (hasEntry && !isSent) countReadyToSend++;
+      if (isSent) countSent++;
+      if (!isSent) countPending++;
+      if (status == 'failed') countFailed++;
+      if (!hasEntry) countNoEntry++;
+    }
+
+    // Eligible selected customers (must have entry, valid phone, and NOT sent)
     final eligibleSelected = customers.where((c) {
       final cid = '${c['customer']['id']}';
       final customer = c['customer'] as Map? ?? {};
+      final log = c['messageLog'] as Map? ?? {};
+      final status = '${log['status'] ?? 'not_sent'}';
+      final isSent = status == 'sent' || status == 'opened_in_whatsapp';
       return _selectedCustomerIds.contains(cid) &&
           c['hasEntry'] == true &&
-          _hasValidPhone(customer);
+          _hasValidPhone(customer) &&
+          !isSent;
     }).toList();
+
+    // All eligible customers in current filtered list
+    final allEligibleInView = customers.where((c) {
+      final cust = c['customer'] as Map? ?? {};
+      final log = c['messageLog'] as Map? ?? {};
+      final status = '${log['status'] ?? 'not_sent'}';
+      final isSent = status == 'sent' || status == 'opened_in_whatsapp';
+      return c['hasEntry'] == true && _hasValidPhone(cust) && !isSent;
+    }).toList();
+
+    final allEligibleIds = allEligibleInView
+        .map((c) => '${c['customer']['id']}')
+        .toSet();
+
+    final allEligibleSelected = allEligibleIds.isNotEmpty &&
+        allEligibleIds.every((id) => _selectedCustomerIds.contains(id));
 
     final isToday = _formattedDate ==
         DateTime.now().toIso8601String().substring(0, 10);
@@ -904,43 +954,57 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
 
             const SizedBox(height: 8),
 
-            // Filter Chips (Defaulting to Entries Done)
+            // Filter Chips (Defaulting to Entries Done, with dynamic counts)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
                   _FilterChip(
                     label: T.t('Entries Done'),
+                    count: countReadyToSend,
+                    icon: LucideIcons.sendHorizontal,
                     selected: _selectedFilter == 'entry_done',
                     onTap: () => setState(() => _selectedFilter = 'entry_done'),
                   ),
                   const SizedBox(width: 6),
                   _FilterChip(
-                    label: T.t('All'),
-                    selected: _selectedFilter == 'all',
-                    onTap: () => setState(() => _selectedFilter = 'all'),
-                  ),
-                  const SizedBox(width: 6),
-                  _FilterChip(
-                    label: T.t('Pending'),
-                    selected: _selectedFilter == 'pending',
-                    onTap: () => setState(() => _selectedFilter = 'pending'),
-                  ),
-                  const SizedBox(width: 6),
-                  _FilterChip(
                     label: T.t('Sent'),
+                    count: countSent,
+                    icon: LucideIcons.checkCheck,
                     selected: _selectedFilter == 'sent',
                     onTap: () => setState(() => _selectedFilter = 'sent'),
                   ),
                   const SizedBox(width: 6),
                   _FilterChip(
-                    label: T.t('Failed'),
-                    selected: _selectedFilter == 'failed',
-                    onTap: () => setState(() => _selectedFilter = 'failed'),
+                    label: T.t('Pending'),
+                    count: countPending,
+                    icon: LucideIcons.clock,
+                    selected: _selectedFilter == 'pending',
+                    onTap: () => setState(() => _selectedFilter = 'pending'),
                   ),
                   const SizedBox(width: 6),
                   _FilterChip(
+                    label: T.t('All'),
+                    count: countAll,
+                    icon: LucideIcons.users,
+                    selected: _selectedFilter == 'all',
+                    onTap: () => setState(() => _selectedFilter = 'all'),
+                  ),
+                  if (countFailed > 0) ...[
+                    const SizedBox(width: 6),
+                    _FilterChip(
+                      label: T.t('Failed'),
+                      count: countFailed,
+                      icon: LucideIcons.alertCircle,
+                      selected: _selectedFilter == 'failed',
+                      onTap: () => setState(() => _selectedFilter = 'failed'),
+                    ),
+                  ],
+                  const SizedBox(width: 6),
+                  _FilterChip(
                     label: T.t('No Entry'),
+                    count: countNoEntry,
+                    icon: LucideIcons.circleSlash,
                     selected: _selectedFilter == 'no_entry',
                     onTap: () => setState(() => _selectedFilter = 'no_entry'),
                   ),
@@ -1044,84 +1108,184 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
 
             // Bulk Mode Action Banner (if active)
             if (_selectionMode)
-              Container(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xffdcefe3),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xffbbf7d0)),
+                  gradient: LinearGradient(
+                    colors: allEligibleSelected && eligibleSelected.isNotEmpty
+                        ? [
+                            const Color(0xff14532d),
+                            const Color(0xff166534),
+                          ]
+                        : [
+                            const Color(0xfff0fdf4),
+                            const Color(0xffdcfce7),
+                          ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: allEligibleSelected && eligibleSelected.isNotEmpty
+                        ? const Color(0xff4ade80)
+                        : const Color(0xff86efac),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: allEligibleSelected && eligibleSelected.isNotEmpty
+                          ? const Color(0xff166534).withValues(alpha: 0.3)
+                          : const Color(0xff22c55e).withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [
-                        Text(
-                          '${_selectedCustomerIds.length} ${T.t('Selected')} • ${eligibleSelected.length} ${T.t('Eligible')}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xff2d7a55),
-                            fontSize: 14,
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                ? const Color(0xff22c55e)
+                                : const Color(0xffbbf7d0),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            allEligibleSelected && eligibleSelected.isNotEmpty
+                                ? LucideIcons.checkCheck
+                                : LucideIcons.users,
+                            size: 20,
+                            color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                ? Colors.white
+                                : const Color(0xff14532d),
                           ),
                         ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                allEligibleSelected && eligibleSelected.isNotEmpty
+                                    ? '${eligibleSelected.length} ${T.t('All Eligible Selected')}'
+                                    : '${_selectedCustomerIds.length} ${T.t('Selected')} • ${eligibleSelected.length} ${T.t('Eligible')}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                      ? Colors.white
+                                      : const Color(0xff14532d),
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                allEligibleSelected && eligibleSelected.isNotEmpty
+                                    ? T.t('Ready to send WhatsApp delivery updates')
+                                    : (allEligibleIds.isEmpty
+                                        ? T.t('No unsent eligible customers')
+                                        : '${allEligibleIds.length - eligibleSelected.length} ${T.t('eligible remaining')}'),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                      ? const Color(0xffbbf7d0)
+                                      : const Color(0xff166534),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
                             setState(() {
-                              final eligibleCustomers = customers.where((c) {
-                                final cust = c['customer'] as Map? ?? {};
-                                return c['hasEntry'] == true && _hasValidPhone(cust);
-                              }).toList();
-                              final eligibleIds = eligibleCustomers
-                                  .map((c) => '${c['customer']['id']}')
-                                  .toSet();
-                              final allEligibleSelected = eligibleIds.isNotEmpty &&
-                                  eligibleIds.every(
-                                    (id) => _selectedCustomerIds.contains(id),
-                                  );
-
                               if (allEligibleSelected) {
                                 _selectedCustomerIds.clear();
                               } else {
-                                _selectedCustomerIds.addAll(eligibleIds);
+                                _selectedCustomerIds.addAll(allEligibleIds);
                               }
                             });
                           },
-                          child: Text(
-                            customers.where((c) {
-                                      final cust = c['customer'] as Map? ?? {};
-                                      return c['hasEntry'] == true && _hasValidPhone(cust);
-                                    }).isNotEmpty &&
-                                    customers
-                                        .where((c) {
-                                          final cust = c['customer'] as Map? ?? {};
-                                          return c['hasEntry'] == true && _hasValidPhone(cust);
-                                        })
-                                        .every(
-                                          (c) => _selectedCustomerIds.contains(
-                                            '${c['customer']['id']}',
-                                          ),
-                                        )
-                                ? T.t('Deselect All')
-                                : T.t('Select All Eligible'),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                  ? Colors.white
+                                  : const Color(0xff166534),
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  allEligibleSelected && eligibleSelected.isNotEmpty
+                                      ? LucideIcons.x
+                                      : LucideIcons.checkCheck,
+                                  size: 14,
+                                  color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                      ? const Color(0xff14532d)
+                                      : Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  allEligibleSelected && eligibleSelected.isNotEmpty
+                                      ? T.t('Deselect All')
+                                      : T.t('Select All Eligible'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                        ? const Color(0xff14532d)
+                                        : Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                     if (_selectedCustomerIds.length > eligibleSelected.length)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2, bottom: 8),
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: allEligibleSelected && eligibleSelected.isNotEmpty
+                              ? Colors.black.withValues(alpha: 0.25)
+                              : Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                ? const Color(0xff86efac).withValues(alpha: 0.3)
+                                : Colors.amber.shade200,
+                          ),
+                        ),
                         child: Text(
-                          '⚠️ ${_selectedCustomerIds.length - eligibleSelected.length} ${T.t('selected customer(s) skipped (missing today’s milk entry or valid phone number).')}',
+                          'ℹ️ ${_selectedCustomerIds.length - eligibleSelected.length} ${T.t('selected customer(s) already sent or missing today\'s entry (skipped).')}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.amber.shade900,
+                            color: allEligibleSelected && eligibleSelected.isNotEmpty
+                                ? const Color(0xfffef08a)
+                                : Colors.amber.shade900,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
                     FilledButton.icon(
                       onPressed: eligibleSelected.isEmpty || _bulkSending
                           ? null
@@ -1132,16 +1296,23 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                       label: Text(
                         _bulkSending
                             ? T.t('Sending WhatsApp SMS...')
-                            : '${T.t('Send WhatsApp SMS')} (${eligibleSelected.length} ${T.t('eligible')})',
+                            : (eligibleSelected.isEmpty
+                                ? T.t('Select eligible customers above')
+                                : '${T.t('Send WhatsApp SMS')} (${eligibleSelected.length} ${T.t('Customers')})'),
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                         ),
                       ),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xff2d7a55),
+                        backgroundColor: allEligibleSelected && eligibleSelected.isNotEmpty
+                            ? const Color(0xff22c55e)
+                            : const Color(0xff166534),
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade600,
                         minimumSize: const Size.fromHeight(46),
+                        elevation: eligibleSelected.isEmpty ? 0 : 2,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -1565,19 +1736,24 @@ class _FilterChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.count,
+    this.icon,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final int? count;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? const Color(0xff1b4d36) : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -1585,15 +1761,58 @@ class _FilterChip extends StatelessWidget {
             color: selected
                 ? const Color(0xff1b4d36)
                 : const Color(0xffe2e8f0),
+            width: selected ? 1.5 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xff1b4d36).withValues(alpha: 0.18),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? Colors.white : Colors.black87,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 13,
+                color: selected ? Colors.white : const Color(0xff2d7a55),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? Colors.white : const Color(0xff1f2937),
+              ),
+            ),
+            if (count != null) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : const Color(0xfff1f5f9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : const Color(0xff4b5563),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
