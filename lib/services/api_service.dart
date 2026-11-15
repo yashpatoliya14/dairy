@@ -223,10 +223,25 @@ class ApiService {
         : data is Map
         ? (data['customers'] as List? ?? [])
         : <dynamic>[];
-    return list
+    final result = list
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+    result.sort((a, b) {
+      final aNum = int.tryParse(
+              '${a['uniqueNumber'] ?? a['customerNumber'] ?? ''}') ??
+          999999;
+      final bNum = int.tryParse(
+              '${b['uniqueNumber'] ?? b['customerNumber'] ?? ''}') ??
+          999999;
+      return aNum.compareTo(bNum);
+    });
+    return result;
+  }
+
+  Future<Map<String, dynamic>> deleteCustomer(String customerId) async {
+    final response = await _send('DELETE', '/customers/$customerId');
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
   Future<Map<String, dynamic>> getSettings() async {
@@ -685,9 +700,8 @@ class ApiService {
     return response;
   }
 
-  // ─── Local Payment Entry Storage ───────────────────────────────────────────
-  // Payments are stored locally using SharedPreferences until a backend
-  // endpoint is available. Key format: payment_{customerId}_{year}_{month}
+  // ─── Payment Entry Storage (Backend synced with local offline cache) ──────────
+  // Key format: payment_{customerId}_{year}_{month}
 
   static String _paymentKey(String customerId, int year, int month) =>
       'payment_${customerId}_${year}_$month';
@@ -715,6 +729,25 @@ class ApiService {
       'updatedAt': DateTime.now().toIso8601String(),
     });
     await prefs.setString(key, data);
+
+    if (hasSession && customerId.isNotEmpty) {
+      try {
+        await _send(
+          'POST',
+          '/customers/$customerId/payments',
+          body: {
+            'year': year,
+            'month': month,
+            'billAmount': billAmount,
+            'receivedAmount': receivedAmount,
+            'note': note ?? '',
+            'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
+          },
+        );
+      } catch (_) {
+        // Cached locally for offline access
+      }
+    }
   }
 
   /// Get a payment entry for a customer for a specific month.
@@ -723,6 +756,27 @@ class ApiService {
     required int year,
     required int month,
   }) async {
+    if (hasSession && customerId.isNotEmpty) {
+      try {
+        final response = await _send(
+          'GET',
+          '/customers/$customerId/payments?year=$year&month=$month',
+        );
+        if (response.statusCode == 200 && response.body.trim().isNotEmpty) {
+          final decoded = jsonDecode(response.body);
+          if (decoded != null && decoded is Map) {
+            final map = Map<String, dynamic>.from(decoded);
+            final prefs = await SharedPreferences.getInstance();
+            final key = _paymentKey(customerId, year, month);
+            await prefs.setString(key, jsonEncode(map));
+            return map;
+          }
+        }
+      } catch (_) {
+        // Fall back to local storage
+      }
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final key = _paymentKey(customerId, year, month);
     final data = prefs.getString(key);
@@ -743,6 +797,15 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final key = _paymentKey(customerId, year, month);
     await prefs.remove(key);
+
+    if (hasSession && customerId.isNotEmpty) {
+      try {
+        await _send(
+          'DELETE',
+          '/customers/$customerId/payments?year=$year&month=$month',
+        );
+      } catch (_) {}
+    }
   }
 
   Future<Map<String, dynamic>> checkAppVersion({

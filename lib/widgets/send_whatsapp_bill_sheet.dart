@@ -138,7 +138,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           : '0.00',
     );
 
-    // Monthly defaults
+    // Monthly defaults (strictly calculated based on actual entries; if 0 entries, bill is ₹0.00)
     final now = DateTime.now();
     const monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -150,20 +150,19 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     _totalDaysController = TextEditingController(
       text: widget.initialTotalDays != null
           ? '${widget.initialTotalDays}'
-          : '30',
+          : '0',
     );
     _monthlyLitersController = TextEditingController(
       text: widget.initialMonthlyLiters != null
           ? widget.initialMonthlyLiters!.toStringAsFixed(1)
-          : (defaultLiters * 30).toStringAsFixed(1),
+          : '0.0',
     );
     final initialMonthAmt = widget.initialMonthlyAmount != null
         ? widget.initialMonthlyAmount!
         : (widget.initialMonthlyLiters != null && widget.initialRate != null
             ? double.parse((widget.initialMonthlyLiters! * widget.initialRate!)
                 .toStringAsFixed(2))
-            : double.parse(
-                (defaultLiters * 30 * defaultPrice).toStringAsFixed(2)));
+            : 0.0);
     _monthlyAmountController = TextEditingController(
       text: initialMonthAmt.toStringAsFixed(2),
     );
@@ -174,6 +173,62 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     );
 
     _session = now.hour < 14 ? 'Morning' : 'Evening';
+
+    if (widget.initialMonthlyAmount == null) {
+      _loadMonthlyEntriesForBill();
+    }
+  }
+
+  Future<void> _loadMonthlyEntriesForBill() async {
+    final customerId =
+        '${widget.customer['id'] ?? widget.customer['cid'] ?? ''}'.trim();
+    if (customerId.isEmpty) return;
+    final now = DateTime.now();
+    try {
+      final monthData = await widget.api.getMilkEntriesForMonth(
+        customerId,
+        year: now.year,
+        month: now.month,
+      );
+      final entriesList = monthData['entries'] as List? ?? [];
+      if (entriesList.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _totalDaysController.text = '0';
+            _monthlyLitersController.text = '0.0';
+            _monthlyAmountController.text = '0.00';
+          });
+        }
+        return;
+      }
+      double totalLiters = 0.0;
+      double totalAmount = 0.0;
+      final activeDaysSet = <String>{};
+      final defaultPrice = _asDouble(widget.customer['price'], 60.0);
+      for (final e in entriesList) {
+        if (e is Map) {
+          final l = _asDouble(e['liters'], 0.0);
+          totalLiters += l;
+          final total = _asDouble(e['total'], -1.0);
+          if (total >= 0) {
+            totalAmount += total;
+          } else {
+            final p = _asDouble(e['price'], defaultPrice);
+            totalAmount += double.parse((l * p).toStringAsFixed(2));
+          }
+          if (e['entryDate'] != null) {
+            activeDaysSet.add('${e['entryDate']}');
+          }
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _totalDaysController.text = '${activeDaysSet.length}';
+          _monthlyLitersController.text = totalLiters.toStringAsFixed(1);
+          _monthlyAmountController.text = totalAmount.toStringAsFixed(2);
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -201,9 +256,12 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     final litersPerDay = double.tryParse(_dailyLitersController.text) ?? 0;
     final rate = double.tryParse(_rateController.text) ?? 0;
     setState(() {
-      final newLiters = days * litersPerDay;
-      _monthlyLitersController.text = newLiters.toStringAsFixed(1);
-      if (widget.initialMonthlyAmount == null) {
+      if (days <= 0) {
+        _monthlyLitersController.text = '0.0';
+        _monthlyAmountController.text = '0.00';
+      } else {
+        final newLiters = days * litersPerDay;
+        _monthlyLitersController.text = newLiters.toStringAsFixed(1);
         _monthlyAmountController.text = (newLiters * rate).toStringAsFixed(2);
       }
     });

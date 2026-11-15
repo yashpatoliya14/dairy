@@ -1730,6 +1730,80 @@ class _CustomerTile extends StatelessWidget {
     if (updated == true) await onChanged();
   }
 
+  Future<void> _deleteCustomer(BuildContext context) async {
+    final customerId = '${customer['id'] ?? customer['cid'] ?? ''}'.trim();
+    if (customerId.isEmpty) return;
+    final name = '${customer['name'] ?? customer['fullName'] ?? 'Customer'}'.trim();
+    final number = '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? ''}'.trim();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xfffee2e2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(LucideIcons.trash2, color: Color(0xffdc2626), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                T.t('Delete Customer'),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '${T.t('Are you sure you want to delete customer')} #$number ($name)?\n\n'
+          '${T.t('All milk entries and payment history for this customer will be removed.')}\n\n'
+          '${T.t('Note: Customer numbers for other customers (e.g. 1, 2, 3, 5) will remain unchanged.')}',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(T.t('Cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xffdc2626)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(T.t('Delete')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await api.deleteCustomer(customerId);
+        await onChanged();
+        Get.snackbar(
+          T.t('Customer Deleted'),
+          '$name (#$number) ${T.t('has been removed')}',
+          backgroundColor: const Color(0xff1e293b),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(12),
+        );
+      } catch (e) {
+        Get.snackbar(
+          T.t('Error'),
+          '${T.t('Failed to delete customer')}: $e',
+          backgroundColor: const Color(0xffdc2626),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(12),
+        );
+      }
+    }
+  }
+
   Future<void> _openDetails() async {
     final updated = await Get.to<bool>(
       () => CustomerDetailsPage(api: api, customer: customer),
@@ -1920,36 +1994,78 @@ class _CustomerTile extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
 
-                // Save Milk Entry Button
+                // Section 2: Save Milk Entry Button
                 Tooltip(
                   message: T.t('Save entry'),
                   child: Material(
                     color: const Color(0xff2d7a55),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(9),
                     child: InkWell(
                       onTap: () => _addMilk(context),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(9),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 7,
+                          horizontal: 8,
+                          vertical: 6.5,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
                               LucideIcons.circlePlus,
-                              size: 15,
+                              size: 14,
                               color: Colors.white,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 3),
                             Text(
                               T.t('Entry'),
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 12,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+
+                // Section 3: Bill & Entries Button (same as bills > customer item)
+                Tooltip(
+                  message: T.t('Bill & Entries'),
+                  child: Material(
+                    color: const Color(0xfff0fdf4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9),
+                      side: const BorderSide(color: Color(0xff86efac), width: 1),
+                    ),
+                    child: InkWell(
+                      onTap: _openBillAndEntries,
+                      borderRadius: BorderRadius.circular(9),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6.5,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              LucideIcons.receiptText,
+                              size: 14,
+                              color: Color(0xff166534),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              T.t('Bill'),
+                              style: const TextStyle(
+                                color: Color(0xff166534),
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -1986,6 +2102,7 @@ class _CustomerTile extends StatelessWidget {
                     }
                     if (value == 'edit') _edit(context);
                     if (value == 'details') _openDetails();
+                    if (value == 'delete') _deleteCustomer(context);
                   },
                   itemBuilder: (context) => [
                     PopupMenuItem(
@@ -2050,6 +2167,27 @@ class _CustomerTile extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.trash2,
+                          color: Color(0xffdc2626),
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('Delete customer'),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xffdc2626),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -2089,6 +2227,80 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     );
     if (updated == true && mounted) {
       Get.back(result: true);
+    }
+  }
+
+  Future<void> _deleteCustomer() async {
+    final customerId = '${_customer['id'] ?? _customer['cid'] ?? ''}'.trim();
+    if (customerId.isEmpty) return;
+    final name = '${_customer['name'] ?? _customer['fullName'] ?? 'Customer'}'.trim();
+    final number = '${_customer['uniqueNumber'] ?? _customer['customerNumber'] ?? ''}'.trim();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xfffee2e2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(LucideIcons.trash2, color: Color(0xffdc2626), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                T.t('Delete Customer'),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '${T.t('Are you sure you want to delete customer')} #$number ($name)?\n\n'
+          '${T.t('All milk entries and payment history for this customer will be removed.')}\n\n'
+          '${T.t('Note: Customer numbers for other customers (e.g. 1, 2, 3, 5) will remain unchanged.')}',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(T.t('Cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xffdc2626)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(T.t('Delete')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await widget.api.deleteCustomer(customerId);
+        Get.back(result: true);
+        Get.snackbar(
+          T.t('Customer Deleted'),
+          '$name (#$number) ${T.t('has been removed')}',
+          backgroundColor: const Color(0xff1e293b),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(12),
+        );
+      } catch (e) {
+        Get.snackbar(
+          T.t('Error'),
+          '${T.t('Failed to delete customer')}: $e',
+          backgroundColor: const Color(0xffdc2626),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(12),
+        );
+      }
     }
   }
 
@@ -2150,6 +2362,11 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             tooltip: T.t('Edit customer'),
             onPressed: _editCustomer,
             icon: const Icon(Icons.edit_outlined, color: Colors.white),
+          ),
+          IconButton(
+            tooltip: T.t('Delete customer'),
+            onPressed: _deleteCustomer,
+            icon: const Icon(LucideIcons.trash2, color: Color(0xfff87171)),
           ),
         ],
       ),

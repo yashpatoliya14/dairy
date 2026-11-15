@@ -91,5 +91,30 @@ void main() {
       expect(netBalanceDue, 0.0);
       expect(thisMonthPaid >= totalPayable, isTrue);
     });
+
+    test('Entering 50% payment against current bill correctly reduces balance due to 50%', () {
+      const grossPastDue = 0.0;
+      const grossPastAdvance = 0.0;
+      const thisMonthBill = 10000.0;
+      const thisMonthPaid = 5000.0;
+
+      final thisMonthDue = thisMonthPaid >= thisMonthBill
+          ? 0.0
+          : double.parse((thisMonthBill - thisMonthPaid).toStringAsFixed(2));
+      final thisMonthAdvance = thisMonthPaid > thisMonthBill
+          ? double.parse((thisMonthPaid - thisMonthBill).toStringAsFixed(2))
+          : 0.0;
+
+      final creditsForPast = thisMonthAdvance + grossPastAdvance;
+      final remainingPastDue = grossPastDue > creditsForPast
+          ? double.parse((grossPastDue - creditsForPast).toStringAsFixed(2))
+          : 0.0;
+      final netBalanceDue =
+          double.parse((remainingPastDue + thisMonthDue).toStringAsFixed(2));
+
+      expect(thisMonthDue, 5000.0);
+      expect(netBalanceDue, 5000.0);
+      expect(thisMonthDue < thisMonthBill, isTrue);
+    });
   });
 }

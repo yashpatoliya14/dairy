@@ -260,20 +260,28 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
       } catch (_) {}
     }
 
-    // 4. Net calculations with FIFO credit allocation:
-    // Credits available = thisMonthPaid + grossPastAdvance
-    final totalCredits = thisMonthPaid + grossPastAdvance;
+    // 4. Net calculations:
+    // When a customer pays for the selected month (thisMonthPaid), that payment
+    // directly settles this month's bill (thisMonthDue = max(0, thisMonthBill - thisMonthPaid)).
+    // If the payment exceeds this month's bill, the excess rolls over as advance or towards past dues.
+    final thisMonthDue = thisMonthPaid >= thisMonthBill
+        ? 0.0
+        : double.parse((thisMonthBill - thisMonthPaid).toStringAsFixed(2));
+    final thisMonthAdvance = thisMonthPaid > thisMonthBill
+        ? double.parse((thisMonthPaid - thisMonthBill).toStringAsFixed(2))
+        : 0.0;
 
-    // Apply credits towards gross past dues first (oldest debt cleared first)
-    final creditForPast = totalCredits > grossPastDue ? grossPastDue : totalCredits;
-    final remainingPastDue = grossPastDue - creditForPast;
-    final creditsLeft = totalCredits - creditForPast;
-
-    // Remaining credits apply to this month's bill
-    final creditForThisMonth = creditsLeft > thisMonthBill ? thisMonthBill : creditsLeft;
-    final thisMonthDue = thisMonthBill - creditForThisMonth;
-    final netAdvance = creditsLeft > thisMonthBill ? (creditsLeft - thisMonthBill) : 0.0;
-    final netBalanceDue = remainingPastDue + thisMonthDue;
+    // Past dues settlement:
+    // Credits available for past dues = thisMonthAdvance + grossPastAdvance
+    final creditsForPast = thisMonthAdvance + grossPastAdvance;
+    final remainingPastDue = grossPastDue > creditsForPast
+        ? double.parse((grossPastDue - creditsForPast).toStringAsFixed(2))
+        : 0.0;
+    final netAdvance = creditsForPast > grossPastDue
+        ? double.parse((creditsForPast - grossPastDue).toStringAsFixed(2))
+        : 0.0;
+    final netBalanceDue =
+        double.parse((remainingPastDue + thisMonthDue).toStringAsFixed(2));
 
     return CustomerBillItem(
       customer: c,
@@ -886,6 +894,10 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
     Color badgeBg;
     String badgeText;
 
+    final pctPaid = item.thisMonthBill > 0
+        ? ((item.thisMonthPaid / item.thisMonthBill) * 100).clamp(0, 100).toInt()
+        : 0;
+
     if (item.netAdvance > 0) {
       badgeColor = const Color(0xff0d9488);
       badgeBg = const Color(0xffccfbf1);
@@ -897,7 +909,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
     } else if (item.thisMonthPaid > 0 && item.netBalanceDue > 0) {
       badgeColor = const Color(0xffd97706);
       badgeBg = const Color(0xfffef3c7);
-      badgeText = '⏳ ${T.t("Partially Paid")}';
+      badgeText = '⏳ ${T.t("Partially Paid")} ($pctPaid%)';
     } else if (item.thisMonthBill > 0) {
       badgeColor = const Color(0xffdc2626);
       badgeBg = const Color(0xfffee2e2);
@@ -1028,7 +1040,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
 
           // Monthly Metrics Grid
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
             child: Row(
               children: [
                 Expanded(
@@ -1045,6 +1057,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                     value: '₹${item.thisMonthBill.toStringAsFixed(0)}',
                     sub: '@ ₹${item.defaultPrice.toStringAsFixed(0)}/L',
                     color: const Color(0xff0284c7),
+                    bg: const Color(0xfff0f9ff),
                   ),
                 ),
                 Expanded(
@@ -1053,6 +1066,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                     value: '₹${item.thisMonthPaid.toStringAsFixed(0)}',
                     sub: item.hasPayment ? T.t('Paid') : T.t('Unpaid'),
                     color: const Color(0xff16a34a),
+                    bg: item.thisMonthPaid > 0 ? const Color(0xfff0fdf4) : null,
                   ),
                 ),
                 Expanded(
@@ -1061,11 +1075,33 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                     value: '₹${item.thisMonthDue.toStringAsFixed(0)}',
                     sub: _monthLabel(_selectedMonth, _selectedYear).split(' ').first,
                     color: item.thisMonthDue > 0 ? const Color(0xffdc2626) : const Color(0xff16a34a),
+                    bg: item.thisMonthDue > 0 ? const Color(0xfffef2f2) : const Color(0xfff0fdf4),
                   ),
                 ),
               ],
             ),
           ),
+
+          // Payment Progress Indicator
+          if (item.thisMonthBill > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: (item.thisMonthPaid / item.thisMonthBill).clamp(0.0, 1.0),
+                  minHeight: 5,
+                  backgroundColor: const Color(0xffe2e8f0),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    item.thisMonthDue == 0
+                        ? const Color(0xff16a34a)
+                        : (item.thisMonthPaid > 0
+                            ? const Color(0xffd97706)
+                            : const Color(0xffcbd5e1)),
+                  ),
+                ),
+              ),
+            ),
 
           // Multi-Month Ledger Alert Row (Rollover details)
           if (item.pastMonthsDue > 0 || (item.grossPastAdvance > 0 && item.netAdvance > 0))
@@ -1266,36 +1302,55 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
     required String value,
     required String sub,
     required Color color,
+    Color? bg,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade600,
-          ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg ?? const Color(0xfff8fafc),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: bg != null ? color.withValues(alpha: 0.2) : const Color(0xffe2e8f0),
+          width: 0.8,
         ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: color,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        Text(
-          sub,
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey.shade500,
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          Text(
+            sub,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }
