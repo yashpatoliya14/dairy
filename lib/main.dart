@@ -16,9 +16,9 @@ import 'services/api_service.dart';
 import 'views/app_update_screen.dart';
 import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
-import 'widgets/customer_bills_screen.dart';
 import 'widgets/monthly_entries_screen.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
+import 'widgets/support_bottom_sheet.dart';
 import 'widgets/whatsapp_messaging_screen.dart';
 
 Future<void> main() async {
@@ -496,171 +496,479 @@ class _AuthPageState extends State<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
+    final langController = Get.isRegistered<AppLanguageController>()
+        ? Get.find<AppLanguageController>()
+        : null;
+
     return Scaffold(
+      backgroundColor: const Color(0xfff8fafc),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: _pagePadding(context),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(
-                      LucideIcons.milk,
-                      size: 54,
-                      color: Color(0xff2d7a55),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Dairy Desk',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      T.t(signup ? 'Set up your dairy' : 'Welcome back'),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 34),
-                    SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment(value: false, label: Text(T.t('Log in'))),
-                        ButtonSegment(
-                          value: true,
-                          label: Text(T.t('Create account')),
+              child: Column(
+                children: [
+                  // Top Row: Language Quick Switcher
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (langController != null)
+                        PopupMenuButton<String>(
+                          onSelected: (code) => langController.setLanguage(code),
+                          tooltip: T.t('Language & localization'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xffe2e8f0)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  LucideIcons.globe,
+                                  size: 14,
+                                  color: Color(0xff166534),
+                                ),
+                                const SizedBox(width: 6),
+                                Obx(() {
+                                  final current = langController.language.value;
+                                  final label = current == 'gu'
+                                      ? 'ગુજરાતી'
+                                      : current == 'hi'
+                                          ? 'हिन्दी'
+                                          : 'English';
+                                  return Text(
+                                    label,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xff166534),
+                                    ),
+                                  );
+                                }),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  LucideIcons.chevronDown,
+                                  size: 12,
+                                  color: Color(0xff166534),
+                                ),
+                              ],
+                            ),
+                          ),
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'en',
+                              child: Text('English'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'gu',
+                              child: Text('ગુજરાતી (Gujarati)'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'hi',
+                              child: Text('हिन्दी (Hindi)'),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Brand Hero Header
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xffecfdf5), Color(0xffd1fae5)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: const Color(0xffa7f3d0),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xff059669).withValues(alpha: 0.15),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
                       ],
-                      selected: {signup},
-                      onSelectionChanged: busy
-                          ? null
-                          : (selection) =>
-                                setState(() => signup = selection.first),
                     ),
-                    const SizedBox(height: 22),
-                    if (signup) ...[
-                      Row(
+                    child: const Center(
+                      child: Icon(
+                        LucideIcons.milk,
+                        size: 38,
+                        color: Color(0xff15803d),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  Text(
+                    'Dairy Desk',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xff0f172a),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    T.t(signup
+                        ? 'Create your dairy account'
+                        : 'Welcome back to your dairy desk'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Modern Form Container Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xffe2e8f0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: firstName,
+                          SegmentedButton<bool>(
+                            style: ButtonStyle(
+                              backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+                                if (states.contains(WidgetState.selected)) {
+                                  return Colors.white;
+                                }
+                                return const Color(0xfff1f5f9);
+                              }),
+                              foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+                                if (states.contains(WidgetState.selected)) {
+                                  return const Color(0xff166534);
+                                }
+                                return const Color(0xff64748b);
+                              }),
+                              elevation: WidgetStateProperty.resolveWith<double>((states) {
+                                if (states.contains(WidgetState.selected)) {
+                                  return 1.5;
+                                }
+                                return 0;
+                              }),
+                              side: const WidgetStatePropertyAll(BorderSide(color: Color(0xffe2e8f0))),
+                              shape: WidgetStatePropertyAll(
+                                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                            showSelectedIcon: false,
+                            segments: [
+                              ButtonSegment(
+                                value: false,
+                                label: Text(
+                                  T.t('Log in'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              ButtonSegment(
+                                value: true,
+                                label: Text(
+                                  T.t('Create account'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                            selected: {signup},
+                            onSelectionChanged: busy
+                                ? null
+                                : (selection) => setState(() => signup = selection.first),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          if (signup) ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: firstName,
+                                    textCapitalization: TextCapitalization.words,
+                                    decoration: InputDecoration(
+                                      labelText: T.t('First name'),
+                                      prefixIcon: const Icon(LucideIcons.user, size: 18),
+                                      filled: true,
+                                      fillColor: const Color(0xfff8fafc),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Color(0xff166534), width: 2),
+                                      ),
+                                    ),
+                                    validator: _required,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: lastName,
+                                    textCapitalization: TextCapitalization.words,
+                                    decoration: InputDecoration(
+                                      labelText: T.t('Last name'),
+                                      prefixIcon: const Icon(LucideIcons.user, size: 18),
+                                      filled: true,
+                                      fillColor: const Color(0xfff8fafc),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Color(0xff166534), width: 2),
+                                      ),
+                                    ),
+                                    validator: _required,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: dairyName,
                               textCapitalization: TextCapitalization.words,
                               decoration: InputDecoration(
-                                labelText: T.t('First name'),
+                                labelText: T.t('Dairy name'),
+                                prefixIcon: const Icon(LucideIcons.store, size: 18),
+                                filled: true,
+                                fillColor: const Color(0xfff8fafc),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xff166534), width: 2),
+                                ),
                               ),
                               validator: _required,
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: lastName,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: InputDecoration(
-                                labelText: T.t('Last name'),
+                            const SizedBox(height: 14),
+                          ],
+
+                          // Email or Mobile Field
+                          TextFormField(
+                            controller: email,
+                            keyboardType: signup
+                                ? TextInputType.emailAddress
+                                : TextInputType.text,
+                            decoration: InputDecoration(
+                              labelText: signup
+                                  ? T.t('Email address')
+                                  : T.t('Email address or mobile number'),
+                              prefixIcon: Icon(
+                                signup ? LucideIcons.mail : LucideIcons.userCheck,
+                                size: 18,
                               ),
-                              validator: _required,
+                              filled: true,
+                              fillColor: const Color(0xfff8fafc),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xff166534), width: 2),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return T.t('Required');
+                              }
+                              final val = v.trim();
+                              if (signup) {
+                                return _isValidEmail(val)
+                                    ? null
+                                    : T.t('Enter a valid email');
+                              }
+                              if (val.contains('@')) {
+                                return _isValidEmail(val)
+                                    ? null
+                                    : T.t('Enter a valid email');
+                              }
+                              final digits = val.replaceAll(RegExp(r'\D'), '');
+                              if (digits.length >= 10 && digits.length <= 15) {
+                                return null;
+                              }
+                              return T.t('Enter a valid email or 10-digit mobile number');
+                            },
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Password Field
+                          TextFormField(
+                            controller: password,
+                            obscureText: obscurePassword,
+                            decoration: InputDecoration(
+                              labelText: T.t('Password'),
+                              prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                              filled: true,
+                              fillColor: const Color(0xfff8fafc),
+                              helperText: signup
+                                  ? T.t('Minimum 6 characters, 1 number, 1 special character')
+                                  : null,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xff166534), width: 2),
+                              ),
+                              suffixIcon: IconButton(
+                                tooltip: obscurePassword
+                                    ? T.t('Show password')
+                                    : T.t('Hide password'),
+                                icon: Icon(
+                                  obscurePassword
+                                      ? LucideIcons.eye
+                                      : LucideIcons.eyeOff,
+                                  size: 18,
+                                ),
+                                onPressed: () => setState(
+                                  () => obscurePassword = !obscurePassword,
+                                ),
+                              ),
+                            ),
+                            validator: (v) =>
+                                signup ? _strongPasswordError(v) : _required(v),
+                          ),
+
+                          if (!signup) ...[
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xff166534),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                onPressed: busy
+                                    ? null
+                                    : () => Get.to(
+                                          () => ForgotPasswordPage(
+                                            api: widget.api,
+                                            initialEmail: email.text.trim(),
+                                          ),
+                                        ),
+                                icon: const Icon(LucideIcons.keyRound, size: 13),
+                                label: Text(
+                                  T.t('Forgot password?'),
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          const SizedBox(height: 16),
+
+                          // Submit Button
+                          FilledButton(
+                            onPressed: busy ? null : submit,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xff166534),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: busy
+                                ? DairyMilkLoader.mini(color: Colors.white, size: 22)
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        signup ? LucideIcons.userPlus : LucideIcons.logIn,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        T.t(signup ? 'Create account' : 'Log in'),
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Need Help? Contact Support Button
+                  InkWell(
+                    onTap: () => SupportHelper.showSupportSheet(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            LucideIcons.headphones,
+                            size: 14,
+                            color: Color(0xff166534),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            T.t('Need help? Contact Support'),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xff166534),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: dairyName,
-                        decoration: InputDecoration(
-                          labelText: T.t('Dairy name'),
-                        ),
-                        validator: _required,
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    TextFormField(
-                      controller: email,
-                      keyboardType: signup
-                          ? TextInputType.emailAddress
-                          : TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: signup
-                            ? T.t('Email address')
-                            : T.t('Email address or mobile number'),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return T.t('Required');
-                        }
-                        final val = v.trim();
-                        if (signup) {
-                          return _isValidEmail(val)
-                              ? null
-                              : T.t('Enter a valid email');
-                        }
-                        // Login mode accepts email or mobile number
-                        if (val.contains('@')) {
-                          return _isValidEmail(val)
-                              ? null
-                              : T.t('Enter a valid email');
-                        }
-                        final digits = val.replaceAll(RegExp(r'\D'), '');
-                        if (digits.length >= 10 && digits.length <= 15) {
-                          return null;
-                        }
-                        return T.t('Enter a valid email or 10-digit mobile number');
-                      },
                     ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: password,
-                      obscureText: obscurePassword,
-                      decoration: InputDecoration(
-                        labelText: T.t('Password'),
-                        helperText: signup
-                            ? T.t(
-                                'Minimum 6 characters, 1 number, 1 special character',
-                              )
-                            : null,
-                        suffixIcon: IconButton(
-                          tooltip: obscurePassword
-                              ? T.t('Show password')
-                              : T.t('Hide password'),
-                          icon: Icon(
-                            obscurePassword
-                                ? LucideIcons.eye
-                                : LucideIcons.eyeOff,
-                          ),
-                          onPressed: () => setState(
-                            () => obscurePassword = !obscurePassword,
-                          ),
-                        ),
-                      ),
-                      validator: (v) =>
-                          signup ? _strongPasswordError(v) : _required(v),
-                    ),
-                    if (!signup)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: busy
-                              ? null
-                              : () => Get.to(
-                                  () => ForgotPasswordPage(api: widget.api, initialEmail: email.text.trim()),
-                                ),
-                          child: Text(T.t('Forgot password?')),
-                        ),
-                      ),
-                    const SizedBox(height: 22),
-                    FilledButton(
-                      onPressed: busy ? null : submit,
-                      child: Padding(
-                        padding: const EdgeInsets.all(13),
-                        child: busy
-                            ? DairyMilkLoader.mini(color: Colors.white, size: 22)
-                            : Text(T.t(signup ? 'Create account' : 'Log in')),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -668,9 +976,6 @@ class _AuthPageState extends State<AuthPage> {
       ),
     );
   }
-
-  String? _required(String? value) =>
-      value == null || value.trim().isEmpty ? T.t('Required') : null;
 }
 
 class VerifyEmailPage extends StatefulWidget {
@@ -1845,7 +2150,6 @@ class _CustomerTile extends StatelessWidget {
     final channel =
         '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
     final isWhatsApp = channel == 'whatsapp';
-    final customerId = '${customer['id'] ?? customer['cid'] ?? ''}'.trim();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1992,14 +2296,7 @@ class _CustomerTile extends StatelessWidget {
                           _openBillAndEntries();
                         }
                         if (value == 'bills_due') {
-                          Get.to(
-                            () => CustomerBillsScreen(
-                              api: api,
-                              controller: Get.find<DashboardController>(),
-                              targetCustomerId: customerId,
-                              targetCustomerName: name,
-                            ),
-                          );
+                          _openBillAndEntries();
                         }
                         if (value == 'whatsapp') {
                           SendWhatsAppBillSheet.show(
@@ -2939,11 +3236,9 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   color: Color(0xff115e59),
                 ),
                 onTap: () => Get.to(
-                  () => CustomerBillsScreen(
+                  () => MonthlyEntriesScreen(
                     api: widget.api,
-                    controller: Get.find<DashboardController>(),
-                    targetCustomerId: '${_customer['id'] ?? _customer['cid'] ?? ''}'.trim(),
-                    targetCustomerName: '${_customer['name'] ?? _customer['fullName'] ?? ''}'.trim(),
+                    customer: _customer,
                   ),
                 ),
               ),
@@ -3315,8 +3610,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 iconBg: const Color(0xffccfbf1),
                 iconColor: const Color(0xff0f766e),
                 title: T.t('Contact support'),
-                subtitle: 'support@dairydesk.app',
-                onTap: () => _openSupportEmail(context),
+                subtitle: '+91 91041 52524 (WhatsApp / Call)',
+                onTap: () => SupportHelper.showSupportSheet(context),
               ),
               const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
               _SettingsListTile(
@@ -3324,8 +3619,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 iconBg: const Color(0xfff3e8ff),
                 iconColor: const Color(0xff9333ea),
                 title: T.t('Send feedback'),
-                subtitle: T.t('Help us improve Dairy Desk'),
-                onTap: () => _showFeedbackDialog(context),
+                subtitle: T.t('Send feedback via WhatsApp (+91 91041 52524)'),
+                onTap: () => SupportHelper.showFeedbackDialog(context),
               ),
               const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
               _SettingsListTile(
@@ -4327,80 +4622,6 @@ String _profileInitial(Map<String, dynamic> profile) {
   return value.isEmpty ? '?' : value.substring(0, 1).toUpperCase();
 }
 
-Future<void> _openSupportEmail(BuildContext context) async {
-  final uri = Uri(
-    scheme: 'mailto',
-    path: 'support@dairydesk.app',
-    queryParameters: {'subject': 'Dairy Desk support request'},
-  );
-  if (await launchUrl(uri)) return;
-  if (context.mounted) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(T.t('No email app is available'))));
-  }
-}
-
-Future<void> _showFeedbackDialog(BuildContext context) async {
-  final feedback = TextEditingController();
-  final submitted = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              T.t('Send feedback'),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 20),
-            tooltip: T.t('Close'),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: () => Navigator.pop(dialogContext, false),
-          ),
-        ],
-      ),
-      content: TextField(
-        controller: feedback,
-        maxLines: 5,
-        autofocus: true,
-        decoration: InputDecoration(
-          hintText: T.t('Tell us what we can improve'),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
-          child: Text(T.t('Cancel')),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
-          child: Text(T.t('Continue')),
-        ),
-      ],
-    ),
-  );
-  final message = feedback.text.trim();
-  feedback.dispose();
-  if (submitted != true || message.isEmpty || !context.mounted) return;
-  final uri = Uri(
-    scheme: 'mailto',
-    path: 'feedback@dairydesk.app',
-    queryParameters: {'subject': 'Dairy Desk feedback', 'body': message},
-  );
-  if (await launchUrl(uri)) return;
-  if (context.mounted) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(T.t('No email app is available'))));
-  }
-}
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key, required this.api});

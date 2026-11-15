@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../controllers/monthly_entries_controller.dart';
 import '../services/api_service.dart';
 import '../services/app_language.dart';
+import '../views/customer_bill_page.dart';
 import 'dairy_milk_loader.dart';
 import 'payment_entry_sheet.dart';
 import 'send_whatsapp_bill_sheet.dart';
@@ -457,100 +458,107 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Invoice Header Bar: Dairy Name + Status Badge + Full view button
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xffdcfce7),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          LucideIcons.receiptText,
-                          color: Color(0xff166534),
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                  InkWell(
+                    onTap: () => _showFullInvoiceDialog(context),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xffdcfce7),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              LucideIcons.receiptText,
+                              color: Color(0xff166534),
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    dairy,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 14,
-                                      color: Color(0xff166534),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        dairy,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                          color: Color(0xff166534),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: controller.isFullyPaid
+                                            ? const Color(0xffdcfce7)
+                                            : controller.isPartiallyPaid
+                                                ? const Color(0xfffef3c7)
+                                                : const Color(0xffdcfce7),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: controller.isFullyPaid
+                                              ? const Color(0xff86efac)
+                                              : controller.isPartiallyPaid
+                                                  ? const Color(0xfffcd34d)
+                                                  : const Color(0xff86efac),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        controller.isFullyPaid
+                                            ? T.t('Fully Paid')
+                                            : controller.isPartiallyPaid
+                                                ? T.t('Partially Paid')
+                                                : T.t('Billed'),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: controller.isFullyPaid
+                                              ? const Color(0xff166534)
+                                              : controller.isPartiallyPaid
+                                                  ? const Color(0xffb45309)
+                                                  : const Color(0xff166534),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: controller.isFullyPaid
-                                        ? const Color(0xffdcfce7)
-                                        : controller.isPartiallyPaid
-                                            ? const Color(0xfffef3c7)
-                                            : const Color(0xffdcfce7),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: controller.isFullyPaid
-                                          ? const Color(0xff86efac)
-                                          : controller.isPartiallyPaid
-                                              ? const Color(0xfffcd34d)
-                                              : const Color(0xff86efac),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    controller.isFullyPaid
-                                        ? T.t('Fully Paid')
-                                        : controller.isPartiallyPaid
-                                            ? T.t('Partially Paid')
-                                            : T.t('Billed'),
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: controller.isFullyPaid
-                                          ? const Color(0xff166534)
-                                          : controller.isPartiallyPaid
-                                              ? const Color(0xffb45309)
-                                              : const Color(0xff166534),
-                                    ),
+                                Text(
+                                  '${T.t('Invoice No.')} $invoiceNumber  •  $monthName',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
                                   ),
                                 ),
                               ],
                             ),
-                            Text(
-                              '${T.t('Invoice No.')} $invoiceNumber  •  $monthName',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
-                              ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 18,
+                            tooltip: T.t('View Full Invoice'),
+                            onPressed: () => _showFullInvoiceDialog(context),
+                            icon: const Icon(
+                              LucideIcons.arrowUpRight,
+                              color: Color(0xff2d7a55),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 18,
-                        tooltip: T.t('View Full Invoice'),
-                        onPressed: () => _showFullInvoiceDialog(context),
-                        icon: const Icon(
-                          LucideIcons.maximize2,
-                          color: Color(0xff2d7a55),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
 
                   const SizedBox(height: 8),
@@ -907,233 +915,11 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
   }
 
   void _showFullInvoiceDialog(BuildContext context) {
-    final monthName = _monthLabel(
-      controller.selectedMonth.value,
-      controller.selectedYear.value,
-    );
-    final daysInMonth = controller.daysInMonth.value;
-    final totalLiters = controller.totalLiters.value;
-    final totalAmount = controller.billTotalAmount;
-    final effectiveRate = controller.effectiveRate;
-    final activeDays = controller.activeDeliveryDays;
-    final offDays = controller.zeroDeliveryDays + controller.missingDays;
-    final dailyAvg = controller.averageDailyLiters;
-    final invoiceNumber =
-        'INV-${controller.selectedYear.value}${controller.selectedMonth.value.toString().padLeft(2, '0')}-${controller.customerNumber}';
-    final now = DateTime.now();
-    final todayFormatted =
-        '${now.day.toString().padLeft(2, '0')} ${_monthNames[now.month - 1].substring(0, 3)} ${now.year}';
-    final words = _numberToIndianWords(totalAmount);
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(LucideIcons.receiptText, color: Color(0xff166534)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '${T.t('Bill')} - ${controller.customerName}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              tooltip: T.t('Close'),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xfff0fdf4),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xffbbf7d0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      controller.dairyName.value.isNotEmpty
-                          ? controller.dairyName.value
-                          : 'Dairy Desk',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xff166534),
-                      ),
-                    ),
-                    Text(
-                      'Invoice: $invoiceNumber  •  Date: $todayFormatted',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              _BillDetailRow(
-                label: T.t('Customer no.'),
-                value: controller.customerNumber,
-              ),
-              const SizedBox(height: 6),
-              _BillDetailRow(label: T.t('Month'), value: monthName),
-              const SizedBox(height: 6),
-              _BillDetailRow(
-                label: T.t('Delivery Days'),
-                value: '$activeDays / $daysInMonth Days',
-              ),
-              const SizedBox(height: 6),
-              _BillDetailRow(
-                label: T.t('Absent / Off Days'),
-                value: '$offDays Days',
-              ),
-              const SizedBox(height: 6),
-              _BillDetailRow(
-                label: T.t('Daily Average'),
-                value: '${dailyAvg.toStringAsFixed(2)} L/day',
-              ),
-              const Divider(height: 20),
-              _BillDetailRow(
-                label: T.t('Total Milk Supplied'),
-                value: '${totalLiters.toStringAsFixed(1)} L',
-                isBold: true,
-              ),
-              const SizedBox(height: 6),
-              _BillDetailRow(
-                label: T.t('Rate per Liter'),
-                value: '₹${effectiveRate.toStringAsFixed(2)}/L',
-                isBold: true,
-              ),
-              const SizedBox(height: 6),
-              _BillDetailRow(
-                label: T.t('Subtotal'),
-                value: '₹${totalAmount.toStringAsFixed(2)}',
-              ),
-              if (controller.pastMonthsDue.value > 0) ...[
-                const SizedBox(height: 6),
-                _BillDetailRow(
-                  label: controller.pastMonthsBreakdown.isNotEmpty
-                      ? '${T.t('Past Overdue')} (${controller.pastMonthsBreakdown.join(', ')})'
-                      : T.t('Past Overdue'),
-                  value: '₹${controller.pastMonthsDue.value.toStringAsFixed(2)}',
-                  isBold: true,
-                ),
-              ],
-              if (controller.hasPayment.value) ...[
-                const SizedBox(height: 6),
-                _BillDetailRow(
-                  label: T.t('Amount Received'),
-                  value: '₹${controller.paymentReceived.value.toStringAsFixed(2)}',
-                  isBold: true,
-                ),
-                const SizedBox(height: 6),
-                _BillDetailRow(
-                  label: T.t('Balance Due'),
-                  value: '₹${controller.balanceDue.toStringAsFixed(2)}',
-                  isBold: true,
-                ),
-              ],
-              if (controller.netAdvance.value > 0) ...[
-                const SizedBox(height: 6),
-                _BillDetailRow(
-                  label: T.t('Advance Credit'),
-                  value: '₹${controller.netAdvance.value.toStringAsFixed(2)}',
-                  isBold: true,
-                ),
-              ],
-              const Divider(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: controller.isFullyPaid
-                      ? const Color(0xff064e3b)
-                      : controller.isPartiallyPaid
-                          ? const Color(0xff78350f)
-                          : const Color(0xff064e3b),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          controller.hasPayment.value
-                              ? (controller.isFullyPaid
-                                  ? '${T.t('Total Amount Payable')} (${T.t('Fully Paid')})'
-                                  : T.t('Net Total Due'))
-                              : T.t('Total Amount Payable'),
-                          style: TextStyle(
-                            color: controller.isPartiallyPaid
-                                ? const Color(0xfffef08a)
-                                : const Color(0xffa7f3d0),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                        Text(
-                          controller.isFullyPaid
-                              ? '₹0.00'
-                              : (controller.hasPayment.value
-                                  ? '₹${controller.netTotalPayable.toStringAsFixed(2)}'
-                                  : (controller.pastMonthsDue.value > 0
-                                      ? '₹${controller.netTotalPayable.toStringAsFixed(2)}'
-                                      : '₹${totalAmount.toStringAsFixed(2)}')),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (totalAmount > 0) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        words,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 10,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(T.t('Close')),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _copyBillToClipboard(context);
-            },
-            icon: const Icon(LucideIcons.copy, size: 16),
-            label: Text(T.t('Copy Bill')),
-          ),
-        ],
+    Get.to(
+      () => CustomerBillPage(
+        api: widget.api,
+        customer: widget.customer,
+        controller: controller,
       ),
     );
   }
@@ -1472,44 +1258,6 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
   }
 }
 
-// ─── Bill Detail Row ─────────────────────────────────────────────────────────
-
-class _BillDetailRow extends StatelessWidget {
-  const _BillDetailRow({
-    required this.label,
-    required this.value,
-    this.isBold = false,
-  });
-
-  final String label;
-  final String value;
-  final bool isBold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade700,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-            color: isBold ? Colors.black87 : Colors.grey.shade900,
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 // ─── Compact Metric Widget ───────────────────────────────────────────────────
 

@@ -6,8 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../controllers/dashboard_controller.dart';
 import '../services/api_service.dart';
 import '../services/app_language.dart';
-import 'customer_bills_screen.dart';
 import 'daily_collection_screen.dart';
+import 'support_bottom_sheet.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
@@ -407,15 +407,10 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildActionTile(
-                      icon: LucideIcons.receiptText,
-                      label: T.t('Bills'),
-                      color: const Color(0xffd97706),
-                      onTap: () => Get.to(
-                        () => CustomerBillsScreen(
-                          api: api,
-                          controller: controller,
-                        ),
-                      ),
+                      icon: LucideIcons.headphones,
+                      label: T.t('Support'),
+                      color: const Color(0xff059669),
+                      onTap: () => SupportHelper.showSupportSheet(context),
                     ),
                   ),
                 ],
