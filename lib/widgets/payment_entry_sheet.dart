@@ -347,8 +347,8 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                           children: [
                             Text(
                               hasCombinedDebt
-                                  ? '${T.t('This Month Bill')} (${widget.totalLiters.toStringAsFixed(1)} L @ ₹${widget.effectiveRate.toStringAsFixed(2)})'
-                                  : '${widget.totalLiters.toStringAsFixed(1)} L  @  ₹${widget.effectiveRate.toStringAsFixed(2)}/L',
+                                  ? '${T.t('This Month Bill')} (${widget.totalLiters.toStringAsFixed(1)} L)'
+                                  : '${widget.totalLiters.toStringAsFixed(1)} L (${widget.activeDeliveryDays} ${T.t('Days')})',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,

@@ -137,8 +137,11 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
       if (entry != null) {
         final liters = _asDouble(entry['liters'], 0.0);
         final entryPrice = _asDouble(entry['price'], 0.0);
-        final price = _defaultPrice > 0 ? _defaultPrice : (entryPrice > 0 ? entryPrice : _defaultPrice);
-        final total = liters * price;
+        final price = entryPrice > 0 ? entryPrice : _defaultPrice;
+        final entryTotal = _asDouble(entry['total'], -1.0);
+        final total = entryTotal >= 0
+            ? entryTotal
+            : double.parse((liters * price).toStringAsFixed(2));
         totalPay += total;
         totalLiters += liters;
         recordedDays++;
@@ -146,8 +149,8 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
     }
 
     return _CardCalculations(
-      totalPay: totalPay,
-      totalLiters: totalLiters,
+      totalPay: double.parse(totalPay.toStringAsFixed(2)),
+      totalLiters: double.parse(totalLiters.toStringAsFixed(2)),
       recordedDays: recordedDays,
       applicableDays: maxDay,
       hasEntries: _entriesByDate.isNotEmpty,
@@ -915,7 +918,9 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
                                         'entryDate': dateKey,
                                         'liters': l,
                                         'price': p,
-                                        'total': l * p,
+                                        'total': result['total'] != null
+                                            ? _asDouble(result['total'], l * p)
+                                            : double.parse((l * p).toStringAsFixed(2)),
                                       };
                                       _hasMutatedData = true;
 

@@ -763,8 +763,10 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                               initialTotalDays: daysInMonth,
                               initialMonthlyLiters: totalLiters,
                               initialRate: effectiveRate,
-                              initialPreviousDue: controller.hasPayment.value
-                                  ? (controller.balanceDue > 0 ? controller.balanceDue : 0.0)
+                              initialMonthlyAmount: totalAmount,
+                              initialPreviousDue: 0.0,
+                              initialAdvanceCredit: controller.hasPayment.value
+                                  ? controller.paymentReceived.value
                                   : 0.0,
                             );
                           },

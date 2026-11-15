@@ -72,27 +72,46 @@ class MonthlyEntriesController extends GetxController {
   int get zeroDeliveryDays =>
       entries.where((e) => _asDouble(e['liters'], -1) == 0).length;
 
-  /// Effective rate used for billing.
-  /// If customer has a default price set (> 0), that price is used by default.
-  /// Otherwise, falls back to the calculated average rate (totalAmount / totalLiters).
+  /// Effective rate shown for customer reference.
+  /// Note: The bill itself is ALWAYS computed by summing daily entry totals,
+  /// never by multiplying total liters by an average rate.
   double get effectiveRate {
     if (customerDefaultPrice > 0) {
       return customerDefaultPrice;
     }
-    if (totalLiters.value > 0 && totalAmount.value > 0) {
-      return totalAmount.value / totalLiters.value;
+    if (entries.isNotEmpty) {
+      final firstPrice = _asDouble(entries.first['price'], 0.0);
+      if (firstPrice > 0 &&
+          entries.every((e) => _asDouble(e['price'], 0.0) == firstPrice)) {
+        return firstPrice;
+      }
+    }
+    if (totalLiters.value > 0 && billTotalAmount > 0) {
+      return double.parse(
+          (billTotalAmount / totalLiters.value).toStringAsFixed(2));
     }
     return customerDefaultPrice;
   }
 
   /// Total bill amount.
-  /// If customer has a default price set (> 0), calculates as (totalLiters * defaultPrice).
-  /// Otherwise, uses the sum of entry totals from the server.
+  /// Computed as the exact sum of all entry totals for the billing period.
+  /// Never calculated from an average per-liter rate or approximate multiplication.
   double get billTotalAmount {
-    if (customerDefaultPrice > 0) {
-      return totalLiters.value * customerDefaultPrice;
+    if (entries.isNotEmpty) {
+      double sum = 0.0;
+      for (final e in entries) {
+        final total = _asDouble(e['total'], -1.0);
+        if (total >= 0) {
+          sum += total;
+        } else {
+          final l = _asDouble(e['liters'], 0.0);
+          final p = _asDouble(e['price'], customerDefaultPrice);
+          sum += double.parse((l * p).toStringAsFixed(2));
+        }
+      }
+      return double.parse(sum.toStringAsFixed(2));
     }
-    return totalAmount.value;
+    return double.parse(totalAmount.value.toStringAsFixed(2));
   }
 
   double get averageDailyLiters {
@@ -415,7 +434,7 @@ class MonthlyEntriesController extends GetxController {
 
   /// Outstanding balance for the current month.
   double get balanceDue =>
-      billTotalAmount - paymentReceived.value;
+      double.parse((billTotalAmount - paymentReceived.value).toStringAsFixed(2));
 
   /// Whether the bill is fully paid.
   bool get isFullyPaid =>

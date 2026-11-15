@@ -149,11 +149,30 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
         year: _selectedYear,
         month: _selectedMonth,
       );
-      thisMonthLiters = CustomerBillItem._asDouble(monthData['totalLiters'], 0.0);
-      final rawAmount = CustomerBillItem._asDouble(monthData['totalAmount'], 0.0);
-      thisMonthBill = defaultPrice > 0 ? (thisMonthLiters * defaultPrice) : rawAmount;
+      thisMonthLiters =
+          CustomerBillItem._asDouble(monthData['totalLiters'], 0.0);
+      final rawAmount =
+          CustomerBillItem._asDouble(monthData['totalAmount'], 0.0);
       final entriesList = monthData['entries'] as List? ?? [];
-      activeDays = entriesList.where((e) => CustomerBillItem._asDouble(e['liters'], 0) > 0).length;
+      double entriesSum = 0.0;
+      for (final e in entriesList) {
+        if (e is Map) {
+          final total = CustomerBillItem._asDouble(e['total'], -1.0);
+          if (total >= 0) {
+            entriesSum += total;
+          } else {
+            final l = CustomerBillItem._asDouble(e['liters'], 0.0);
+            final p = CustomerBillItem._asDouble(e['price'], defaultPrice);
+            entriesSum += double.parse((l * p).toStringAsFixed(2));
+          }
+        }
+      }
+      thisMonthBill = entriesList.isNotEmpty
+          ? double.parse(entriesSum.toStringAsFixed(2))
+          : rawAmount;
+      activeDays = entriesList
+          .where((e) => CustomerBillItem._asDouble(e['liters'], 0) > 0)
+          .length;
     } catch (_) {}
 
     // 2. Current month payment
@@ -197,9 +216,25 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
           year: prevY,
           month: prevM,
         );
-        final prevLiters = CustomerBillItem._asDouble(prevMonthData['totalLiters'], 0.0);
-        final prevRawAmount = CustomerBillItem._asDouble(prevMonthData['totalAmount'], 0.0);
-        final prevBill = defaultPrice > 0 ? (prevLiters * defaultPrice) : prevRawAmount;
+        final prevRawAmount =
+            CustomerBillItem._asDouble(prevMonthData['totalAmount'], 0.0);
+        final prevEntriesList = prevMonthData['entries'] as List? ?? [];
+        double prevEntriesSum = 0.0;
+        for (final e in prevEntriesList) {
+          if (e is Map) {
+            final total = CustomerBillItem._asDouble(e['total'], -1.0);
+            if (total >= 0) {
+              prevEntriesSum += total;
+            } else {
+              final l = CustomerBillItem._asDouble(e['liters'], 0.0);
+              final p = CustomerBillItem._asDouble(e['price'], defaultPrice);
+              prevEntriesSum += double.parse((l * p).toStringAsFixed(2));
+            }
+          }
+        }
+        final prevBill = prevEntriesList.isNotEmpty
+            ? double.parse(prevEntriesSum.toStringAsFixed(2))
+            : prevRawAmount;
 
         final prevPay = await widget.api.getPaymentEntry(
           customerId: customerId,
@@ -456,7 +491,9 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
       initialTotalDays: daysInMonth,
       initialMonthlyLiters: item.thisMonthLiters,
       initialRate: item.defaultPrice,
+      initialMonthlyAmount: item.thisMonthBill,
       initialPreviousDue: item.pastMonthsDue > 0 ? item.pastMonthsDue : 0.0,
+      initialAdvanceCredit: item.netAdvance > 0 ? item.netAdvance : 0.0,
     );
   }
 

@@ -22,6 +22,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
     this.initialTotalDays,
     this.initialMonthlyLiters,
     this.initialRate,
+    this.initialMonthlyAmount,
     this.initialPreviousDue,
     this.initialMonthToDateBill,
     this.initialAdvanceCredit,
@@ -34,6 +35,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
   final int? initialTotalDays;
   final double? initialMonthlyLiters;
   final double? initialRate;
+  final double? initialMonthlyAmount;
   final double? initialPreviousDue;
   final double? initialMonthToDateBill;
   final double? initialAdvanceCredit;
@@ -47,6 +49,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
     int? initialTotalDays,
     double? initialMonthlyLiters,
     double? initialRate,
+    double? initialMonthlyAmount,
     double? initialPreviousDue,
     double? initialMonthToDateBill,
     double? initialAdvanceCredit,
@@ -63,6 +66,7 @@ class SendWhatsAppBillSheet extends StatefulWidget {
         initialTotalDays: initialTotalDays,
         initialMonthlyLiters: initialMonthlyLiters,
         initialRate: initialRate,
+        initialMonthlyAmount: initialMonthlyAmount,
         initialPreviousDue: initialPreviousDue,
         initialMonthToDateBill: initialMonthToDateBill,
         initialAdvanceCredit: initialAdvanceCredit,
@@ -88,6 +92,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
   late final TextEditingController _monthNameController;
   late final TextEditingController _totalDaysController;
   late final TextEditingController _monthlyLitersController;
+  late final TextEditingController _monthlyAmountController;
   late final TextEditingController _advanceCreditController;
 
   DateTime _selectedDate = DateTime.now();
@@ -152,6 +157,16 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           ? widget.initialMonthlyLiters!.toStringAsFixed(1)
           : (defaultLiters * 30).toStringAsFixed(1),
     );
+    final initialMonthAmt = widget.initialMonthlyAmount != null
+        ? widget.initialMonthlyAmount!
+        : (widget.initialMonthlyLiters != null && widget.initialRate != null
+            ? double.parse((widget.initialMonthlyLiters! * widget.initialRate!)
+                .toStringAsFixed(2))
+            : double.parse(
+                (defaultLiters * 30 * defaultPrice).toStringAsFixed(2)));
+    _monthlyAmountController = TextEditingController(
+      text: initialMonthAmt.toStringAsFixed(2),
+    );
     _advanceCreditController = TextEditingController(
       text: widget.initialAdvanceCredit != null
           ? widget.initialAdvanceCredit!.toStringAsFixed(2)
@@ -171,6 +186,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     _monthNameController.dispose();
     _totalDaysController.dispose();
     _monthlyLitersController.dispose();
+    _monthlyAmountController.dispose();
     _advanceCreditController.dispose();
     super.dispose();
   }
@@ -183,8 +199,13 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
   void _onDaysChanged(String value) {
     final days = double.tryParse(value) ?? 0;
     final litersPerDay = double.tryParse(_dailyLitersController.text) ?? 0;
+    final rate = double.tryParse(_rateController.text) ?? 0;
     setState(() {
-      _monthlyLitersController.text = (days * litersPerDay).toStringAsFixed(1);
+      final newLiters = days * litersPerDay;
+      _monthlyLitersController.text = newLiters.toStringAsFixed(1);
+      if (widget.initialMonthlyAmount == null) {
+        _monthlyAmountController.text = (newLiters * rate).toStringAsFixed(2);
+      }
     });
   }
 
@@ -274,7 +295,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       final month = _monthNameController.text.trim();
       final days = int.tryParse(_totalDaysController.text) ?? 30;
       final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
-      final monthlyAmount = totalLiters * rate;
+      final monthlyAmount = double.tryParse(_monthlyAmountController.text) ??
+          (widget.initialMonthlyAmount ?? (totalLiters * rate));
       final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
       final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
       final netPayable = (monthlyAmount + pastOverdue) - advanceCredit;
@@ -352,9 +374,13 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'languageCode': 'en',
         });
       } else {
-        final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
-        final monthlyAmount = totalLiters * rate;
-        final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
+        final totalLiters =
+            double.tryParse(_monthlyLitersController.text) ?? 0.0;
+        final monthlyAmount =
+            double.tryParse(_monthlyAmountController.text) ??
+                (widget.initialMonthlyAmount ?? (totalLiters * rate));
+        final advanceCredit =
+            double.tryParse(_advanceCreditController.text) ?? 0.0;
         final netPayable = (monthlyAmount + pastOverdue) - advanceCredit;
 
         await widget.api.sendWhatsAppBill({
@@ -445,7 +471,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       calculatedTotal = mtd + pastOverdue;
     } else {
       final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
-      final monthlyAmount = totalLiters * rate;
+      final monthlyAmount = double.tryParse(_monthlyAmountController.text) ??
+          (widget.initialMonthlyAmount ?? (totalLiters * rate));
       final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
       final net = (monthlyAmount + pastOverdue) - advanceCredit;
       calculatedTotal = net > 0 ? net : 0.0;
@@ -1013,6 +1040,30 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                             labelText: T.t('Rate / Liter'),
                             prefixIcon:
                                 const Icon(LucideIcons.indianRupee, size: 18),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _monthlyAmountController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: T.t('Monthly Milk Bill'),
+                            prefixIcon:
+                                const Icon(LucideIcons.receiptText, size: 18),
+                            prefixText: '₹',
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 12),
                             border: OutlineInputBorder(
