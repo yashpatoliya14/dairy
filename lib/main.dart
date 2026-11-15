@@ -1868,385 +1868,410 @@ class _CustomerTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           onTap: _openDetails,
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar with sequential number & optional WhatsApp badge
-                Stack(
-                  clipBehavior: Clip.none,
+                // Top Row: Avatar + Customer Details (Name & Phone) + 3-Dot Menu
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xffdcefe3), Color(0xffc2e7cf)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    // Avatar with sequential number & optional WhatsApp badge
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xffdcefe3), Color(0xffc2e7cf)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            number.isNotEmpty ? '#$number' : '#',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xff2d7a55),
+                            ),
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        number.isNotEmpty ? number : '#',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xff2d7a55),
-                        ),
-                      ),
+                        if (isWhatsApp)
+                          Positioned(
+                            right: -3,
+                            bottom: -3,
+                            child: Container(
+                              padding: const EdgeInsets.all(2.5),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xff25D366),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  LucideIcons.messageCircle,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    if (isWhatsApp)
-                      Positioned(
-                        right: -3,
-                        bottom: -3,
-                        child: Container(
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Color(0xff25D366),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              LucideIcons.messageCircle,
-                              size: 10,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
+                    const SizedBox(width: 10),
 
-                // Customer info & metrics
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xff111827),
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 5),
-
-                      // Metrics row: Liters pill & Rate pill (clear, bold, readable)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                    // Customer info: Name and Phone with generous width
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xff111827),
+                              letterSpacing: -0.2,
                             ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xffdcefe3),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (phone.isNotEmpty && phone != 'null') ...[
+                            const SizedBox(height: 2),
+                            Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
-                                  LucideIcons.droplets,
-                                  size: 12,
-                                  color: Color(0xff2d7a55),
+                                Icon(
+                                  LucideIcons.phone,
+                                  size: 11,
+                                  color: Colors.grey.shade500,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  '$liters L',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xff2d7a55),
+                                Flexible(
+                                  child: Text(
+                                    phone,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xfff0fdf4),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xffbbf7d0),
-                                width: 0.8,
-                              ),
-                            ),
-                            child: Text(
-                              '₹$price/L',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xff166534),
-                              ),
-                            ),
-                          ),
+                          ],
                         ],
                       ),
-                      if (phone.isNotEmpty && phone != 'null') ...[
-                        const SizedBox(height: 3),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              LucideIcons.phone,
-                              size: 10,
-                              color: Colors.grey.shade500,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              phone,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                    ),
 
-                const SizedBox(width: 6),
-
-                // Section 2: Save Milk Entry Button
-                Tooltip(
-                  message: T.t('Save entry'),
-                  child: Material(
-                    color: const Color(0xff2d7a55),
-                    borderRadius: BorderRadius.circular(9),
-                    child: InkWell(
-                      onTap: () => _addMilk(context),
-                      borderRadius: BorderRadius.circular(9),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6.5,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              LucideIcons.circlePlus,
-                              size: 14,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              T.t('Entry'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
+                    // Three-dot popup menu
+                    PopupMenuButton<String>(
+                      tooltip: T.t('More options'),
+                      icon: Icon(
+                        LucideIcons.moreVertical,
+                        size: 20,
+                        color: Colors.grey.shade600,
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-
-                // Section 3: Bill & Entries Button (same as bills > customer item)
-                Tooltip(
-                  message: T.t('Bill & Entries'),
-                  child: Material(
-                    color: const Color(0xfff0fdf4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9),
-                      side: const BorderSide(color: Color(0xff86efac), width: 1),
-                    ),
-                    child: InkWell(
-                      onTap: _openBillAndEntries,
-                      borderRadius: BorderRadius.circular(9),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6.5,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 170),
+                      onSelected: (value) {
+                        if (value == 'bill_entries' ||
+                            value == 'milk_card' ||
+                            value == 'monthly') {
+                          _openBillAndEntries();
+                        }
+                        if (value == 'bills_due') {
+                          Get.to(
+                            () => CustomerBillsScreen(
+                              api: api,
+                              controller: Get.find<DashboardController>(),
+                              targetCustomerId: customerId,
+                              targetCustomerName: name,
+                            ),
+                          );
+                        }
+                        if (value == 'whatsapp') {
+                          SendWhatsAppBillSheet.show(
+                            context,
+                            api: api,
+                            customer: customer,
+                          );
+                        }
+                        if (value == 'edit') _edit(context);
+                        if (value == 'details') _openDetails();
+                        if (value == 'delete') _deleteCustomer(context);
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'bill_entries',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
                               LucideIcons.receiptText,
-                              size: 14,
-                              color: Color(0xff166534),
+                              color: Color(0xff2d7a55),
+                              size: 18,
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              T.t('Bill'),
-                              style: const TextStyle(
-                                color: Color(0xff166534),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            title: Text(
+                              T.t('Bill & Entries'),
+                              style: const TextStyle(fontSize: 13),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 2),
-
-                // Three-dot popup menu
-                PopupMenuButton<String>(
-                  tooltip: T.t('More options'),
-                  icon: Icon(
-                    LucideIcons.moreVertical,
-                    size: 19,
-                    color: Colors.grey.shade600,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 170),
-                  onSelected: (value) {
-                    if (value == 'bill_entries' ||
-                        value == 'milk_card' ||
-                        value == 'monthly') {
-                      _openBillAndEntries();
-                    }
-                    if (value == 'bills_due') {
-                      Get.to(
-                        () => CustomerBillsScreen(
-                          api: api,
-                          controller: Get.find<DashboardController>(),
-                          targetCustomerId: customerId,
-                          targetCustomerName: name,
-                        ),
-                      );
-                    }
-                    if (value == 'whatsapp') {
-                      SendWhatsAppBillSheet.show(
-                        context,
-                        api: api,
-                        customer: customer,
-                      );
-                    }
-                    if (value == 'edit') _edit(context);
-                    if (value == 'details') _openDetails();
-                    if (value == 'delete') _deleteCustomer(context);
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'bill_entries',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          LucideIcons.receiptText,
-                          color: Color(0xff2d7a55),
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('Bill & Entries'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'bills_due',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          LucideIcons.wallet,
-                          color: Color(0xff0d9488),
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('Customer Bills & Dues'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'whatsapp',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          LucideIcons.messageCircle,
-                          color: Color(0xff25D366),
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('Send WhatsApp Bill'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.edit_outlined,
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('Edit customer'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'details',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.person_outline,
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('View customer details'),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    const PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          LucideIcons.trash2,
-                          color: Color(0xffdc2626),
-                          size: 18,
-                        ),
-                        title: Text(
-                          T.t('Delete customer'),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xffdc2626),
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
+                        PopupMenuItem(
+                          value: 'bills_due',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              LucideIcons.wallet,
+                              color: Color(0xff0d9488),
+                              size: 18,
+                            ),
+                            title: Text(
+                              T.t('Customer Bills & Dues'),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'whatsapp',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              LucideIcons.messageCircle,
+                              color: Color(0xff25D366),
+                              size: 18,
+                            ),
+                            title: Text(
+                              T.t('Send WhatsApp Bill'),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                            ),
+                            title: Text(
+                              T.t('Edit customer'),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'details',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              Icons.person_outline,
+                              size: 18,
+                            ),
+                            title: Text(
+                              T.t('View customer details'),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              LucideIcons.trash2,
+                              color: Color(0xffdc2626),
+                              size: 18,
+                            ),
+                            title: Text(
+                              T.t('Delete customer'),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xffdc2626),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                // Bottom Row: Metrics & Quick Action Buttons (Adaptive Wrap)
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // Metrics row: Liters pill & Rate pill
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xffdcefe3),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.droplets,
+                                size: 12,
+                                color: Color(0xff2d7a55),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$liters L',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xff2d7a55),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xfff0fdf4),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xffbbf7d0),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            '₹$price/L',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xff166534),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Action buttons: Entry & Bill
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Save Milk Entry Button
+                        Tooltip(
+                          message: T.t('Save entry'),
+                          child: Material(
+                            color: const Color(0xff2d7a55),
+                            borderRadius: BorderRadius.circular(8),
+                            child: InkWell(
+                              onTap: () => _addMilk(context),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      LucideIcons.circlePlus,
+                                      size: 13,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      T.t('Entry'),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Bill & Entries Button
+                        Tooltip(
+                          message: T.t('Bill & Entries'),
+                          child: Material(
+                            color: const Color(0xfff0fdf4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: const BorderSide(
+                                color: Color(0xff86efac),
+                                width: 1,
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: _openBillAndEntries,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      LucideIcons.receiptText,
+                                      size: 13,
+                                      color: Color(0xff166534),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      T.t('Bill'),
+                                      style: const TextStyle(
+                                        color: Color(0xff166534),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

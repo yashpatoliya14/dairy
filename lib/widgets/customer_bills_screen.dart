@@ -1203,21 +1203,27 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 2,
                         children: [
-                          if (item.phone.isNotEmpty) ...[
-                            Icon(LucideIcons.phone, size: 12, color: Colors.grey.shade600),
-                            const SizedBox(width: 4),
-                            Text(
-                              item.phone,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          if (item.phone.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.phone, size: 12, color: Colors.grey.shade600),
+                                const SizedBox(width: 4),
+                                Text(
+                                  item.phone,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                          ],
                           Text(
                             '•  ${item.defaultLiters.toStringAsFixed(1)} L @ ₹${item.defaultPrice.toStringAsFixed(0)}/L',
                             style: TextStyle(
