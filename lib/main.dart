@@ -269,7 +269,11 @@ class DairyApp extends StatelessWidget {
         ],
         home: Obx(() {
           if (!appController.ready.value) {
-            return const DairySplashScreen();
+            return DairySplashScreen(
+              statusText: appController.api.hasSession
+                  ? T.t('Loading dashboard...')
+                  : T.t('Starting Dairy Desk...'),
+            );
           }
           final latest = appController.updateService.latestInfo.value;
           if (appController.updateService.hasUpdate.value && latest != null) {
@@ -288,7 +292,9 @@ class DairyApp extends StatelessWidget {
 }
 
 class DairySplashScreen extends StatelessWidget {
-  const DairySplashScreen({super.key});
+  const DairySplashScreen({super.key, this.statusText});
+
+  final String? statusText;
 
   @override
   Widget build(BuildContext context) {
@@ -377,7 +383,7 @@ class DairySplashScreen extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            T.t('Starting Dairy Desk...'),
+                            statusText ?? T.t('Starting Dairy Desk...'),
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -464,6 +470,14 @@ class _AuthPageState extends State<AuthPage> {
         await widget.api.login(email.text.trim(), password.text);
         await widget.api.saveLastAccountEmail(email.text.trim());
       }
+      if (!mounted) return;
+      final dashCtrl = Get.isRegistered<DashboardController>()
+          ? Get.find<DashboardController>()
+          : Get.put(DashboardController(widget.api));
+      await dashCtrl.load().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => null,
+      );
       if (!mounted) return;
       Get.offAll(() => Dashboard(api: widget.api));
     } catch (error) {
@@ -709,6 +723,13 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     setState(() => busy = true);
     try {
       await widget.api.verifyEmail(widget.email, code.text.trim());
+      final dashCtrl = Get.isRegistered<DashboardController>()
+          ? Get.find<DashboardController>()
+          : Get.put(DashboardController(widget.api));
+      await dashCtrl.load().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => null,
+      );
       if (mounted) Get.offAll(() => Dashboard(api: widget.api));
     } catch (error) {
       if (mounted) _showAuthMessage(context, error);
@@ -3059,6 +3080,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (shouldLogout != true) return;
 
     await widget.api.logout();
+    await DashboardController.clearCache();
     Get.delete<DashboardController>();
     Get.offAll(() => AuthPage(api: widget.api));
   }

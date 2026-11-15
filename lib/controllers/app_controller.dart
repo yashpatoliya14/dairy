@@ -80,6 +80,7 @@ class AppController extends GetxController with WidgetsBindingObserver {
     try {
       DairyMilkLoadingService.reset();
       await api.logout();
+      await DashboardController.clearCache();
       try {
         if (Get.isRegistered<DashboardController>()) {
           Get.delete<DashboardController>();
@@ -125,6 +126,24 @@ class AppController extends GetxController with WidgetsBindingObserver {
             onTimeout: () => null,
           ),
       ]);
+
+      // If authenticated, keep splash screen active until dashboard details are fetched
+      if (api.hasSession && !Platform.environment.containsKey('FLUTTER_TEST')) {
+        final hasBlockingUpdate = updateService.hasUpdate.value &&
+            (updateService.latestInfo.value?.mustForceUpdate == true ||
+                updateService.latestInfo.value?.forceUpdate == true);
+        if (!hasBlockingUpdate) {
+          final dashCtrl = Get.isRegistered<DashboardController>()
+              ? Get.find<DashboardController>()
+              : Get.put(DashboardController(api));
+          await dashCtrl.load().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => null,
+          );
+        }
+      }
+    } catch (_) {
+      // Graceful fallback so app always loads even if network drops
     } finally {
       ready.value = true;
     }

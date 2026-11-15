@@ -25,6 +25,7 @@ class AppLanguageController extends GetxController {
 class T {
   static const _translations = <String, Map<String, String>>{
     'hi': {
+      'Loading dashboard...': 'डैशबोर्ड लोड हो रहा है...',
       'Pouring fresh milk...': 'ताज़ा दूध भरा जा रहा है...',
       'Starting Dairy Desk...': 'डेयरी डेस्क शुरू हो रहा है...',
       'Loading customers...': 'ग्राहक लोड हो रहे हैं...',
@@ -392,6 +393,7 @@ class T {
       'Due': 'देय',
     },
     'gu': {
+      'Loading dashboard...': 'ડેશબોર્ડ લોડ થઈ રહ્યું છે...',
       'Pouring fresh milk...': 'તાજું દૂધ ભરાઈ રહ્યું છે...',
       'Starting Dairy Desk...': 'ડેરી ડેસ્ક શરૂ થઈ રહ્યું છે...',
       'Loading customers...': 'ગ્રાહકો લોડ થઈ રહ્યા છે...',

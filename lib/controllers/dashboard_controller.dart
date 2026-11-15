@@ -129,7 +129,29 @@ class DashboardController extends GetxController {
     } catch (_) {}
   }
 
-  Future<void> load() async {
+  static Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheDairyNameKey);
+      await prefs.remove(_cacheOwnerNameKey);
+      await prefs.remove(_cacheDefaultLitersKey);
+      await prefs.remove(_cacheDefaultPriceKey);
+      await prefs.remove(_cacheCustomersKey);
+      await prefs.remove(_cacheTodaySummaryKey);
+    } catch (_) {}
+  }
+
+  Future<void>? _inFlightLoad;
+
+  Future<void> load() {
+    if (_inFlightLoad != null) return _inFlightLoad!;
+    _inFlightLoad = _performLoad().whenComplete(() {
+      _inFlightLoad = null;
+    });
+    return _inFlightLoad!;
+  }
+
+  Future<void> _performLoad() async {
     if (customers.isEmpty) {
       loading.value = true;
     }
@@ -166,6 +188,7 @@ class DashboardController extends GetxController {
       ]);
     } finally {
       loading.value = false;
+      _saveCache();
     }
   }
 
