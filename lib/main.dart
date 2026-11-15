@@ -16,6 +16,7 @@ import 'services/api_service.dart';
 import 'views/app_update_screen.dart';
 import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
+import 'widgets/customer_bills_screen.dart';
 import 'widgets/monthly_entries_screen.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
 import 'widgets/whatsapp_messaging_screen.dart';
@@ -1823,6 +1824,7 @@ class _CustomerTile extends StatelessWidget {
     final channel =
         '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
     final isWhatsApp = channel == 'whatsapp';
+    final customerId = '${customer['id'] ?? customer['cid'] ?? ''}'.trim();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1919,75 +1921,79 @@ class _CustomerTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
 
-                      // Metrics row: Liters pill & Rate pill
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xffdcefe3),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  LucideIcons.droplets,
-                                  size: 11,
-                                  color: Color(0xff2d7a55),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '$liters L',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                      // Metrics row: Liters pill & Rate pill (strictly single-line responsive)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xffdcefe3),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    LucideIcons.droplets,
+                                    size: 11,
                                     color: Color(0xff2d7a55),
                                   ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$liters L',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xff2d7a55),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfff0fdf4),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xffbbf7d0),
+                                  width: 0.8,
                                 ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xfff0fdf4),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xffbbf7d0),
-                                width: 0.8,
+                              ),
+                              child: Text(
+                                '₹$price/L',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff166534),
+                                ),
                               ),
                             ),
-                            child: Text(
-                              '₹$price/L',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xff166534),
+                            if (phone.isNotEmpty && phone != 'null') ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                phone,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: Colors.grey.shade500,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
                               ),
-                            ),
-                          ),
-                          if (phone.isNotEmpty && phone != 'null')
-                            Text(
-                              phone,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: Colors.grey.shade500,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                        ],
+                            ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -2092,6 +2098,16 @@ class _CustomerTile extends StatelessWidget {
                         value == 'monthly') {
                       _openBillAndEntries();
                     }
+                    if (value == 'bills_due') {
+                      Get.to(
+                        () => CustomerBillsScreen(
+                          api: api,
+                          controller: Get.find<DashboardController>(),
+                          targetCustomerId: customerId,
+                          targetCustomerName: name,
+                        ),
+                      );
+                    }
                     if (value == 'whatsapp') {
                       SendWhatsAppBillSheet.show(
                         context,
@@ -2116,6 +2132,22 @@ class _CustomerTile extends StatelessWidget {
                         ),
                         title: Text(
                           T.t('Bill & Entries'),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'bills_due',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.wallet,
+                          color: Color(0xff0d9488),
+                          size: 18,
+                        ),
+                        title: Text(
+                          T.t('Customer Bills & Dues'),
                           style: const TextStyle(fontSize: 13),
                         ),
                       ),
@@ -2801,6 +2833,64 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   context,
                   api: widget.api,
                   customer: _customer,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // QUICK ACTION: CUSTOMER BILLS & DUES
+            Card(
+              color: const Color(0xfff0fdfa),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Color(0xff99f6e4)),
+              ),
+              child: ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                leading: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xff0d9488),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    LucideIcons.wallet,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+                title: Text(
+                  T.t('Customer Bills & Dues'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xff115e59),
+                    fontSize: 13.5,
+                  ),
+                ),
+                subtitle: Text(
+                  T.t('Record payments, view past dues & net balance'),
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 11.5,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 13,
+                  color: Color(0xff115e59),
+                ),
+                onTap: () => Get.to(
+                  () => CustomerBillsScreen(
+                    api: widget.api,
+                    controller: Get.find<DashboardController>(),
+                    targetCustomerId: '${_customer['id'] ?? _customer['cid'] ?? ''}'.trim(),
+                    targetCustomerName: '${_customer['name'] ?? _customer['fullName'] ?? ''}'.trim(),
+                  ),
                 ),
               ),
             ),

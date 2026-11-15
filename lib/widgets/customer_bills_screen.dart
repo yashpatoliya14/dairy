@@ -108,10 +108,16 @@ class CustomerBillsScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.controller,
+    this.targetCustomerId,
+    this.targetCustomerName,
+    this.autoOpenPaymentSheet = false,
   });
 
   final ApiService api;
   final DashboardController controller;
+  final String? targetCustomerId;
+  final String? targetCustomerName;
+  final bool autoOpenPaymentSheet;
 
   @override
   State<CustomerBillsScreen> createState() => _CustomerBillsScreenState();
@@ -138,7 +144,23 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
     final now = DateTime.now();
     _selectedYear = now.year;
     _selectedMonth = now.month;
-    _loadBills();
+    if (widget.targetCustomerName != null &&
+        widget.targetCustomerName!.trim().isNotEmpty) {
+      _searchController.text = widget.targetCustomerName!.trim();
+      _searchQuery.value = widget.targetCustomerName!.trim();
+    }
+    _loadBills().then((_) {
+      if (widget.autoOpenPaymentSheet &&
+          widget.targetCustomerId != null &&
+          mounted) {
+        final target = _billItems.firstWhereOrNull(
+          (i) => i.customerId == widget.targetCustomerId,
+        );
+        if (target != null) {
+          _openPaymentSheet(target);
+        }
+      }
+    });
   }
 
   @override
@@ -494,6 +516,98 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
     }
   }
 
+  void _updateItemPaymentLocally({
+    required String customerId,
+    required double receivedAmount,
+    required String note,
+    required DateTime receivedDate,
+  }) {
+    final idx = _billItems.indexWhere((i) => i.customerId == customerId);
+    if (idx < 0) return;
+    final item = _billItems[idx];
+
+    final thisMonthPaid = receivedAmount;
+    final thisMonthDue = thisMonthPaid >= item.thisMonthBill
+        ? 0.0
+        : double.parse((item.thisMonthBill - thisMonthPaid).toStringAsFixed(2));
+    final thisMonthAdvance = thisMonthPaid > item.thisMonthBill
+        ? double.parse((thisMonthPaid - item.thisMonthBill).toStringAsFixed(2))
+        : 0.0;
+
+    final creditsForPast = thisMonthAdvance + item.grossPastAdvance;
+    final remainingPastDue = item.grossPastDue > creditsForPast
+        ? double.parse((item.grossPastDue - creditsForPast).toStringAsFixed(2))
+        : 0.0;
+    final netAdvance = creditsForPast > item.grossPastDue
+        ? double.parse((creditsForPast - item.grossPastDue).toStringAsFixed(2))
+        : 0.0;
+    final netBalanceDue =
+        double.parse((remainingPastDue + thisMonthDue).toStringAsFixed(2));
+
+    final updated = CustomerBillItem(
+      customer: item.customer,
+      thisMonthLiters: item.thisMonthLiters,
+      defaultPrice: item.defaultPrice,
+      thisMonthBill: item.thisMonthBill,
+      thisMonthPaid: thisMonthPaid,
+      thisMonthDue: thisMonthDue,
+      activeDays: item.activeDays,
+      grossPastDue: item.grossPastDue,
+      grossPastAdvance: item.grossPastAdvance,
+      pastMonthsDue: remainingPastDue,
+      pastMonthsAdvance: item.grossPastAdvance,
+      pastMonthsBreakdown: item.pastMonthsBreakdown,
+      netBalanceDue: netBalanceDue,
+      netAdvance: netAdvance,
+      paymentNote: note,
+      paymentDate: receivedDate,
+      hasPayment: true,
+    );
+
+    _billItems[idx] = updated;
+    _billItems.refresh();
+  }
+
+  void _deleteItemPaymentLocally(String customerId) {
+    final idx = _billItems.indexWhere((i) => i.customerId == customerId);
+    if (idx < 0) return;
+    final item = _billItems[idx];
+
+    final thisMonthDue = item.thisMonthBill;
+    final creditsForPast = item.grossPastAdvance;
+    final remainingPastDue = item.grossPastDue > creditsForPast
+        ? double.parse((item.grossPastDue - creditsForPast).toStringAsFixed(2))
+        : 0.0;
+    final netAdvance = creditsForPast > item.grossPastDue
+        ? double.parse((creditsForPast - item.grossPastDue).toStringAsFixed(2))
+        : 0.0;
+    final netBalanceDue =
+        double.parse((remainingPastDue + thisMonthDue).toStringAsFixed(2));
+
+    final updated = CustomerBillItem(
+      customer: item.customer,
+      thisMonthLiters: item.thisMonthLiters,
+      defaultPrice: item.defaultPrice,
+      thisMonthBill: item.thisMonthBill,
+      thisMonthPaid: 0.0,
+      thisMonthDue: thisMonthDue,
+      activeDays: item.activeDays,
+      grossPastDue: item.grossPastDue,
+      grossPastAdvance: item.grossPastAdvance,
+      pastMonthsDue: remainingPastDue,
+      pastMonthsAdvance: item.grossPastAdvance,
+      pastMonthsBreakdown: item.pastMonthsBreakdown,
+      netBalanceDue: netBalanceDue,
+      netAdvance: netAdvance,
+      paymentNote: '',
+      paymentDate: null,
+      hasPayment: false,
+    );
+
+    _billItems[idx] = updated;
+    _billItems.refresh();
+  }
+
   Future<void> _openPaymentSheet(CustomerBillItem item) async {
     final monthName = _monthLabel(_selectedMonth, _selectedYear);
     final daysInMonth = DateTime(_selectedYear, _selectedMonth + 1, 0).day;
@@ -521,29 +635,50 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
         initialDate: item.paymentDate,
         hasExistingPayment: item.hasPayment,
         onSave: ({required receivedAmount, note, receivedDate}) async {
-          await widget.api.savePaymentEntry(
+          _updateItemPaymentLocally(
             customerId: item.customerId,
-            year: _selectedYear,
-            month: _selectedMonth,
-            billAmount: item.thisMonthBill,
             receivedAmount: receivedAmount,
-            note: note,
-            receivedDate: receivedDate,
+            note: note ?? '',
+            receivedDate: receivedDate ?? DateTime.now(),
           );
-          _loadBills();
+          try {
+            await widget.api.savePaymentEntry(
+              customerId: item.customerId,
+              year: _selectedYear,
+              month: _selectedMonth,
+              billAmount: item.thisMonthBill,
+              receivedAmount: receivedAmount,
+              note: note,
+              receivedDate: receivedDate,
+            );
+          } catch (_) {
+            await _loadBills();
+            rethrow;
+          }
+          await _loadBills();
         },
         onDelete: item.hasPayment
             ? () async {
-                await widget.api.deletePaymentEntry(
-                  customerId: item.customerId,
-                  year: _selectedYear,
-                  month: _selectedMonth,
-                );
-                _loadBills();
+                _deleteItemPaymentLocally(item.customerId);
+                try {
+                  await widget.api.deletePaymentEntry(
+                    customerId: item.customerId,
+                    year: _selectedYear,
+                    month: _selectedMonth,
+                  );
+                } catch (_) {
+                  await _loadBills();
+                  rethrow;
+                }
+                await _loadBills();
               }
             : null,
       ),
     );
+
+    if (mounted) {
+      await _loadBills();
+    }
   }
 
   Future<void> _openWhatsAppBill(CustomerBillItem item) async {
@@ -1366,7 +1501,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
         color: bg ?? const Color(0xfff8fafc),
         borderRadius: BorderRadius.circular(8),
@@ -1378,36 +1513,45 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+              maxLines: 1,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+              maxLines: 1,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          Text(
-            sub,
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade500,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              sub,
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade500,
+              ),
+              maxLines: 1,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

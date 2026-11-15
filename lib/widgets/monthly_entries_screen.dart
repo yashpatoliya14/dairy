@@ -557,54 +557,73 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                   const Divider(height: 1),
                   const SizedBox(height: 8),
 
-                  // 4-Column Professional Metric Chips
-                  Row(
-                    children: [
-                      // Total Liters
-                      Expanded(
-                        child: _CompactMetric(
-                          icon: Icons.local_drink_outlined,
-                          label: T.t('Total Liters'),
-                          value: '${totalLiters.toStringAsFixed(1)} L',
-                          color: const Color(0xff2d7a55),
-                          bgColor: const Color(0xffdcefe3),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Rate per Liter
-                      Expanded(
-                        child: _CompactMetric(
-                          icon: Icons.payments_outlined,
-                          label: T.t('Rate per Liter'),
-                          value: '₹${effectiveRate.toStringAsFixed(0)}/L',
-                          color: const Color(0xff0284c7),
-                          bgColor: const Color(0xffe0f2fe),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Days Delivered
-                      Expanded(
-                        child: _CompactMetric(
-                          icon: LucideIcons.calendarCheck,
-                          label: T.t('Delivery Days'),
-                          value: '$activeDays/$daysInMonth',
-                          color: const Color(0xff7c3aed),
-                          bgColor: const Color(0xffede9fe),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Total Sum
-                      Expanded(
-                        child: _CompactMetric(
-                          icon: LucideIcons.receipt,
-                          label: T.t('Total Amount'),
-                          value: '₹${totalAmount.toStringAsFixed(2)}',
-                          color: const Color(0xff166534),
-                          bgColor: const Color(0xffbbf7d0),
-                          isHighlight: true,
-                        ),
-                      ),
-                    ],
+                  // 4-Column Professional Metric Chips (Responsive 2x2 or 4x1)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final totalLitersChip = _CompactMetric(
+                        icon: Icons.local_drink_outlined,
+                        label: T.t('Total Liters'),
+                        value: '${totalLiters.toStringAsFixed(1)} L',
+                        color: const Color(0xff2d7a55),
+                        bgColor: const Color(0xffdcefe3),
+                      );
+                      final rateChip = _CompactMetric(
+                        icon: Icons.payments_outlined,
+                        label: T.t('Rate per Liter'),
+                        value: '₹${effectiveRate.toStringAsFixed(0)}/L',
+                        color: const Color(0xff0284c7),
+                        bgColor: const Color(0xffe0f2fe),
+                      );
+                      final daysChip = _CompactMetric(
+                        icon: LucideIcons.calendarCheck,
+                        label: T.t('Delivery Days'),
+                        value: '$activeDays/$daysInMonth',
+                        color: const Color(0xff7c3aed),
+                        bgColor: const Color(0xffede9fe),
+                      );
+                      final amountChip = _CompactMetric(
+                        icon: LucideIcons.receipt,
+                        label: T.t('Total Amount'),
+                        value: '₹${totalAmount.toStringAsFixed(2)}',
+                        color: const Color(0xff166534),
+                        bgColor: const Color(0xffbbf7d0),
+                        isHighlight: true,
+                      );
+
+                      if (constraints.maxWidth < 340) {
+                        return Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(child: totalLitersChip),
+                                const SizedBox(width: 6),
+                                Expanded(child: rateChip),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(child: daysChip),
+                                const SizedBox(width: 6),
+                                Expanded(child: amountChip),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: totalLitersChip),
+                          const SizedBox(width: 6),
+                          Expanded(child: rateChip),
+                          const SizedBox(width: 6),
+                          Expanded(child: daysChip),
+                          const SizedBox(width: 6),
+                          Expanded(child: amountChip),
+                        ],
+                      );
+                    },
                   ),
 
                   if (totalAmount > 0) ...[
@@ -1502,28 +1521,32 @@ class _CompactMetric extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(height: 3),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 11,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                color: color,
+              ),
+              maxLines: 1,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 1),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+              maxLines: 1,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
