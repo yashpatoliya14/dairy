@@ -69,6 +69,12 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     return net > 0 ? net : 0.0;
   }
 
+  double get _remainingDue {
+    final prev = widget.hasExistingPayment ? (widget.initialReceived ?? 0.0) : 0.0;
+    final rem = _totalPayable - prev;
+    return rem > 0 ? rem : 0.0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -106,6 +112,15 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
       double.tryParse(_receivedController.text.trim()) ?? 0.0;
 
   void _fillTotalAmount() {
+    setState(() {
+      _receivedController.text =
+          _totalPayable == _totalPayable.truncateToDouble()
+              ? _totalPayable.toStringAsFixed(0)
+              : _totalPayable.toStringAsFixed(2);
+    });
+  }
+
+  void _fillRemainingDue() {
     setState(() {
       _receivedController.text =
           _totalPayable == _totalPayable.truncateToDouble()
@@ -478,26 +493,42 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                   if (widget.hasExistingPayment && widget.initialReceived != null) ...[
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xffeff6ff),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xffbfdbfe), width: 0.8),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xffbfdbfe), width: 1),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(LucideIcons.history, size: 13, color: Color(0xff2563eb)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '${T.t('Previously Recorded')}: ₹${widget.initialReceived!.toStringAsFixed(2)}${widget.initialDate != null ? ' (${widget.initialDate!.day}/${widget.initialDate!.month}/${widget.initialDate!.year})' : ''}',
+                          Row(
+                            children: [
+                              const Icon(LucideIcons.history, size: 14, color: Color(0xff2563eb)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${T.t('Recorded Payment')}: ₹${widget.initialReceived!.toStringAsFixed(2)}${widget.initialDate != null ? ' (${widget.initialDate!.day}/${widget.initialDate!.month}/${widget.initialDate!.year})' : ''}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff1e40af),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_remainingDue > 0) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${T.t('Remaining Balance to Clear')}: ₹${_remainingDue.toStringAsFixed(2)}',
                               style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xff1e40af),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xffdc2626),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -563,8 +594,21 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                   const SizedBox(height: 8),
 
                   // ─── QUICK PRESET BUTTONS ──────────────────────────────────
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
+                      if (widget.hasExistingPayment && _remainingDue > 0)
+                        ActionChip(
+                          avatar: const Icon(LucideIcons.checkCheck, size: 14, color: Color(0xff16a34a)),
+                          label: Text(
+                            '${T.t('Pay Remaining')} (₹${_remainingDue.toStringAsFixed(0)})',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xff166534)),
+                          ),
+                          onPressed: _fillRemainingDue,
+                          backgroundColor: const Color(0xfff0fdf4),
+                          side: const BorderSide(color: Color(0xff86efac)),
+                        ),
                       ActionChip(
                         avatar: const Icon(LucideIcons.checkCheck, size: 14),
                         label: Text(
@@ -576,7 +620,6 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                         side: const BorderSide(color: Color(0xff86efac)),
                       ),
                       if (hasCombinedDebt && widget.totalAmount > 0) ...[
-                        const SizedBox(width: 6),
                         ActionChip(
                           avatar: const Icon(LucideIcons.calendar, size: 14),
                           label: Text(
@@ -588,7 +631,6 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                           side: const BorderSide(color: Color(0xffe2e8f0)),
                         ),
                       ],
-                      const SizedBox(width: 6),
                       ActionChip(
                         avatar: const Icon(LucideIcons.percent, size: 14),
                         label: Text(
@@ -780,23 +822,77 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                   Row(
                     children: [
                       if (widget.hasExistingPayment && widget.onDelete != null) ...[
-                        OutlinedButton(
+                        OutlinedButton.icon(
                           onPressed: _saving
                               ? null
                               : () async {
-                                  Navigator.of(context).pop();
-                                  await widget.onDelete!();
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (dCtx) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                                      title: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              T.t('Delete Payment?'),
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.close, size: 20),
+                                            tooltip: T.t('Close'),
+                                            visualDensity: VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            onPressed: () => Navigator.of(dCtx).pop(false),
+                                          ),
+                                        ],
+                                      ),
+                                      content: Text(
+                                        T.t('This will remove the recorded payment and reset the customer dues to unpaid.'),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(dCtx).pop(false),
+                                          child: Text(T.t('Cancel')),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () => Navigator.of(dCtx).pop(true),
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: Colors.red.shade700,
+                                          ),
+                                          child: Text(T.t('Delete')),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                    await widget.onDelete!();
+                                  }
                                 },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.red.shade700,
                             side: BorderSide(color: Colors.red.shade300),
                             padding: const EdgeInsets.symmetric(
-                                vertical: 12, horizontal: 14),
+                                vertical: 12, horizontal: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Icon(Icons.delete_outline, size: 20),
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(
+                            T.t('Delete'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                         const SizedBox(width: 10),
                       ],

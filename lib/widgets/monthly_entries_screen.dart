@@ -1356,6 +1356,8 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
             note: note,
             receivedDate: receivedDate,
           );
+          await controller.loadPayment();
+          await controller.loadMonth();
           if (!mounted) return;
           if (success) {
             messenger.clearSnackBars();
@@ -1421,6 +1423,8 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                 );
                 if (confirm == true) {
                   final success = await controller.deletePayment();
+                  await controller.loadPayment();
+                  await controller.loadMonth();
                   if (!mounted) return;
                   if (success) {
                     messenger.clearSnackBars();

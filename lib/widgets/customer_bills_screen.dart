@@ -609,6 +609,10 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
   }
 
   Future<void> _openPaymentSheet(CustomerBillItem item) async {
+    final freshItem = _billItems.firstWhereOrNull(
+      (i) => i.customerId == item.customerId,
+    ) ?? item;
+
     final monthName = _monthLabel(_selectedMonth, _selectedYear);
     final daysInMonth = DateTime(_selectedYear, _selectedMonth + 1, 0).day;
 
@@ -617,36 +621,36 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => PaymentEntrySheet(
-        customerName: item.name,
-        customerNumber: item.number,
+        customerName: freshItem.name,
+        customerNumber: freshItem.number,
         month: _selectedMonth,
         year: _selectedYear,
         monthName: monthName,
-        totalLiters: item.thisMonthLiters,
-        effectiveRate: item.defaultPrice,
-        totalAmount: item.thisMonthBill,
-        previousDue: item.grossPastDue,
-        previousAdvance: item.grossPastAdvance,
-        pastMonthsBreakdown: item.pastMonthsBreakdown,
+        totalLiters: freshItem.thisMonthLiters,
+        effectiveRate: freshItem.defaultPrice,
+        totalAmount: freshItem.thisMonthBill,
+        previousDue: freshItem.grossPastDue,
+        previousAdvance: freshItem.grossPastAdvance,
+        pastMonthsBreakdown: freshItem.pastMonthsBreakdown,
         daysInMonth: daysInMonth,
-        activeDeliveryDays: item.activeDays,
-        initialReceived: item.hasPayment ? item.thisMonthPaid : null,
-        initialNote: item.paymentNote,
-        initialDate: item.paymentDate,
-        hasExistingPayment: item.hasPayment,
+        activeDeliveryDays: freshItem.activeDays,
+        initialReceived: freshItem.hasPayment ? freshItem.thisMonthPaid : null,
+        initialNote: freshItem.paymentNote,
+        initialDate: freshItem.paymentDate,
+        hasExistingPayment: freshItem.hasPayment,
         onSave: ({required receivedAmount, note, receivedDate}) async {
           _updateItemPaymentLocally(
-            customerId: item.customerId,
+            customerId: freshItem.customerId,
             receivedAmount: receivedAmount,
             note: note ?? '',
             receivedDate: receivedDate ?? DateTime.now(),
           );
           try {
             await widget.api.savePaymentEntry(
-              customerId: item.customerId,
+              customerId: freshItem.customerId,
               year: _selectedYear,
               month: _selectedMonth,
-              billAmount: item.thisMonthBill,
+              billAmount: freshItem.thisMonthBill,
               receivedAmount: receivedAmount,
               note: note,
               receivedDate: receivedDate,
@@ -657,12 +661,12 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
           }
           await _loadBills();
         },
-        onDelete: item.hasPayment
+        onDelete: freshItem.hasPayment
             ? () async {
-                _deleteItemPaymentLocally(item.customerId);
+                _deleteItemPaymentLocally(freshItem.customerId);
                 try {
                   await widget.api.deletePaymentEntry(
-                    customerId: item.customerId,
+                    customerId: freshItem.customerId,
                     year: _selectedYear,
                     month: _selectedMonth,
                   );
