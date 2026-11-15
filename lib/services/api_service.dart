@@ -836,31 +836,39 @@ class ApiService {
     String? note,
     DateTime? receivedDate,
   }) async {
+    final cleanCustomerId = customerId.trim();
+    final safeBillAmount = double.parse(
+        (billAmount.isNaN ? 0.0 : billAmount).toStringAsFixed(2));
+    final safeReceivedAmount = double.parse(
+        (receivedAmount.isNaN ? 0.0 : receivedAmount).toStringAsFixed(2));
+    final dateObj = receivedDate ?? DateTime.now();
+    final safeDateIso = dateObj.toUtc().toIso8601String();
+
     final prefs = await SharedPreferences.getInstance();
-    final key = _paymentKey(customerId, year, month);
+    final key = _paymentKey(cleanCustomerId, year, month);
     final paymentData = {
-      'customerId': customerId,
+      'customerId': cleanCustomerId,
       'year': year,
       'month': month,
-      'billAmount': billAmount,
-      'receivedAmount': receivedAmount,
+      'billAmount': safeBillAmount,
+      'receivedAmount': safeReceivedAmount,
       'note': note ?? '',
-      'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
-      'updatedAt': DateTime.now().toIso8601String(),
+      'receivedDate': safeDateIso,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
     };
     await prefs.setString(key, jsonEncode(paymentData));
 
-    if (hasSession && customerId.isNotEmpty) {
+    if (hasSession && cleanCustomerId.isNotEmpty) {
       final response = await _send(
         'POST',
-        '/customers/$customerId/payments',
+        '/customers/$cleanCustomerId/payments',
         body: {
           'year': year,
           'month': month,
-          'billAmount': billAmount,
-          'receivedAmount': receivedAmount,
+          'billAmount': safeBillAmount,
+          'receivedAmount': safeReceivedAmount,
           'note': note ?? '',
-          'receivedDate': (receivedDate ?? DateTime.now()).toIso8601String(),
+          'receivedDate': safeDateIso,
         },
         showLoader: true,
         loaderMessage: 'Recording payment...',
@@ -872,12 +880,12 @@ class ApiService {
         if (decoded != null && decoded is Map) {
           final serverMap = Map<String, dynamic>.from(decoded);
           await prefs.setString(key, jsonEncode(serverMap));
-          notifyPaymentChanged(customerId, year, month);
+          notifyPaymentChanged(cleanCustomerId, year, month);
           return serverMap;
         }
       }
     }
-    notifyPaymentChanged(customerId, year, month);
+    notifyPaymentChanged(cleanCustomerId, year, month);
     return paymentData;
   }
 

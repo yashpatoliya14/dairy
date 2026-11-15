@@ -35,7 +35,8 @@ class MonthlyEntriesController extends GetxController {
 
   // Customer state
   final customer = Rxn<Map<String, dynamic>>();
-  String get customerId => '${customer.value?['id'] ?? ''}'.trim();
+  String get customerId =>
+      '${customer.value?['id'] ?? customer.value?['cid'] ?? ''}'.trim();
   String get customerName =>
       '${customer.value?['name'] ?? customer.value?['fullName'] ?? ''}';
   String get customerNumber =>

@@ -421,7 +421,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                       children: [
                         Text(
                           c.isFullyPaid
-                              ? '${T.t('Status')}: ${T.t('Fully Paid')}'
+                              ? '${T.t('Amount Paid')} (${T.t('Fully Paid')})'
                               : T.t('Net Total Due'),
                           style: TextStyle(
                             color: c.isPartiallyPaid
@@ -433,7 +433,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                         ),
                         Text(
                           c.isFullyPaid
-                              ? '₹0.00'
+                              ? '₹${(c.paymentReceived.value > 0 ? c.paymentReceived.value : totalAmount).toStringAsFixed(2)}'
                               : '₹${c.netTotalPayable.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.white,
@@ -446,7 +446,9 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      words,
+                      c.isFullyPaid
+                          ? '${_numberToIndianWords(c.paymentReceived.value > 0 ? c.paymentReceived.value : totalAmount)}  •  ${T.t('Remaining Due')}: ₹0.00'
+                          : words,
                       style: TextStyle(
                         fontSize: 11,
                         fontStyle: FontStyle.italic,

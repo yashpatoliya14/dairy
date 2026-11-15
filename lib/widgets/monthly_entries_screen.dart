@@ -32,17 +32,19 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
   @override
   void initState() {
     super.initState();
+    final tagId = widget.customer['id'] ?? widget.customer['cid'] ?? '';
     controller = Get.put(
       MonthlyEntriesController(widget.api),
-      tag: 'monthly_${widget.customer['id']}',
+      tag: 'monthly_$tagId',
     );
     controller.setCustomer(widget.customer);
   }
 
   @override
   void dispose() {
+    final tagId = widget.customer['id'] ?? widget.customer['cid'] ?? '';
     Get.delete<MonthlyEntriesController>(
-      tag: 'monthly_${widget.customer['id']}',
+      tag: 'monthly_$tagId',
     );
     super.dispose();
   }
@@ -721,7 +723,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                                 ),
                                 Text(
                                   controller.isFullyPaid
-                                      ? T.t('Fully Paid')
+                                      ? '${T.t('Fully Paid')} (₹0.00 ${T.t('Due')})'
                                       : '${T.t('Balance Due')}: ₹${controller.balanceDue.toStringAsFixed(2)}',
                                   style: TextStyle(
                                     fontSize: 11,

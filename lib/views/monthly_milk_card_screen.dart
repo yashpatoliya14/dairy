@@ -69,7 +69,8 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
     _loadMonthEntries();
   }
 
-  String get _customerId => '${widget.customer['id']}'.trim();
+  String get _customerId =>
+      '${widget.customer['id'] ?? widget.customer['cid'] ?? ''}'.trim();
 
   String get _customerName =>
       '${widget.customer['name'] ?? widget.customer['fullName'] ?? 'Customer'}';

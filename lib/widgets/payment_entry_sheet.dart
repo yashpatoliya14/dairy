@@ -129,14 +129,15 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
   }
 
   double get _currentEntered =>
-      double.tryParse(_receivedController.text.trim()) ?? 0.0;
+      double.tryParse(_receivedController.text.replaceAll(',', '').trim()) ??
+      0.0;
 
   /// Effective total paid that will be stored on the backend
   double get _effectiveTotalPaid {
     if (_oldPayment > 0 && _entryMode == PaymentEntryMode.addNew) {
-      return _oldPayment + _currentEntered;
+      return double.parse((_oldPayment + _currentEntered).toStringAsFixed(2));
     }
-    return _currentEntered;
+    return double.parse(_currentEntered.toStringAsFixed(2));
   }
 
   double get _effectiveRemainingDue {
@@ -502,14 +503,25 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  T.t('Net Total Due'),
+                                  _netTotalDue <= 0
+                                      ? T.t('Amount Paid')
+                                      : T.t('Net Total Due'),
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w900,
                                     color: Color(0xff0f172a),
                                   ),
                                 ),
-                                if (_oldPayment > 0)
+                                if (_netTotalDue <= 0)
+                                  Text(
+                                    '${T.t('Fully Paid')} • ${T.t('Remaining Due')}: ₹0.00',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      color: Color(0xff16a34a),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  )
+                                else if (_oldPayment > 0)
                                   Text(
                                     T.t('Remaining balance to clear'),
                                     style: TextStyle(
@@ -522,7 +534,7 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                             ),
                             Text(
                               _netTotalDue <= 0
-                                  ? '₹0.00'
+                                  ? '₹${(_oldPayment > 0 ? _oldPayment : _grossPayable).toStringAsFixed(2)}'
                                   : '₹${_netTotalDue.toStringAsFixed(2)}',
                               style: TextStyle(
                                 fontSize: 22,

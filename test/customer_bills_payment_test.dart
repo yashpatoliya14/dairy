@@ -117,7 +117,7 @@ void main() {
       expect(thisMonthDue < thisMonthBill, isTrue);
     });
 
-    test('MonthlyEntriesScreen display: fully paid bill displays 0.00 instead of original gross total', () {
+    test('Customer Bill & Payment dialog: fully paid bill displays amount paid number instead of 0.0', () {
       const billTotalAmount = 4500.0;
       const paymentReceived = 4500.0;
       const pastMonthsDue = 0.0;
@@ -126,11 +126,15 @@ void main() {
       final balanceDue = paymentReceived >= billTotalAmount ? 0.0 : billTotalAmount - paymentReceived;
       final netTotalPayable = pastMonthsDue + balanceDue;
 
-      // Exact ternary logic in MonthlyEntriesScreen
-      final displayedDue = isFullyPaid ? '₹0.00' : '₹${netTotalPayable.toStringAsFixed(2)}';
+      // New user requirement: display amount paid number when fully paid!
+      final displayedAmount = isFullyPaid
+          ? '₹${(paymentReceived > 0 ? paymentReceived : billTotalAmount).toStringAsFixed(2)}'
+          : '₹${netTotalPayable.toStringAsFixed(2)}';
+      final displayedStatus = isFullyPaid ? 'Amount Paid (Fully Paid)' : 'Net Total Due';
 
       expect(isFullyPaid, isTrue);
-      expect(displayedDue, '₹0.00');
+      expect(displayedAmount, '₹4500.00');
+      expect(displayedStatus, 'Amount Paid (Fully Paid)');
     });
 
     test('SendWhatsAppBillSheet: calculated net payable deducts paid amount and formats bill message', () {
