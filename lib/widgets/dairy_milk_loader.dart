@@ -95,7 +95,7 @@ class DairyMilkOverlay extends StatelessWidget {
             return IgnorePointer(
               ignoring: !loading,
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 120),
                 curve: Curves.easeInOut,
                 opacity: loading ? 1.0 : 0.0,
                 child: loading
@@ -140,7 +140,7 @@ class _CompactFloatingHud extends StatelessWidget {
           // Small centered floating badge
           Center(
             child: TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 140),
               curve: Curves.easeOutBack,
               tween: Tween<double>(begin: 0.88, end: 1.0),
               builder: (context, scale, child) {
@@ -282,7 +282,7 @@ class _DairyMilkLoaderState extends State<DairyMilkLoader>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 950),
     )..repeat();
   }
 

@@ -437,7 +437,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
         final monthToDate = double.tryParse(_monthToDateBillController.text) ?? todayAmount;
         final totalPayable = monthToDate + pastOverdue;
 
-        await widget.api.sendWhatsAppBill({
+        final res = await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
           'type': 'daily',
@@ -455,6 +455,13 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'templateName': 'daily_milk_delivery_update',
           'languageCode': 'en',
         });
+        if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {
+          setState(() {
+            _errorMessage = ': ';
+            _successMessage = null;
+          });
+          return;
+        }
       } else {
         final totalLiters =
             double.tryParse(_monthlyLitersController.text) ?? 0.0;
@@ -473,7 +480,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
             pastOverdue > credit ? (pastOverdue - credit) : 0.0;
         final netPayable = currentDue + remainingPastDue;
 
-        await widget.api.sendWhatsAppBill({
+        final res = await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
           'type': 'monthly',
@@ -494,10 +501,18 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'templateName': 'monthly_milk_bill_settlement',
           'languageCode': 'en',
         });
+        if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {
+          setState(() {
+            _errorMessage = ': ';
+            _successMessage = null;
+          });
+          return;
+        }
       }
 
       setState(() {
         _successMessage = T.t('WhatsApp template message sent successfully! 🚀');
+        _errorMessage = null;
       });
     } catch (e) {
       setState(() {
@@ -729,30 +744,40 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                                     ]
                                   : null,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  LucideIcons.sunMedium,
-                                  size: 16,
-                                  color: _billType == BillType.daily
-                                      ? const Color(0xff075e54)
-                                      : Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  T.t('Daily Milk Update'),
-                                  style: TextStyle(
-                                    fontWeight: _billType == BillType.daily
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.sunMedium,
+                                    size: 15,
                                     color: _billType == BillType.daily
                                         ? const Color(0xff075e54)
-                                        : Colors.grey.shade700,
-                                    fontSize: 13,
+                                        : Colors.grey.shade600,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        T.t('Daily Milk Update'),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontWeight: _billType == BillType.daily
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: _billType == BillType.daily
+                                              ? const Color(0xff075e54)
+                                              : Colors.grey.shade700,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -785,30 +810,40 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                                     ]
                                   : null,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  LucideIcons.receiptText,
-                                  size: 16,
-                                  color: _billType == BillType.monthly
-                                      ? const Color(0xff075e54)
-                                      : Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  T.t('Monthly Bill Statement'),
-                                  style: TextStyle(
-                                    fontWeight: _billType == BillType.monthly
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.receiptText,
+                                    size: 15,
                                     color: _billType == BillType.monthly
                                         ? const Color(0xff075e54)
-                                        : Colors.grey.shade700,
-                                    fontSize: 13,
+                                        : Colors.grey.shade600,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        T.t('Monthly Bill Statement'),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontWeight: _billType == BillType.monthly
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: _billType == BillType.monthly
+                                              ? const Color(0xff075e54)
+                                              : Colors.grey.shade700,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),

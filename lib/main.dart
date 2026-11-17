@@ -355,44 +355,6 @@ class DairySplashScreen extends StatelessWidget {
                         color: const Color(0xff2d7a55),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xffdcefe3)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xff1b4d36).withValues(alpha: 0.04),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xff2d7a55),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            statusText ?? T.t('Starting Dairy Desk...'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xff1b4d36),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     const Spacer(flex: 4),
                     Text(
                       'Smart & Simple Milk Accounting',
@@ -1725,6 +1687,22 @@ class _DashboardState extends State<Dashboard> {
   }
 }
 
+String formatDisplayPhoneNumber(String? raw) {
+  if (raw == null) return '';
+  final cleaned = raw.replaceAll(RegExp(r'[^\d+]'), '').trim();
+  if (cleaned.isEmpty || cleaned == 'null') return '';
+  String digits = cleaned.replaceAll(RegExp(r'[^\d]'), '');
+  if (digits.length == 12 && digits.startsWith('91')) {
+    digits = digits.substring(2);
+  } else if (digits.length == 11 && digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  if (digits.length == 10) {
+    return '+91 $digits';
+  }
+  return cleaned.startsWith('+') ? cleaned : '+91 $cleaned';
+}
+
 class _CustomerTile extends StatelessWidget {
   const _CustomerTile({
     required this.customer,
@@ -1804,6 +1782,31 @@ class _CustomerTile extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xfff0fdf4),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xffbbf7d0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(LucideIcons.info, size: 14, color: Color(0xff166534)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              T.t('Adds to today’s total (e.g. 2 + 2 = 4 L)'),
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xff166534),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     // Plus/Minus row for liters
                     Row(
                       children: [
@@ -2016,6 +2019,7 @@ class _CustomerTile extends StatelessWidget {
         date: DateTime.now(),
         liters: litersValue,
         price: priceValue,
+        mode: 'add',
       );
       developer.log('Entry API call succeeded', name: 'MilkEntry');
       if (!context.mounted) return;
@@ -2262,7 +2266,7 @@ class _CustomerTile extends StatelessWidget {
                                 const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
-                                    phone,
+                                    formatDisplayPhoneNumber(phone),
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       color: Colors.grey.shade600,
@@ -2295,9 +2299,6 @@ class _CustomerTile extends StatelessWidget {
                             value == 'monthly') {
                           _openBillAndEntries();
                         }
-                        if (value == 'bills_due') {
-                          _openBillAndEntries();
-                        }
                         if (value == 'whatsapp') {
                           SendWhatsAppBillSheet.show(
                             context,
@@ -2322,22 +2323,6 @@ class _CustomerTile extends StatelessWidget {
                             ),
                             title: Text(
                               T.t('Bill & Entries'),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'bills_due',
-                          child: ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(
-                              LucideIcons.wallet,
-                              color: Color(0xff0d9488),
-                              size: 18,
-                            ),
-                            title: Text(
-                              T.t('Customer Bills & Dues'),
                               style: const TextStyle(fontSize: 13),
                             ),
                           ),
@@ -2825,7 +2810,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      hasPhone ? phone : T.t('Not provided'),
+                                      hasPhone ? formatDisplayPhoneNumber(phone) : T.t('Not provided'),
                                       style: TextStyle(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w500,
@@ -3187,62 +3172,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-
-            // QUICK ACTION: CUSTOMER BILLS & DUES
-            Card(
-              color: const Color(0xfff0fdfa),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xff99f6e4)),
-              ),
-              child: ListTile(
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 2,
-                ),
-                leading: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xff0d9488),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    LucideIcons.wallet,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-                title: Text(
-                  T.t('Customer Bills & Dues'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xff115e59),
-                    fontSize: 13.5,
-                  ),
-                ),
-                subtitle: Text(
-                  T.t('Record payments, view past dues & net balance'),
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 11.5,
-                  ),
-                ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 13,
-                  color: Color(0xff115e59),
-                ),
-                onTap: () => Get.to(
-                  () => MonthlyEntriesScreen(
-                    api: widget.api,
-                    customer: _customer,
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -3255,18 +3184,60 @@ class _DetailRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.iconBg = const Color(0xfff0fdf4),
+    this.iconColor = const Color(0xff2d7a55),
   });
   final IconData icon;
   final String label;
   final String value;
+  final Color iconBg;
+  final Color iconColor;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    leading: Icon(icon, color: const Color(0xff2d7a55)),
-    title: Text(label),
-    subtitle: Text(value),
-  );
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xff1f2937),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 double _asDouble(dynamic value, {double fallback = 0}) {
@@ -4501,24 +4472,32 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   _DetailRow(
                     icon: LucideIcons.user,
+                    iconBg: const Color(0xffe0f2fe),
+                    iconColor: const Color(0xff0284c7),
                     label: T.t('Full Name'),
                     value: fullName.isEmpty ? '—' : fullName,
                   ),
                   const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
                   _DetailRow(
                     icon: LucideIcons.mail,
+                    iconBg: const Color(0xfffef3c7),
+                    iconColor: const Color(0xffd97706),
                     label: T.t('Email Address'),
                     value: email.isEmpty ? '—' : email,
                   ),
                   const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
                   _DetailRow(
                     icon: LucideIcons.phone,
+                    iconBg: const Color(0xffdcfce7),
+                    iconColor: const Color(0xff16a34a),
                     label: T.t('Mobile Number'),
-                    value: phone.isEmpty ? T.t('Not provided') : phone,
+                    value: phone.isEmpty ? T.t('Not provided') : formatDisplayPhoneNumber(phone),
                   ),
                   const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
                   _DetailRow(
                     icon: LucideIcons.store,
+                    iconBg: const Color(0xffede9fe),
+                    iconColor: const Color(0xff7c3aed),
                     label: T.t('Registered Dairy'),
                     value: dairyName,
                   ),
@@ -4551,12 +4530,16 @@ class _ProfilePageState extends State<ProfilePage> {
                   const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
                   _DetailRow(
                     icon: LucideIcons.checkCheck,
+                    iconBg: const Color(0xffdcfce7),
+                    iconColor: const Color(0xff15803d),
                     label: T.t('Account Role'),
                     value: 'Distributor (Administrator)',
                   ),
                   const Divider(height: 1, indent: 54, endIndent: 16, color: Color(0xfff1f5f9)),
                   _DetailRow(
                     icon: LucideIcons.sparkles,
+                    iconBg: const Color(0xffccfbf1),
+                    iconColor: const Color(0xff0f766e),
                     label: T.t('Application Version'),
                     value: 'v${AppUpdateService.currentVersion} (Build ${AppUpdateService.currentBuildNumber})',
                   ),

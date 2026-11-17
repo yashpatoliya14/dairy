@@ -53,6 +53,7 @@ class MockApiService extends ApiService {
     required DateTime date,
     required double liters,
     required double price,
+    String mode = 'add',
   }) async {
     final entry = {
       'id': 'entry_${addedEntries.length + 1}',

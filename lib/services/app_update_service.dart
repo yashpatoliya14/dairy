@@ -87,8 +87,8 @@ class AppUpdateService {
   final ApiService api;
 
   // The client installed version and build number
-  static const String currentVersion = '1.0.18';
-  static const int currentBuildNumber = 20;
+  static const String currentVersion = '1.0.19';
+  static const int currentBuildNumber = 21;
 
   Timer? _checkTimer;
   Future<AppVersionInfo?>? _inFlightCheck;

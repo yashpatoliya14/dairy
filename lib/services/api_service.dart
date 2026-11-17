@@ -342,6 +342,7 @@ class ApiService {
     required DateTime date,
     required double liters,
     required double price,
+    String mode = 'add',
   }) async {
     if (customerId.trim().isEmpty) {
       throw const ApiException(0, 'Cannot save entry: customer ID is missing.');
@@ -353,6 +354,7 @@ class ApiService {
         'entryDate': date.toIso8601String().substring(0, 10),
         'liters': liters,
         'price': price,
+        'mode': mode,
       },
       showLoader: true,
       loaderMessage: 'Saving milk entry...',

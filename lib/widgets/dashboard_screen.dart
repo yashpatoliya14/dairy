@@ -264,12 +264,23 @@ class DashboardScreen extends StatelessWidget {
                       onTap: () => onNavigateTab(2), // Jump to messages
                       child: _buildMetricCard(
                         icon: LucideIcons.messageCircle,
-                        iconBg: const Color(0xffdcfce7),
-                        iconColor: const Color(0xff16a34a),
+                        iconBg: controller.todayFailedCount.value > 0 &&
+                                (controller.todaySentCount.value + controller.todayOpenedCount.value == 0)
+                            ? const Color(0xfffee2e2)
+                            : const Color(0xffdcfce7),
+                        iconColor: controller.todayFailedCount.value > 0 &&
+                                (controller.todaySentCount.value + controller.todayOpenedCount.value == 0)
+                            ? const Color(0xffdc2626)
+                            : const Color(0xff16a34a),
                         title: T.t('Messages'),
                         value: '${controller.todaySentCount.value + controller.todayOpenedCount.value} ${T.t("Notified")}',
-                        subtitle: '${controller.todayNotSentCount.value} ${T.t("Pending")}',
-                        badgeColor: const Color(0xff16a34a),
+                        subtitle: controller.todayFailedCount.value > 0
+                            ? '${controller.todayFailedCount.value} ${T.t("Failed")} • ${controller.todayNotSentCount.value} ${T.t("Pending")}'
+                            : '${controller.todayNotSentCount.value} ${T.t("Pending")}',
+                        badgeColor: controller.todayFailedCount.value > 0 &&
+                                (controller.todaySentCount.value + controller.todayOpenedCount.value == 0)
+                            ? const Color(0xffdc2626)
+                            : const Color(0xff16a34a),
                         showTapArrow: true,
                       ),
                     ),

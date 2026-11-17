@@ -150,6 +150,22 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     return digits;
   }
 
+  String _formatDisplayPhone(String? raw) {
+    if (raw == null) return '';
+    final cleaned = raw.replaceAll(RegExp(r'[^\d+]'), '').trim();
+    if (cleaned.isEmpty || cleaned == 'null') return '';
+    String digits = cleaned.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.length == 12 && digits.startsWith('91')) {
+      digits = digits.substring(2);
+    } else if (digits.length == 11 && digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    if (digits.length == 10) {
+      return '+91 ${digits.substring(0, 5)} ${digits.substring(5)}';
+    }
+    return raw;
+  }
+
   bool _hasValidPhone(Map customer) {
     final raw = '${customer['phoneNumber'] ?? customer['phone'] ?? ''}'.trim();
     final digits = raw.replaceAll(RegExp(r'\D'), '');
@@ -432,22 +448,30 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
         // Silently update list so newly sent items turn green
         await _loadData(silent: true);
 
-        if (status == 'completed' || status == 'failed' || polls >= 60) {
+        if (status == 'completed' || status == 'failed' || status == 'partially_completed' || polls >= 60) {
           timer.cancel();
           if (mounted) {
             setState(() {
               _activeJobStatus = null;
             });
 
+            final bool isAllFailed = (sent == 0 && failed > 0) || status == 'failed';
+            final bool isPartial = failed > 0 && sent > 0;
+
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  status == 'completed'
-                      ? '${T.t('Bulk messages finished')}: $sent ${T.t('sent')}, $failed ${T.t('failed')}'
-                      : '${T.t('Bulk job finished with status')}: $status ($sent ${T.t('sent')}, $failed ${T.t('failed')})',
+                  isAllFailed
+                      ? '${T.t('Failed to send WhatsApp messages')}: $failed ${T.t('failed')}. ${T.t('Please check your WhatsApp API connection.')}'
+                      : isPartial
+                          ? '${T.t('Partially completed')}: $sent ${T.t('sent')}, $failed ${T.t('failed')}'
+                          : '${T.t('Bulk messages finished')}: $sent ${T.t('sent')}',
                 ),
-                backgroundColor:
-                    failed == 0 ? const Color(0xff2d7a55) : Colors.orange.shade800,
+                backgroundColor: isAllFailed
+                    ? Colors.red.shade700
+                    : isPartial
+                        ? Colors.orange.shade800
+                        : const Color(0xff2d7a55),
                 duration: const Duration(seconds: 4),
               ),
             );
@@ -1110,8 +1134,8 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
             if (_selectionMode)
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: allEligibleSelected && eligibleSelected.isNotEmpty
@@ -1126,20 +1150,20 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: allEligibleSelected && eligibleSelected.isNotEmpty
                         ? const Color(0xff4ade80)
                         : const Color(0xff86efac),
-                    width: 1.5,
+                    width: 1.2,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: allEligibleSelected && eligibleSelected.isNotEmpty
-                          ? const Color(0xff166534).withValues(alpha: 0.3)
-                          : const Color(0xff22c55e).withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
+                          ? const Color(0xff166534).withValues(alpha: 0.25)
+                          : const Color(0xff22c55e).withValues(alpha: 0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
@@ -1149,8 +1173,8 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                     Row(
                       children: [
                         Container(
-                          width: 38,
-                          height: 38,
+                          width: 28,
+                          height: 28,
                           decoration: BoxDecoration(
                             color: allEligibleSelected && eligibleSelected.isNotEmpty
                                 ? const Color(0xff22c55e)
@@ -1161,13 +1185,13 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                             allEligibleSelected && eligibleSelected.isNotEmpty
                                 ? LucideIcons.checkCheck
                                 : LucideIcons.users,
-                            size: 20,
+                            size: 15,
                             color: allEligibleSelected && eligibleSelected.isNotEmpty
                                 ? Colors.white
                                 : const Color(0xff14532d),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1178,13 +1202,12 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                     : '${_selectedCustomerIds.length} ${T.t('Selected')} • ${eligibleSelected.length} ${T.t('Eligible')}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 15,
+                                  fontSize: 13,
                                   color: allEligibleSelected && eligibleSelected.isNotEmpty
                                       ? Colors.white
                                       : const Color(0xff14532d),
                                 ),
                               ),
-                              const SizedBox(height: 1),
                               Text(
                                 allEligibleSelected && eligibleSelected.isNotEmpty
                                     ? T.t('Ready to send WhatsApp delivery updates')
@@ -1192,7 +1215,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                         ? T.t('No unsent eligible customers')
                                         : '${allEligibleIds.length - eligibleSelected.length} ${T.t('eligible remaining')}'),
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w500,
                                   color: allEligibleSelected && eligibleSelected.isNotEmpty
                                       ? const Color(0xffbbf7d0)
@@ -1212,18 +1235,18 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                               }
                             });
                           },
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: allEligibleSelected && eligibleSelected.isNotEmpty
                                   ? Colors.white
                                   : const Color(0xff166534),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 4,
+                                  blurRadius: 3,
                                   offset: const Offset(0, 1),
                                 ),
                               ],
@@ -1235,7 +1258,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                   allEligibleSelected && eligibleSelected.isNotEmpty
                                       ? LucideIcons.x
                                       : LucideIcons.checkCheck,
-                                  size: 14,
+                                  size: 12,
                                   color: allEligibleSelected && eligibleSelected.isNotEmpty
                                       ? const Color(0xff14532d)
                                       : Colors.white,
@@ -1246,7 +1269,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                       ? T.t('Deselect All')
                                       : T.t('Select All Eligible'),
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w700,
                                     color: allEligibleSelected && eligibleSelected.isNotEmpty
                                         ? const Color(0xff14532d)
@@ -1261,13 +1284,13 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                     ),
                     if (_selectedCustomerIds.length > eligibleSelected.length)
                       Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        margin: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: allEligibleSelected && eligibleSelected.isNotEmpty
                               ? Colors.black.withValues(alpha: 0.25)
                               : Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: allEligibleSelected && eligibleSelected.isNotEmpty
                                 ? const Color(0xff86efac).withValues(alpha: 0.3)
@@ -1277,7 +1300,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                         child: Text(
                           'ℹ️ ${_selectedCustomerIds.length - eligibleSelected.length} ${T.t('selected customer(s) already sent or missing today\'s entry (skipped).')}',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             color: allEligibleSelected && eligibleSelected.isNotEmpty
                                 ? const Color(0xfffef08a)
                                 : Colors.amber.shade900,
@@ -1285,14 +1308,14 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     FilledButton.icon(
                       onPressed: eligibleSelected.isEmpty || _bulkSending
                           ? null
                           : () => _sendBulkToSelected(eligibleSelected),
                       icon: _bulkSending
-                          ? DairyMilkLoader.mini(color: Colors.white, size: 20)
-                          : const Icon(LucideIcons.send, size: 18),
+                          ? DairyMilkLoader.mini(color: Colors.white, size: 16)
+                          : const Icon(LucideIcons.send, size: 15),
                       label: Text(
                         _bulkSending
                             ? T.t('Sending WhatsApp SMS...')
@@ -1301,7 +1324,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                 : '${T.t('Send WhatsApp SMS')} (${eligibleSelected.length} ${T.t('Customers')})'),
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                          fontSize: 13,
                         ),
                       ),
                       style: FilledButton.styleFrom(
@@ -1311,10 +1334,11 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: Colors.grey.shade300,
                         disabledForegroundColor: Colors.grey.shade600,
-                        minimumSize: const Size.fromHeight(46),
+                        minimumSize: const Size.fromHeight(36),
+                        padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
                         elevation: eligibleSelected.isEmpty ? 0 : 2,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ),
@@ -1521,7 +1545,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                       Flexible(
                                         child: Text(
                                           phone.isNotEmpty
-                                              ? phone
+                                              ? _formatDisplayPhone(phone)
                                               : T.t('No phone number available'),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
