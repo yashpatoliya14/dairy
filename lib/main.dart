@@ -1747,8 +1747,15 @@ class _CustomerTile extends StatelessWidget {
   }
 
   Future<void> _addMilk(BuildContext context) async {
-    final liters = TextEditingController(text: '${customer['liters'] ?? 0}');
-    final price = TextEditingController(text: '${customer['price'] ?? 0}');
+    final hasToday = customer['hasTodayEntry'] == true || customer['todayLiters'] != null;
+    final existingTodayLiters = customer['todayLiters'] != null
+        ? (double.tryParse('${customer['todayLiters']}') ?? 0.0)
+        : (hasToday ? (double.tryParse('${customer['liters']}') ?? 0.0) : 0.0);
+    final defaultToAdd = customer['defaultLiters'] != null
+        ? '${customer['defaultLiters']}'
+        : (!hasToday ? '${customer['liters'] ?? 1}' : '1');
+    final liters = TextEditingController(text: defaultToAdd);
+    final price = TextEditingController(text: '${customer['todayPrice'] ?? customer['price'] ?? 0}');
     final formKey = GlobalKey<FormState>();
     final result = await showDialog<Map<String, double>>(
       context: context,
@@ -1784,19 +1791,21 @@ class _CustomerTile extends StatelessWidget {
                   children: [
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xfff0fdf4),
+                        color: hasToday ? const Color(0xffecfdf5) : const Color(0xfff0fdf4),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xffbbf7d0)),
+                        border: Border.all(color: hasToday ? const Color(0xffa7f3d0) : const Color(0xffbbf7d0)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(LucideIcons.info, size: 14, color: Color(0xff166534)),
-                          const SizedBox(width: 6),
+                          Icon(hasToday ? Icons.check_circle_outline : LucideIcons.info, size: 16, color: const Color(0xff166534)),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              T.t('Adds to today’s total (e.g. 2 + 2 = 4 L)'),
+                              hasToday && existingTodayLiters > 0
+                                  ? '${T.t('Today\'s current')}: ${existingTodayLiters.toStringAsFixed(1)} L. ${T.t('Adding')} ${currentLiters.toStringAsFixed(1)} L → ${T.t('Total')}: ${(existingTodayLiters + currentLiters).toStringAsFixed(1)} L'
+                                  : T.t('Adds to today’s total (e.g. 2 + 2 = 4 L)'),
                               style: const TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
@@ -2157,8 +2166,10 @@ class _CustomerTile extends StatelessWidget {
         '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'.trim();
     final phone =
         '${customer['phoneNumber'] ?? customer['mobileNumber'] ?? customer['phone'] ?? ''}'.trim();
-    final liters = (customer['liters'] ?? customer['defaultLiters'] ?? 0);
-    final price = (customer['price'] ?? customer['defaultPrice'] ?? 0);
+    final hasTodayEntry = customer['hasTodayEntry'] == true || customer['todayLiters'] != null;
+    final todayLiters = customer['todayLiters'] ?? (hasTodayEntry ? customer['liters'] : null);
+    final liters = (todayLiters ?? customer['liters'] ?? customer['defaultLiters'] ?? 0);
+    final price = (customer['todayPrice'] ?? customer['price'] ?? customer['defaultPrice'] ?? 0);
     final channel =
         '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
     final isWhatsApp = channel == 'whatsapp';
@@ -2426,8 +2437,9 @@ class _CustomerTile extends StatelessWidget {
                             vertical: 3.5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xffdcefe3),
+                            color: hasTodayEntry ? const Color(0xffdcfce7) : const Color(0xffdcefe3),
                             borderRadius: BorderRadius.circular(6),
+                            border: hasTodayEntry ? Border.all(color: const Color(0xff86efac), width: 0.8) : null,
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -2446,6 +2458,24 @@ class _CustomerTile extends StatelessWidget {
                                   color: Color(0xff2d7a55),
                                 ),
                               ),
+                              if (hasTodayEntry) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xff2d7a55),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    T.t('Today'),
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),

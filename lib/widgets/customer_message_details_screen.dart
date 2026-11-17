@@ -173,18 +173,6 @@ class _CustomerMessageDetailsScreenState
       return;
     }
 
-    final hasEntry = widget.customerItem['hasEntry'] == true ||
-        widget.customerItem['entry'] != null;
-    if (!hasEntry) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(T.t('Customer has no milk entry for this date. Please add entry first.')),
-          backgroundColor: Colors.amber.shade900,
-        ),
-      );
-      return;
-    }
-
     final message = _messageController.text;
     setState(() => _saving = true);
 

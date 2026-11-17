@@ -260,20 +260,6 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     final customer = item['customer'] as Map? ?? {};
     final cid = '${customer['id']}';
     final name = '${customer['name'] ?? 'Customer'}'.trim();
-    final hasEntry = item['hasEntry'] == true || item['entry'] != null;
-
-    if (!hasEntry) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            T.t('Customer has no milk entry for today. Please add today’s entry first.'),
-          ),
-          backgroundColor: Colors.amber.shade900,
-        ),
-      );
-      return;
-    }
-
     final phone = '${customer['phoneNumber'] ?? ''}'.trim();
     final cleanPhone = _cleanPhone(phone);
     if (cleanPhone.length < 10) {
@@ -339,7 +325,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            T.t('No selected customers have today’s milk entry. Please record their entries first.'),
+            T.t('Please select customers with valid mobile numbers to send WhatsApp messages.'),
           ),
           backgroundColor: Colors.amber.shade900,
         ),
@@ -371,7 +357,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
           ],
         ),
         content: Text(
-          '${T.t('Send milk delivery messages to')} ${eligibleList.length} ${T.t('customers with today’s entry via WhatsApp Business API?')}',
+          '${T.t('Send milk delivery messages to')} ${eligibleList.length} ${T.t('customers via WhatsApp Business API?')}',
         ),
         actions: [
           TextButton(
@@ -640,7 +626,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
       if (!hasEntry) countNoEntry++;
     }
 
-    // Eligible selected customers (must have entry, valid phone, and NOT sent)
+    // Eligible selected customers (valid phone and NOT sent)
     final eligibleSelected = customers.where((c) {
       final cid = '${c['customer']['id']}';
       final customer = c['customer'] as Map? ?? {};
@@ -648,7 +634,6 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
       final status = '${log['status'] ?? 'not_sent'}';
       final isSent = status == 'sent' || status == 'opened_in_whatsapp';
       return _selectedCustomerIds.contains(cid) &&
-          c['hasEntry'] == true &&
           _hasValidPhone(customer) &&
           !isSent;
     }).toList();
@@ -659,7 +644,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
       final log = c['messageLog'] as Map? ?? {};
       final status = '${log['status'] ?? 'not_sent'}';
       final isSent = status == 'sent' || status == 'opened_in_whatsapp';
-      return c['hasEntry'] == true && _hasValidPhone(cust) && !isSent;
+      return _hasValidPhone(cust) && !isSent;
     }).toList();
 
     final allEligibleIds = allEligibleInView
