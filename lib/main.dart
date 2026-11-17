@@ -2014,7 +2014,7 @@ class _CustomerTile extends StatelessWidget {
       name: 'MilkEntry',
     );
     try {
-      await api.addMilkEntry(
+      final entryRes = await api.addMilkEntry(
         customerId,
         date: DateTime.now(),
         liters: litersValue,
@@ -2029,8 +2029,16 @@ class _CustomerTile extends StatelessWidget {
         name: 'MilkEntry',
       );
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(T.t('Milk entry saved'))));
+      final savedLiters = entryRes['liters'] != null
+          ? double.tryParse('${entryRes['liters']}')?.toStringAsFixed(1) ?? '$litersValue'
+          : '$litersValue';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${T.t('Milk entry saved')} ($savedLiters L)',
+          ),
+        ),
+      );
     } catch (error) {
       developer.log(
         'Entry API call failed: $error',

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/dashboard_controller.dart';
 import '../services/api_service.dart';
@@ -220,6 +221,41 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     }
   }
 
+  Future<void> _openDirectWhatsApp(Map<String, dynamic> item) async {
+    final customer = item['customer'] as Map? ?? {};
+    final phone = '${customer['phoneNumber'] ?? ''}'.trim();
+    final cleanPhone = _cleanPhone(phone);
+    if (cleanPhone.length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(T.t('Please enter a valid phone number')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+    final message = _buildQuickMessage(item);
+    final encodedMessage = Uri.encodeComponent(message);
+    final nativeUri = Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedMessage');
+    final webUri = Uri.parse('https://wa.me/$cleanPhone?text=$encodedMessage');
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${T.t('Could not open WhatsApp')}: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _sendSingleWhatsApp(Map<String, dynamic> item) async {
     final customer = item['customer'] as Map? ?? {};
     final cid = '${customer['id']}';
@@ -262,7 +298,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
       );
 
       if (mounted) {
-        if (res['success'] == true) {
+        if (res['success'] == true && res['status'] != 'failed') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('${T.t('WhatsApp message sent to')} $name via Business API!'),
@@ -270,10 +306,11 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
             ),
           );
         } else {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp API failed to deliver';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '${T.t('Failed to send WhatsApp message')}: ${res['error'] ?? 'Unknown error'}',
+                '${T.t('Failed to send WhatsApp message')}: $errStr',
               ),
               backgroundColor: Colors.red.shade700,
             ),
@@ -1654,32 +1691,53 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                   ),
                                 ],
                                 const SizedBox(height: 4),
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: !hasEntry
-                                      ? T.t('No milk entry for today')
-                                      : (!_hasValidPhone(customer)
-                                          ? T.t('No valid phone number')
-                                          : T.t('Send WhatsApp message')),
-                                  icon: _sendingCustomerId == cid
-                                      ? DairyMilkLoader.mini(
-                                          color: const Color(0xff2d7a55),
-                                          size: 20,
-                                        )
-                                      : Icon(
-                                          LucideIcons.send,
-                                          color: (hasEntry && _hasValidPhone(customer))
-                                              ? const Color(0xff2d7a55)
-                                              : Colors.grey.shade400,
-                                          size: 20,
-                                        ),
-                                  onPressed: !hasEntry ||
-                                          !_hasValidPhone(customer) ||
-                                          _sendingCustomerId != null ||
-                                          _bulkSending
-                                      ? null
-                                      : () => _sendSingleWhatsApp(item),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: T.t('Open in WhatsApp App'),
+                                      icon: Icon(
+                                        LucideIcons.messageCircle,
+                                        color: (hasEntry && _hasValidPhone(customer))
+                                            ? const Color(0xff25D366)
+                                            : Colors.grey.shade400,
+                                        size: 20,
+                                      ),
+                                      onPressed: !hasEntry || !_hasValidPhone(customer)
+                                          ? null
+                                          : () => _openDirectWhatsApp(item),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: !hasEntry
+                                          ? T.t('No milk entry for today')
+                                          : (!_hasValidPhone(customer)
+                                              ? T.t('No valid phone number')
+                                              : T.t('Send WhatsApp message (API)')),
+                                      icon: _sendingCustomerId == cid
+                                          ? DairyMilkLoader.mini(
+                                              color: const Color(0xff2d7a55),
+                                              size: 20,
+                                            )
+                                          : Icon(
+                                              LucideIcons.send,
+                                              color: (hasEntry && _hasValidPhone(customer))
+                                                  ? const Color(0xff2d7a55)
+                                                  : Colors.grey.shade400,
+                                              size: 19,
+                                            ),
+                                      onPressed: !hasEntry ||
+                                              !_hasValidPhone(customer) ||
+                                              _sendingCustomerId != null ||
+                                              _bulkSending
+                                          ? null
+                                          : () => _sendSingleWhatsApp(item),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

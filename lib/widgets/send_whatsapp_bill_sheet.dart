@@ -456,8 +456,17 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'languageCode': 'en',
         });
         if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp API delivery failed';
           setState(() {
-            _errorMessage = ': ';
+            _errorMessage = '$errStr';
+            _successMessage = null;
+          });
+          return;
+        }
+        if (res['messageId'] == null && res['success'] != true) {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp message not accepted by provider';
+          setState(() {
+            _errorMessage = '$errStr';
             _successMessage = null;
           });
           return;
@@ -502,8 +511,17 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'languageCode': 'en',
         });
         if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp API delivery failed';
           setState(() {
-            _errorMessage = ': ';
+            _errorMessage = '$errStr';
+            _successMessage = null;
+          });
+          return;
+        }
+        if (res['messageId'] == null && res['success'] != true) {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp message not accepted by provider';
+          setState(() {
+            _errorMessage = '$errStr';
             _successMessage = null;
           });
           return;
@@ -890,20 +908,48 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xfffecaca)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(LucideIcons.circleAlert,
-                            color: Color(0xffdc2626), size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                              color: Color(0xff991b1b),
-                              fontSize: 13,
+                        Row(
+                          children: [
+                            const Icon(LucideIcons.circleAlert,
+                                color: Color(0xffdc2626), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xff991b1b),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_hasValidPhone) ...[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _openWhatsAppDirect,
+                            icon: const Icon(LucideIcons.messageCircle,
+                                size: 16, color: Color(0xff16a34a)),
+                            label: Text(
+                              T.t('Send directly via WhatsApp App instead'),
+                              style: const TextStyle(
+                                color: Color(0xff16a34a),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
