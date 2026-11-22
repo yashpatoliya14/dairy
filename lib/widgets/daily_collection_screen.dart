@@ -845,9 +845,6 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
         (existingLiters * existingPrice);
 
     String mode = 'add'; // 'add' (accumulate with last entry) or 'replace'
-    String currentPhone = (phoneNumber ?? '').trim();
-    String cleanPhone = currentPhone.replaceAll(RegExp(r'\D'), '');
-    bool sendWhatsApp = cleanPhone.length >= 10;
 
     final initialLiters = (existingEntry != null)
         ? defaultLiters
@@ -1237,99 +1234,6 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                         ],
                       ),
                     ),
-
-                    // WhatsApp Notification Toggle
-                    const SizedBox(height: 10),
-                    SwitchListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      activeThumbColor: const Color(0xff2d7a55),
-                      title: Row(
-                        children: [
-                          const Icon(LucideIcons.messageCircle, size: 16, color: Color(0xff2d7a55)),
-                          const SizedBox(width: 6),
-                          Text(
-                            T.t('Send WhatsApp receipt'),
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        cleanPhone.isNotEmpty
-                            ? '+91 $cleanPhone'
-                            : T.t('No phone number saved'),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: cleanPhone.isNotEmpty ? Colors.black54 : Colors.red.shade600,
-                        ),
-                      ),
-                      value: sendWhatsApp && cleanPhone.isNotEmpty,
-                      onChanged: cleanPhone.isNotEmpty
-                          ? (val) => setDialogState(() => sendWhatsApp = val)
-                          : null,
-                    ),
-
-                    if (cleanPhone.isEmpty)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          icon: const Icon(LucideIcons.phoneCall, size: 14, color: Color(0xff2d7a55)),
-                          label: Text(
-                            T.t('Add phone number to send WhatsApp'),
-                            style: const TextStyle(fontSize: 12, color: Color(0xff2d7a55)),
-                          ),
-                          onPressed: () async {
-                            final phoneInputCtrl = TextEditingController();
-                            final phoneSaved = await showDialog<String>(
-                              context: ctx,
-                              builder: (pCtx) => AlertDialog(
-                                title: Text(T.t('Add Phone Number')),
-                                content: TextField(
-                                  controller: phoneInputCtrl,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: InputDecoration(
-                                    labelText: T.t('Mobile number'),
-                                    prefixText: '+91 ',
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(pCtx).pop(null),
-                                    child: Text(T.t('Cancel')),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () {
-                                      final raw = phoneInputCtrl.text.replaceAll(RegExp(r'\D'), '');
-                                      if (raw.length >= 10) {
-                                        Navigator.of(pCtx).pop(raw);
-                                      }
-                                    },
-                                    child: Text(T.t('Save')),
-                                  ),
-                                ],
-                              ),
-                            );
-
-                            if (phoneSaved != null && phoneSaved.isNotEmpty) {
-                              try {
-                                await widget.controller.api.updateCustomer(customerId, {
-                                  'phoneNumber': phoneSaved,
-                                });
-                                await widget.controller.loadCustomers();
-                                setDialogState(() {
-                                  currentPhone = phoneSaved;
-                                  cleanPhone = phoneSaved;
-                                  sendWhatsApp = true;
-                                });
-                              } catch (_) {}
-                            }
-                          },
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -1375,79 +1279,17 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
           ? (existingLiters + inputLiters)
           : inputLiters;
       final double finalTotal = finalLiters * inputPrice;
-      final dateFormatted = widget.controller.selectedDate.value.toIso8601String().substring(0, 10);
 
       if (context.mounted) {
         if (success) {
-          if (sendWhatsApp && cleanPhone.length >= 10) {
-            final message = _buildDailyWhatsAppMessage(
-              customerName: name,
-              liters: finalLiters,
-              price: inputPrice,
-              total: finalTotal,
-              dateFormatted: dateFormatted,
-            );
-
-            try {
-              final res = await widget.controller.api.sendDailyWhatsAppEntry(
-                customerId: customerId,
-                date: dateFormatted,
-                message: message,
-              );
-
-              if (context.mounted) {
-                if (res['success'] == true) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('$name: ${finalLiters.toStringAsFixed(1)} L • ₹${finalTotal.toStringAsFixed(0)} | WhatsApp Sent! ✓'),
-                      backgroundColor: const Color(0xff2d7a55),
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('$name saved! WhatsApp: ${res['error'] ?? 'API failed'}'),
-                      backgroundColor: Colors.amber.shade900,
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 5),
-                      action: SnackBarAction(
-                        label: T.t('Open in WhatsApp'),
-                        textColor: Colors.white,
-                        onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
-                      ),
-                    ),
-                  );
-                }
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$name saved! WhatsApp error: $e'),
-                    backgroundColor: Colors.amber.shade900,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 5),
-                    action: SnackBarAction(
-                      label: T.t('Open in WhatsApp'),
-                      textColor: Colors.white,
-                      onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
-                    ),
-                  ),
-                );
-              }
-            }
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$name: ${finalLiters.toStringAsFixed(1)} L • ₹${finalTotal.toStringAsFixed(0)}'),
-                backgroundColor: const Color(0xff2d7a55),
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$name: ${finalLiters.toStringAsFixed(1)} L • ₹${finalTotal.toStringAsFixed(0)}'),
+              backgroundColor: const Color(0xff2d7a55),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -6,7 +6,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'controllers/app_controller.dart';
 import 'controllers/dashboard_controller.dart';
@@ -1747,30 +1746,79 @@ class _CustomerTile extends StatelessWidget {
   }
 
   Future<void> _addMilk(BuildContext context) async {
+    final customerId = '${customer['id'] ?? customer['cid'] ?? ''}'.trim();
+    if (customerId.isEmpty || customerId == 'null') {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(T.t('Cannot save entry: customer ID is missing.'))),
+        );
+      }
+      return;
+    }
+
+    final name = '${customer['name'] ?? customer['fullName'] ?? 'Customer'}'.trim();
     final hasToday = customer['hasTodayEntry'] == true || customer['todayLiters'] != null;
-    final existingTodayLiters = customer['todayLiters'] != null
+    final double existingLiters = customer['todayLiters'] != null
         ? (double.tryParse('${customer['todayLiters']}') ?? 0.0)
         : (hasToday ? (double.tryParse('${customer['liters']}') ?? 0.0) : 0.0);
-    final defaultToAdd = customer['defaultLiters'] != null
-        ? '${customer['defaultLiters']}'
-        : (!hasToday ? '${customer['liters'] ?? 1}' : '1');
-    final liters = TextEditingController(text: defaultToAdd);
-    final price = TextEditingController(text: '${customer['todayPrice'] ?? customer['price'] ?? 0}');
+    final double defaultPrice = double.tryParse('${customer['price'] ?? 0}') ?? 0.0;
+    final double existingPrice = double.tryParse('${customer['todayPrice'] ?? customer['price'] ?? 0}') ?? defaultPrice;
+    final double existingTotal = customer['todayTotal'] != null
+        ? (double.tryParse('${customer['todayTotal']}') ?? (existingLiters * existingPrice))
+        : (existingLiters * existingPrice);
+    final hasExisting = hasToday && existingLiters > 0;
+
+    final double defaultLiters = customer['defaultLiters'] != null
+        ? (double.tryParse('${customer['defaultLiters']}') ?? 1.0)
+        : (double.tryParse('${customer['liters'] ?? 1}') ?? 1.0);
+
+    String mode = 'add'; // 'add' (accumulate with last entry) or 'replace'
+    final initialLiters = hasExisting ? defaultLiters : defaultLiters;
+
+    final litersCtrl = TextEditingController(text: _formatLiters(initialLiters));
+    final priceCtrl = TextEditingController(text: _formatLiters(existingPrice));
     final formKey = GlobalKey<FormState>();
-    final result = await showDialog<Map<String, double>>(
+    double curLiters = initialLiters;
+    double curPrice = existingPrice;
+
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        double currentLiters = double.tryParse(liters.text.trim()) ?? 0;
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final double previewLiters = (hasExisting && mode == 'add')
+              ? (existingLiters + curLiters)
+              : curLiters;
+          final double previewTotal = previewLiters * curPrice;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 12, 0),
             title: Row(
               children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffdcefe3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    LucideIcons.milk,
+                    size: 18,
+                    color: Color(0xff2d7a55),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${T.t('Add today’s milk')} - ${customer['name']}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 IconButton(
@@ -1779,7 +1827,7 @@ class _CustomerTile extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(false),
                 ),
               ],
             ),
@@ -1789,34 +1837,103 @@ class _CustomerTile extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: hasToday ? const Color(0xffecfdf5) : const Color(0xfff0fdf4),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: hasToday ? const Color(0xffa7f3d0) : const Color(0xffbbf7d0)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(hasToday ? Icons.check_circle_outline : LucideIcons.info, size: 16, color: const Color(0xff166534)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              hasToday && existingTodayLiters > 0
-                                  ? '${T.t('Today\'s current')}: ${existingTodayLiters.toStringAsFixed(1)} L. ${T.t('Adding')} ${currentLiters.toStringAsFixed(1)} L → ${T.t('Total')}: ${(existingTodayLiters + currentLiters).toStringAsFixed(1)} L'
-                                  : T.t('Adds to today’s total (e.g. 2 + 2 = 4 L)'),
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xff166534),
-                              ),
+                    // Existing Entry Banner & Mode Switcher
+                    if (hasExisting) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xfff0fdf4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xffbbf7d0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${T.t('Earlier Today')}:',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff166534),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  '${existingLiters.toStringAsFixed(1)} L • ₹${existingTotal.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xff166534),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      '+ ${T.t("Add with Last Entry")}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: mode == 'add'
+                                            ? Colors.white
+                                            : const Color(0xff166534),
+                                      ),
+                                    ),
+                                    selected: mode == 'add',
+                                    selectedColor: const Color(0xff2d7a55),
+                                    backgroundColor: Colors.white,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setDialogState(() {
+                                          mode = 'add';
+                                          curLiters = defaultLiters;
+                                          litersCtrl.text = _formatLiters(curLiters);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      T.t('Replace Entry'),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: mode == 'replace'
+                                            ? Colors.white
+                                            : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    selected: mode == 'replace',
+                                    selectedColor: Colors.orange.shade800,
+                                    backgroundColor: Colors.white,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setDialogState(() {
+                                          mode = 'replace';
+                                          curLiters = existingLiters;
+                                          litersCtrl.text = _formatLiters(curLiters);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    // Plus/Minus row for liters
+                    ],
+
                     Row(
                       children: [
                         Material(
@@ -1824,19 +1941,18 @@ class _CustomerTile extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
-                            onTap: currentLiters > 0
+                            onTap: curLiters > 0
                                 ? () {
                                     setDialogState(() {
-                                      currentLiters = double.parse(
-                                        (currentLiters - 0.25).clamp(0, double.infinity).toStringAsFixed(2),
-                                      );
-                                      liters.text = _formatLiters(currentLiters);
+                                      curLiters = (curLiters - 0.25).clamp(0.0, 999.0);
+                                      curLiters = double.parse(curLiters.toStringAsFixed(2));
+                                      litersCtrl.text = _formatLiters(curLiters);
                                     });
                                   }
                                 : null,
                             child: SizedBox(
-                              width: 48,
-                              height: 48,
+                              width: 44,
+                              height: 44,
                               child: Icon(Icons.remove, color: Colors.red.shade400),
                             ),
                           ),
@@ -1844,27 +1960,38 @@ class _CustomerTile extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextFormField(
-                            controller: liters,
-                            autofocus: false,
+                            controller: litersCtrl,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                             ),
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
                             decoration: InputDecoration(
-                              labelText: T.t('Liters'),
+                              labelText: (hasExisting && mode == 'add')
+                                  ? T.t('Liters to add (+)')
+                                  : (hasExisting)
+                                      ? T.t('Total Liters (Replace)')
+                                      : T.t('Liters'),
                               suffixText: 'L',
                             ),
-                            onChanged: (value) {
-                              final parsed = double.tryParse(value.trim());
+                            onChanged: (val) {
+                              final parsed = double.tryParse(val.trim());
                               if (parsed != null && parsed >= 0) {
-                                setDialogState(() => currentLiters = parsed);
+                                setDialogState(() => curLiters = parsed);
                               }
                             },
-                            validator: _number,
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return T.t('Required');
+                              }
+                              if (double.tryParse(val.trim()) == null) {
+                                return T.t('Invalid number');
+                              }
+                              return null;
+                            },
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1875,15 +2002,14 @@ class _CustomerTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                             onTap: () {
                               setDialogState(() {
-                                currentLiters = double.parse(
-                                  (currentLiters + 0.25).toStringAsFixed(2),
-                                );
-                                liters.text = _formatLiters(currentLiters);
+                                curLiters = curLiters + 0.25;
+                                curLiters = double.parse(curLiters.toStringAsFixed(2));
+                                litersCtrl.text = _formatLiters(curLiters);
                               });
                             },
                             child: const SizedBox(
-                              width: 48,
-                              height: 48,
+                              width: 44,
+                              height: 44,
                               child: Icon(Icons.add, color: Color(0xff2d7a55)),
                             ),
                           ),
@@ -1892,7 +2018,7 @@ class _CustomerTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
 
-                    // Quick Presets: +250 ml, +500 ml, +750 ml, +1 L
+                    // Presets
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
@@ -1902,10 +2028,8 @@ class _CustomerTile extends StatelessWidget {
                           label: '+250 ml',
                           onTap: () {
                             setDialogState(() {
-                              currentLiters = double.parse(
-                                (currentLiters + 0.25).toStringAsFixed(2),
-                              );
-                              liters.text = _formatLiters(currentLiters);
+                              curLiters = double.parse((curLiters + 0.25).toStringAsFixed(2));
+                              litersCtrl.text = _formatLiters(curLiters);
                             });
                           },
                         ),
@@ -1913,10 +2037,8 @@ class _CustomerTile extends StatelessWidget {
                           label: '+500 ml',
                           onTap: () {
                             setDialogState(() {
-                              currentLiters = double.parse(
-                                (currentLiters + 0.50).toStringAsFixed(2),
-                              );
-                              liters.text = _formatLiters(currentLiters);
+                              curLiters = double.parse((curLiters + 0.50).toStringAsFixed(2));
+                              litersCtrl.text = _formatLiters(curLiters);
                             });
                           },
                         ),
@@ -1924,10 +2046,8 @@ class _CustomerTile extends StatelessWidget {
                           label: '+750 ml',
                           onTap: () {
                             setDialogState(() {
-                              currentLiters = double.parse(
-                                (currentLiters + 0.75).toStringAsFixed(2),
-                              );
-                              liters.text = _formatLiters(currentLiters);
+                              curLiters = double.parse((curLiters + 0.75).toStringAsFixed(2));
+                              litersCtrl.text = _formatLiters(curLiters);
                             });
                           },
                         ),
@@ -1935,20 +2055,16 @@ class _CustomerTile extends StatelessWidget {
                           label: '+1 L',
                           onTap: () {
                             setDialogState(() {
-                              currentLiters = double.parse(
-                                (currentLiters + 1.00).toStringAsFixed(2),
-                              );
-                              liters.text = _formatLiters(currentLiters);
+                              curLiters = double.parse((curLiters + 1.00).toStringAsFixed(2));
+                              litersCtrl.text = _formatLiters(curLiters);
                             });
                           },
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 12),
                     TextFormField(
-                      controller: price,
-                      autofocus: false,
+                      controller: priceCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -1956,156 +2072,115 @@ class _CustomerTile extends StatelessWidget {
                         labelText: T.t('Price per liter'),
                         prefixText: '₹ ',
                       ),
-                      validator: _number,
+                      onChanged: (val) {
+                        final parsed = double.tryParse(val.trim());
+                        if (parsed != null && parsed >= 0) {
+                          setDialogState(() => curPrice = parsed);
+                        }
+                      },
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return T.t('Required');
+                        }
+                        if (double.tryParse(val.trim()) == null) {
+                          return T.t('Invalid number');
+                        }
+                        return null;
+                      },
+                    ),
+
+                    // Final Total Preview Banner
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: mode == 'add' ? const Color(0xffecfdf5) : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: mode == 'add' ? const Color(0xffa7f3d0) : Colors.orange.shade200,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${T.t("Final Today")}: ${previewLiters.toStringAsFixed(1)} L',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: mode == 'add' ? const Color(0xff065f46) : Colors.orange.shade900,
+                            ),
+                          ),
+                          Text(
+                            '₹${previewTotal.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: mode == 'add' ? const Color(0xff065f46) : Colors.orange.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             actions: [
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xff2d7a55),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xff2d7a55),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(42),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  onPressed: () {
-                    developer.log(
-                      'Save entry button pressed for customer ${customer['id']}',
-                      name: 'MilkEntry',
-                    );
-                    if (!formKey.currentState!.validate()) return;
-                    final litersValue = double.parse(liters.text.trim());
-                    final priceValue = double.parse(price.text.trim());
-                    developer.log(
-                      'Entry form valid: liters=$litersValue price=$priceValue',
-                      name: 'MilkEntry',
-                    );
-                    Navigator.of(dialogContext).pop({'liters': litersValue, 'price': priceValue});
-                  },
-                  child: Text(
-                    T.t('Save entry'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
+                ),
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.of(dialogCtx).pop(true);
+                },
+                child: Text(
+                  T.t('Save Entry'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
-    liters.dispose();
-    price.dispose();
-    if (result == null || !context.mounted) {
-      developer.log('Entry dialog closed without saving', name: 'MilkEntry');
-      return;
-    }
-    final customerId = '${customer['id'] ?? customer['cid'] ?? ''}'.trim();
-    if (customerId.isEmpty || customerId == 'null') {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(T.t('Cannot save entry: customer ID is missing.'))),
-        );
-      }
-      return;
-    }
-    final litersValue = result['liters'] ?? 0.0;
-    final priceValue = result['price'] ?? 0.0;
-    developer.log(
-      'Starting entry API call: customerId=$customerId '
-      'liters=$litersValue price=$priceValue '
-      'baseUrl=${api.baseUrl}',
-      name: 'MilkEntry',
-    );
+
+    litersCtrl.dispose();
+    priceCtrl.dispose();
+    if (saved != true || !context.mounted) return;
+
     try {
       final entryRes = await api.addMilkEntry(
         customerId,
         date: DateTime.now(),
-        liters: litersValue,
-        price: priceValue,
-        mode: 'add',
+        liters: curLiters,
+        price: curPrice,
+        mode: hasExisting ? mode : 'add',
       );
-      developer.log('Entry API call succeeded', name: 'MilkEntry');
       if (!context.mounted) return;
       await onChanged();
-      developer.log(
-        'Customer list refreshed after entry save',
-        name: 'MilkEntry',
-      );
       if (!context.mounted) return;
       final savedLiters = entryRes['liters'] != null
-          ? double.tryParse('${entryRes['liters']}')?.toStringAsFixed(1) ?? '$litersValue'
-          : '$litersValue';
-      final phone = (customer['phoneNumber'] ?? customer['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+          ? double.tryParse('${entryRes['liters']}')?.toStringAsFixed(1) ?? '$curLiters'
+          : '$curLiters';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '${T.t('Milk entry saved')} ($savedLiters L)',
-          ),
-          action: phone.length >= 10
-              ? SnackBarAction(
-                  label: 'WhatsApp',
-                  textColor: Colors.amberAccent,
-                  onPressed: () async {
-                    try {
-                      final dateStr = DateTime.now().toIso8601String().split('T').first;
-                      final res = await api.sendDailyWhatsAppEntry(
-                        customerId: customerId,
-                        date: dateStr,
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              res['success'] == true
-                                  ? 'WhatsApp receipt sent!'
-                                  : 'Could not send: ${res['error'] ?? 'Opening WhatsApp...'}',
-                            ),
-                          ),
-                        );
-                      }
-                      if (res['success'] != true) {
-                        final clean = phone.startsWith('91') ? phone : '91$phone';
-                        final text = Uri.encodeComponent(
-                          'Milk Delivery Update\nCustomer: ${customer['name']}\nQuantity: $savedLiters L\nDairy Desk',
-                        );
-                        final uri = Uri.parse('whatsapp://send?phone=$clean&text=$text');
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
-                        }
-                      }
-                    } catch (e) {
-                      final clean = phone.startsWith('91') ? phone : '91$phone';
-                      final text = Uri.encodeComponent(
-                        'Milk Delivery Update\nCustomer: ${customer['name']}\nQuantity: $savedLiters L\nDairy Desk',
-                      );
-                      final uri = Uri.parse('whatsapp://send?phone=$clean&text=$text');
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      }
-                    }
-                  },
-                )
-              : null,
+          content: Text('${T.t('Milk entry saved')} ($savedLiters L)'),
+          backgroundColor: const Color(0xff2d7a55),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (error) {
-      developer.log(
-        'Entry API call failed: $error',
-        name: 'MilkEntry',
-        error: error,
-        stackTrace: StackTrace.current,
-      );
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
       }
-      return;
     }
   }
 
