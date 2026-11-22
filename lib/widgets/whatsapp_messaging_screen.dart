@@ -299,41 +299,6 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
 
   Future<void> _sendSingleWhatsApp(Map<String, dynamic> item) async {
     final customer = item['customer'] as Map? ?? {};
-    final phone = '${customer['phoneNumber'] ?? ''}'.trim();
-    final cleanPhone = _cleanPhone(phone);
-    if (cleanPhone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(T.t('Please enter a valid phone number')),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-      return;
-    }
-    final message = _buildQuickMessage(item);
-    final encodedMessage = Uri.encodeComponent(message);
-    final nativeUri = Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedMessage');
-    final webUri = Uri.parse('https://wa.me/$cleanPhone?text=$encodedMessage');
-    try {
-      if (await canLaunchUrl(nativeUri)) {
-        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${T.t('Could not open WhatsApp')}: $e'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _sendSingleWhatsApp(Map<String, dynamic> item) async {
-    final customer = item['customer'] as Map? ?? {};
     final cid = '${customer['id']}';
     final name = '${customer['name'] ?? 'Customer'}'.trim();
     final phone = '${customer['phoneNumber'] ?? ''}'.trim();
