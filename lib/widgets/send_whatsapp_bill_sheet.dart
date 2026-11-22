@@ -124,7 +124,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
 
     _phoneController = TextEditingController(text: cleanPhone);
     _dailyLitersController = TextEditingController(
-      text: defaultLiters.toStringAsFixed(1),
+      text: defaultLiters.toStringAsFixed(2),
     );
     _rateController = TextEditingController(
       text: effectiveRate.toStringAsFixed(2),
@@ -159,8 +159,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     );
     _monthlyLitersController = TextEditingController(
       text: widget.initialMonthlyLiters != null
-          ? widget.initialMonthlyLiters!.toStringAsFixed(1)
-          : '0.0',
+          ? widget.initialMonthlyLiters!.toStringAsFixed(2)
+          : '0.00',
     );
     final initialMonthAmt = widget.initialMonthlyAmount != null
         ? widget.initialMonthlyAmount!
@@ -233,7 +233,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       if (mounted) {
         setState(() {
           _totalDaysController.text = '${activeDaysSet.length}';
-          _monthlyLitersController.text = totalLiters.toStringAsFixed(1);
+          _monthlyLitersController.text = totalLiters.toStringAsFixed(2);
           _monthlyAmountController.text = totalAmount.toStringAsFixed(2);
         });
       }
@@ -267,11 +267,11 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     final rate = double.tryParse(_rateController.text) ?? 0;
     setState(() {
       if (days <= 0) {
-        _monthlyLitersController.text = '0.0';
+        _monthlyLitersController.text = '0.00';
         _monthlyAmountController.text = '0.00';
       } else {
         final newLiters = days * litersPerDay;
-        _monthlyLitersController.text = newLiters.toStringAsFixed(1);
+        _monthlyLitersController.text = newLiters.toStringAsFixed(2);
         _monthlyAmountController.text = (newLiters * rate).toStringAsFixed(2);
       }
     });
@@ -346,7 +346,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'Hello *$name*,\n\n'
           'Here is your milk delivery summary for *$dateShift*:\n\n'
           '📋 *TODAY\'S DELIVERY:*\n'
-          '• Milk Quantity: ${liters.toStringAsFixed(1)} L\n'
+          '• Milk Quantity: ${liters.toStringAsFixed(2)} L\n'
           '• Rate per Liter: ₹${rate.toStringAsFixed(2)}/L\n'
           '• Today\'s Amount: ₹${todayAmount.toStringAsFixed(2)}\n\n'
           '💰 *ACCOUNT BALANCE:*\n'
@@ -388,7 +388,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'Your milk bill for *$month* has been generated.\n\n'
           '📋 *DELIVERY SUMMARY:*\n'
           '• Active Delivery Days: $days Days\n'
-          '• Total Quantity: ${totalLiters.toStringAsFixed(1)} L\n'
+          '• Total Quantity: ${totalLiters.toStringAsFixed(2)} L\n'
           '• Rate per Liter: ₹${rate.toStringAsFixed(2)}/L\n\n'
           '💰 *BILL BREAKDOWN:*\n'
           '• Monthly Milk Bill: ₹${monthlyAmount.toStringAsFixed(2)}\n'
@@ -507,7 +507,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'distributorName': distributorName,
           'distributorPhone': distributorPhone,
           'useTemplate': true,
-          'templateName': 'monthly_milk_bill_settlement',
+          'templateName': 'dairy_milk_bill_update',
           'languageCode': 'en',
         });
         if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {

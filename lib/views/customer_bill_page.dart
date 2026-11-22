@@ -86,7 +86,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
       'Customer: ${c.customerName} (#${c.customerNumber})',
       'Month: $monthName',
       '• Delivery Days: ${c.activeDeliveryDays} / ${c.daysInMonth.value}',
-      '• Total Milk: ${c.totalLiters.value.toStringAsFixed(1)} L',
+      '• Total Milk: ${c.totalLiters.value.toStringAsFixed(2)} L',
       '• Rate: ₹${c.effectiveRate.toStringAsFixed(2)}/L',
       '• Monthly Bill: ₹${totalAmount.toStringAsFixed(2)}',
       if (c.pastMonthsDue.value > 0)
@@ -190,6 +190,14 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
           elevation: 0,
           actions: [
             IconButton(
+              icon: const Icon(LucideIcons.refreshCw, size: 20),
+              tooltip: T.t('Refresh'),
+              onPressed: () async {
+                await widget.controller.loadMonth();
+                if (mounted) setState(() {});
+              },
+            ),
+            IconButton(
               icon: const Icon(LucideIcons.copy, size: 20),
               tooltip: T.t('Copy Bill'),
               onPressed: _copyBill,
@@ -216,9 +224,15 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
             ),
           ],
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await widget.controller.loadMonth();
+            if (mounted) setState(() {});
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header Dairy Card
@@ -362,7 +376,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    _detailRow(T.t('Total Milk Supplied'), '${totalLiters.toStringAsFixed(1)} L', isBold: true),
+                    _detailRow(T.t('Total Milk Supplied'), '${totalLiters.toStringAsFixed(2)} L', isBold: true),
                     const SizedBox(height: 6),
                     _detailRow(T.t('Rate per Liter'), '₹${effectiveRate.toStringAsFixed(2)}/L', isBold: true),
                     const Divider(height: 18),
@@ -522,8 +536,9 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
             ],
           ),
         ),
-      );
-    });
+      ),
+    );
+  });
   }
 
   Widget _detailRow(String label, String value, {bool isBold = false, Color? color}) {

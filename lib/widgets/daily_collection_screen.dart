@@ -187,7 +187,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                         ),
                         const SizedBox(width: 8),
                         _buildStatusPill(
-                          label: '${controller.todayLiters.value.toStringAsFixed(1)} L',
+                          label: '${controller.todayLiters.value.toStringAsFixed(2)} L',
                           color: const Color(0xff0369a1),
                           bg: const Color(0xffe0f2fe),
                         ),
@@ -474,7 +474,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                     Row(
                       children: [
                         Text(
-                          '${recordedLiters.toStringAsFixed(1)} L • ₹${recordedTotal.toStringAsFixed(0)}',
+                          '${recordedLiters.toStringAsFixed(2)} L • ₹${recordedTotal.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -504,7 +504,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                     )
                   else
                     Text(
-                      '${T.t("Expected")}: ${defaultLiters.toStringAsFixed(1)} L @ ₹${defaultPrice.toStringAsFixed(0)}',
+                      '${T.t("Expected")}: ${defaultLiters.toStringAsFixed(2)} L @ ₹${defaultPrice.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -602,12 +602,8 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
         : null;
     final lang = langController?.language.value ?? 'en';
 
-    final lStr = liters == liters.truncateToDouble()
-        ? liters.toStringAsFixed(0)
-        : liters.toStringAsFixed(2);
-    final pStr = price == price.truncateToDouble()
-        ? price.toStringAsFixed(0)
-        : price.toStringAsFixed(2);
+    final lStr = liters.toStringAsFixed(2);
+    final pStr = price.toStringAsFixed(2);
     final tStr = total.toStringAsFixed(2);
 
     if (lang == 'gu') {
@@ -850,14 +846,10 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
         ? defaultLiters
         : defaultLiters;
     final litersCtrl = TextEditingController(
-      text: initialLiters == initialLiters.truncateToDouble()
-          ? initialLiters.toStringAsFixed(0)
-          : initialLiters.toStringAsFixed(2),
+      text: initialLiters.toStringAsFixed(2),
     );
     final priceCtrl = TextEditingController(
-      text: existingPrice == existingPrice.truncateToDouble()
-          ? existingPrice.toStringAsFixed(0)
-          : existingPrice.toStringAsFixed(2),
+      text: existingPrice.toStringAsFixed(2),
     );
     final formKey = GlobalKey<FormState>();
     double curLiters = initialLiters;
@@ -944,7 +936,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${existingLiters.toStringAsFixed(1)} L • ₹${existingTotal.toStringAsFixed(0)}',
+                                  '${existingLiters.toStringAsFixed(2)} L • ₹${existingTotal.toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                     color: Color(0xff166534),
@@ -976,9 +968,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                                         setDialogState(() {
                                           mode = 'add';
                                           curLiters = defaultLiters;
-                                          litersCtrl.text = defaultLiters == defaultLiters.truncateToDouble()
-                                              ? defaultLiters.toStringAsFixed(0)
-                                              : defaultLiters.toStringAsFixed(2);
+                                          litersCtrl.text = defaultLiters.toStringAsFixed(2);
                                         });
                                       }
                                     },
@@ -1005,9 +995,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                                         setDialogState(() {
                                           mode = 'replace';
                                           curLiters = existingLiters;
-                                          litersCtrl.text = existingLiters == existingLiters.truncateToDouble()
-                                              ? existingLiters.toStringAsFixed(0)
-                                              : existingLiters.toStringAsFixed(2);
+                                          litersCtrl.text = existingLiters.toStringAsFixed(2);
                                         });
                                       }
                                     },
@@ -1032,10 +1020,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                                     setDialogState(() {
                                       curLiters = (curLiters - 0.25).clamp(0.0, 999.0);
                                       curLiters = double.parse(curLiters.toStringAsFixed(2));
-                                      litersCtrl.text =
-                                          curLiters == curLiters.truncateToDouble()
-                                              ? curLiters.toStringAsFixed(0)
-                                              : curLiters.toStringAsFixed(2);
+                                      litersCtrl.text = curLiters.toStringAsFixed(2);
                                     });
                                   }
                                 : null,
@@ -1093,10 +1078,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                               setDialogState(() {
                                 curLiters = curLiters + 0.25;
                                 curLiters = double.parse(curLiters.toStringAsFixed(2));
-                                litersCtrl.text =
-                                    curLiters == curLiters.truncateToDouble()
-                                        ? curLiters.toStringAsFixed(0)
-                                        : curLiters.toStringAsFixed(2);
+                                litersCtrl.text = curLiters.toStringAsFixed(2);
                               });
                             },
                             child: const SizedBox(
@@ -1123,10 +1105,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                               curLiters = double.parse(
                                 (curLiters + 0.25).toStringAsFixed(2),
                               );
-                              litersCtrl.text =
-                                  curLiters == curLiters.truncateToDouble()
-                                      ? curLiters.toStringAsFixed(0)
-                                      : curLiters.toStringAsFixed(2);
+                              litersCtrl.text = curLiters.toStringAsFixed(2);
                             });
                           },
                         ),
@@ -1137,10 +1116,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                               curLiters = double.parse(
                                 (curLiters + 0.50).toStringAsFixed(2),
                               );
-                              litersCtrl.text =
-                                  curLiters == curLiters.truncateToDouble()
-                                      ? curLiters.toStringAsFixed(0)
-                                      : curLiters.toStringAsFixed(2);
+                              litersCtrl.text = curLiters.toStringAsFixed(2);
                             });
                           },
                         ),
@@ -1151,10 +1127,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                               curLiters = double.parse(
                                 (curLiters + 0.75).toStringAsFixed(2),
                               );
-                              litersCtrl.text =
-                                  curLiters == curLiters.truncateToDouble()
-                                      ? curLiters.toStringAsFixed(0)
-                                      : curLiters.toStringAsFixed(2);
+                              litersCtrl.text = curLiters.toStringAsFixed(2);
                             });
                           },
                         ),
@@ -1165,10 +1138,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                               curLiters = double.parse(
                                 (curLiters + 1.00).toStringAsFixed(2),
                               );
-                              litersCtrl.text =
-                                  curLiters == curLiters.truncateToDouble()
-                                      ? curLiters.toStringAsFixed(0)
-                                      : curLiters.toStringAsFixed(2);
+                              litersCtrl.text = curLiters.toStringAsFixed(2);
                             });
                           },
                         ),
@@ -1216,7 +1186,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '${T.t("Final Today")}: ${previewLiters.toStringAsFixed(1)} L',
+                            '${T.t("Final Today")}: ${previewLiters.toStringAsFixed(2)} L',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 13,
@@ -1224,7 +1194,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                             ),
                           ),
                           Text(
-                            '₹${previewTotal.toStringAsFixed(0)}',
+                            '₹${previewTotal.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
@@ -1284,7 +1254,7 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$name: ${finalLiters.toStringAsFixed(1)} L • ₹${finalTotal.toStringAsFixed(0)}'),
+              content: Text('$name: ${finalLiters.toStringAsFixed(2)} L • ₹${finalTotal.toStringAsFixed(2)}'),
               backgroundColor: const Color(0xff2d7a55),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 2),

@@ -348,7 +348,7 @@ void main() {
       expect(find.text('Send WhatsApp Bill'), findsOneWidget);
       expect(find.text('Copy Bill'), findsOneWidget);
       expect(find.text('Total Liters'), findsOneWidget);
-      expect(find.text('4.0 L'), findsOneWidget);
+      expect(find.text('4.00 L'), findsOneWidget);
       expect(find.text('Rate per Liter'), findsOneWidget);
       expect(find.text('Delivery Days'), findsOneWidget);
       expect(find.text('Total Amount'), findsOneWidget);

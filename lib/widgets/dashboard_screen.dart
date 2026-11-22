@@ -43,10 +43,10 @@ class DashboardScreen extends StatelessWidget {
       final missingCount = controller.todayMissingCount.value;
       final totalLiters = controller.todayLiters.value;
       final totalAmount = controller.todayTotalAmount.value;
-      final avgLiters = completedCount > 0 ? (totalLiters / completedCount).toStringAsFixed(1) : '0.0';
+      final avgLiters = completedCount > 0 ? (totalLiters / completedCount).toStringAsFixed(2) : '0.00';
       final avgPrice = totalLiters > 0
-          ? (totalAmount / totalLiters).toStringAsFixed(1)
-          : controller.defaultPrice.value.toStringAsFixed(1);
+          ? (totalAmount / totalLiters).toStringAsFixed(2)
+          : controller.defaultPrice.value.toStringAsFixed(2);
       final completionPct = totalCustomers > 0
           ? (completedCount / totalCustomers).clamp(0.0, 1.0)
           : 0.0;
@@ -211,7 +211,7 @@ class DashboardScreen extends StatelessWidget {
                       iconBg: const Color(0xffdcefe3),
                       iconColor: const Color(0xff2d7a55),
                       title: T.t('Total Milk'),
-                      value: '${totalLiters.toStringAsFixed(1)} L',
+                      value: '${totalLiters.toStringAsFixed(2)} L',
                       subtitle: '$avgLiters L / ${T.t("Entries")}',
                       badgeColor: const Color(0xff2d7a55),
                     ),

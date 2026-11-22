@@ -769,7 +769,7 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
                         const SizedBox(width: 8),
                         ActionChip(
                           label: Text(
-                            '${_defaultLiters.toStringAsFixed(1)} L',
+                            '${_defaultLiters.toStringAsFixed(2)} L',
                           ),
                           onPressed: () {
                             litersController.text =

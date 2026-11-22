@@ -289,6 +289,7 @@ class MonthlyEntriesController extends GetxController {
     required int day,
     required double liters,
     required double price,
+    String? mode,
   }) async {
     if (customerId.isEmpty || saving.value) return false;
     saving.value = true;
@@ -317,6 +318,7 @@ class MonthlyEntriesController extends GetxController {
         ),
         liters: liters,
         price: price,
+        mode: mode,
       );
 
       // Update the entryId in snapshot (for new entries)

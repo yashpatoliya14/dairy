@@ -432,7 +432,7 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                                 ),
                               ),
                               child: Text(
-                                '${widget.activeDeliveryDays}/${widget.daysInMonth} ${T.t('Days')} • ${widget.totalLiters.toStringAsFixed(1)}L',
+                                '${widget.activeDeliveryDays}/${widget.daysInMonth} ${T.t('Days')} • ${widget.totalLiters.toStringAsFixed(2)}L',
                                 style: const TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w600,

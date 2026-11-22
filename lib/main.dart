@@ -1713,10 +1713,7 @@ class _CustomerTile extends StatelessWidget {
   final Future<void> Function() onChanged;
 
   static String _formatLiters(double val) {
-    if (val == val.truncateToDouble()) return val.toStringAsFixed(0);
-    String s = val.toStringAsFixed(2);
-    if (s.endsWith('0')) s = s.substring(0, s.length - 1);
-    return s;
+    return val.toStringAsFixed(2);
   }
 
   Widget _buildPresetChip({
@@ -1862,7 +1859,7 @@ class _CustomerTile extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  '${existingLiters.toStringAsFixed(1)} L • ₹${existingTotal.toStringAsFixed(0)}',
+                                  '${existingLiters.toStringAsFixed(2)} L • ₹${existingTotal.toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                     color: Color(0xff166534),
@@ -2104,7 +2101,7 @@ class _CustomerTile extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '${T.t("Final Today")}: ${previewLiters.toStringAsFixed(1)} L',
+                            '${T.t("Final Today")}: ${previewLiters.toStringAsFixed(2)} L',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 13,
@@ -2112,7 +2109,7 @@ class _CustomerTile extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '₹${previewTotal.toStringAsFixed(0)}',
+                            '₹${previewTotal.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
@@ -2168,8 +2165,8 @@ class _CustomerTile extends StatelessWidget {
       await onChanged();
       if (!context.mounted) return;
       final savedLiters = entryRes['liters'] != null
-          ? double.tryParse('${entryRes['liters']}')?.toStringAsFixed(1) ?? '$curLiters'
-          : '$curLiters';
+          ? double.tryParse('${entryRes['liters']}')?.toStringAsFixed(2) ?? curLiters.toStringAsFixed(2)
+          : curLiters.toStringAsFixed(2);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${T.t('Milk entry saved')} ($savedLiters L)'),
