@@ -1536,243 +1536,366 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                       },
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (_selectionMode)
-                              Checkbox(
-                                value: isSelected,
-                                onChanged: (v) {
-                                  setState(() {
-                                    if (v == true) {
-                                      _selectedCustomerIds.add(cid);
-                                    } else {
-                                      _selectedCustomerIds.remove(cid);
-                                    }
-                                  });
-                                },
-                              )
-                            else
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: const Color(0xffdcefe3),
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xff2d7a55),
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 1,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xffe8f0ec),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          '#$uniqueNumber',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xff2d7a55),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        _hasValidPhone(customer) ? LucideIcons.phone : LucideIcons.phoneOff,
-                                        size: 13,
-                                        color: _hasValidPhone(customer)
-                                            ? Theme.of(context).colorScheme.onSurfaceVariant
-                                            : Colors.amber.shade900,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          phone.isNotEmpty
-                                              ? _formatDisplayPhone(phone)
-                                              : T.t('No phone number available'),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: _hasValidPhone(customer)
-                                                ? Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant
-                                                : Colors.amber.shade900,
-                                            fontWeight: _hasValidPhone(customer)
-                                                ? FontWeight.normal
-                                                : FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      if (!_hasValidPhone(customer)) ...[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: Colors.amber.shade100,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            T.t('No Phone'),
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.amber.shade900,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Row(
-                                    children: [
-                                      if (hasEntry) ...[
-                                        Text(
-                                          '$liters  •  $rate  •  $total',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ] else ...[
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.amber.shade100,
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            T.t('No milk entry'),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.amber.shade900,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            // Row 1: Avatar/Checkbox, Name & Number, Status Badge & Time
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(status)
-                                        .withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    _getStatusLabel(status),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: _getStatusColor(status),
+                                if (_selectionMode)
+                                  Checkbox(
+                                    value: isSelected,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        if (v == true) {
+                                          _selectedCustomerIds.add(cid);
+                                        } else {
+                                          _selectedCustomerIds.remove(cid);
+                                        }
+                                      });
+                                    },
+                                  )
+                                else
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: const Color(0xffdcefe3),
+                                    child: Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xff2d7a55),
+                                        fontSize: 14,
+                                      ),
                                     ),
+                                  ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 15,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 1,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xffe8f0ec),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              '#$uniqueNumber',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xff2d7a55),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _hasValidPhone(customer) ? LucideIcons.phone : LucideIcons.phoneOff,
+                                            size: 12,
+                                            color: _hasValidPhone(customer)
+                                                ? Theme.of(context).colorScheme.onSurfaceVariant
+                                                : Colors.amber.shade900,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              phone.isNotEmpty
+                                                  ? _formatDisplayPhone(phone)
+                                                  : T.t('No phone number available'),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: _hasValidPhone(customer)
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant
+                                                    : Colors.amber.shade900,
+                                                fontWeight: _hasValidPhone(customer)
+                                                    ? FontWeight.normal
+                                                    : FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          if (!_hasValidPhone(customer)) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber.shade100,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                T.t('No Phone'),
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.amber.shade900,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                if (lastAttempt != null) ...[
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    lastAttempt,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 4),
-                                if (hasEntry && _hasValidPhone(customer)) ...[
-                                  IconButton(
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    tooltip: T.t('Open in WhatsApp'),
-                                    icon: const Icon(
-                                      LucideIcons.messageCircle,
-                                      color: Color(0xff25D366),
-                                      size: 20,
-                                    ),
-                                    onPressed: () => _launchDirectWhatsApp(
-                                      _cleanPhone('${customer['phoneNumber']}'),
-                                      _buildQuickMessage(item),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                ],
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: !hasEntry
-                                      ? T.t('No milk entry for today')
-                                      : (!_hasValidPhone(customer)
-                                          ? T.t('Add phone number to send WhatsApp')
-                                          : T.t('Send WhatsApp message')),
-                                  icon: _sendingCustomerId == cid
-                                      ? DairyMilkLoader.mini(
-                                          color: const Color(0xff2d7a55),
-                                          size: 20,
-                                        )
-                                      : Icon(
-                                          !_hasValidPhone(customer)
-                                              ? LucideIcons.phoneCall
-                                              : LucideIcons.send,
-                                          color: !hasEntry
-                                              ? Colors.grey.shade400
-                                              : (!_hasValidPhone(customer)
-                                                  ? Colors.amber.shade800
-                                                  : const Color(0xff2d7a55)),
-                                          size: 20,
+                                const SizedBox(width: 8),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _getStatusColor(status)
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: _getStatusColor(status)
+                                              .withValues(alpha: 0.25),
+                                          width: 0.8,
                                         ),
-                                  onPressed: !hasEntry ||
-                                          _sendingCustomerId != null ||
-                                          _bulkSending
-                                      ? null
-                                      : () => _sendSingleWhatsApp(item),
+                                      ),
+                                      child: Text(
+                                        _getStatusLabel(status),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: _getStatusColor(status),
+                                        ),
+                                      ),
+                                    ),
+                                    if (lastAttempt != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        lastAttempt,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 8),
+                            const Divider(height: 1, color: Color(0xfff1f5f9)),
+                            const SizedBox(height: 8),
+
+                            // Row 2: Milk entry metrics
+                            Row(
+                              children: [
+                                if (hasEntry) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xfff0fdf4),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xffbbf7d0), width: 0.8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(LucideIcons.droplets, size: 12, color: Color(0xff2d7a55)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          liters,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xff166534),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xfff8fafc),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xffe2e8f0), width: 0.8),
+                                    ),
+                                    child: Text(
+                                      '$rate/L',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xffecfdf5),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xffa7f3d0), width: 0.8),
+                                    ),
+                                    child: Text(
+                                      total,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xff065f46),
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      borderRadius:
+                                          BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.amber.shade200, width: 0.8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(LucideIcons.circleSlash, size: 12, color: Colors.amber.shade900),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          T.t('No milk entry'),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.amber.shade900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            // Row 3: Full-width responsive action buttons
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 34,
+                                    child: FilledButton.icon(
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: !hasEntry
+                                            ? Colors.grey.shade300
+                                            : (!_hasValidPhone(customer)
+                                                ? Colors.amber.shade800
+                                                : const Color(0xff2d7a55)),
+                                        foregroundColor: !hasEntry ? Colors.grey.shade600 : Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      icon: _sendingCustomerId == cid
+                                          ? const SizedBox(
+                                              width: 14,
+                                              height: 14,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : Icon(
+                                              !_hasValidPhone(customer)
+                                                  ? LucideIcons.phoneCall
+                                                  : LucideIcons.send,
+                                              size: 14,
+                                            ),
+                                      label: Text(
+                                        _sendingCustomerId == cid
+                                            ? T.t('Sending...')
+                                            : (!_hasValidPhone(customer)
+                                                ? T.t('Add Phone')
+                                                : T.t('Send WhatsApp SMS')),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onPressed: !hasEntry ||
+                                              _sendingCustomerId != null ||
+                                              _bulkSending
+                                          ? null
+                                          : () => _sendSingleWhatsApp(item),
+                                    ),
+                                  ),
+                                ),
+                                if (hasEntry && _hasValidPhone(customer)) ...[
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    height: 34,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xff25D366),
+                                        side: const BorderSide(color: Color(0xff25D366), width: 1.2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        LucideIcons.messageCircle,
+                                        color: Color(0xff25D366),
+                                        size: 15,
+                                      ),
+                                      label: Text(
+                                        T.t('WhatsApp'),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xff25D366),
+                                        ),
+                                      ),
+                                      onPressed: () => _launchDirectWhatsApp(
+                                        _cleanPhone('${customer['phoneNumber']}'),
+                                        _buildQuickMessage(item),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ],

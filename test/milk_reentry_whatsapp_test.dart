@@ -4,9 +4,9 @@ import 'package:dairy/services/app_language.dart';
 
 void main() {
   group('Milk Re-entry & WhatsApp Tests', () {
-    test('App update service reflects version 1.0.23 and build 25', () {
-      expect(AppUpdateService.currentVersion, '1.0.23');
-      expect(AppUpdateService.currentBuildNumber, 25);
+    test('App update service reflects version 1.0.24 and build 26', () {
+      expect(AppUpdateService.currentVersion, '1.0.24');
+      expect(AppUpdateService.currentBuildNumber, 26);
     });
 
     test('Re-entry accumulation math: adding evening milk onto morning entry', () {
