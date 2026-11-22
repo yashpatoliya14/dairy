@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/dashboard_controller.dart';
 import '../services/api_service.dart';
@@ -204,6 +205,82 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     }
   }
 
+  Future<void> _launchDirectWhatsApp(String cleanPhone, String message) async {
+    final encoded = Uri.encodeComponent(message);
+    final nativeUri = Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encoded');
+    final webUri = Uri.parse('https://wa.me/$cleanPhone?text=$encoded');
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _promptEnterPhone(Map<String, dynamic> item) async {
+    final customer = item['customer'] as Map? ?? {};
+    final cid = '${customer['id']}';
+    final name = '${customer['name'] ?? 'Customer'}'.trim();
+    final phoneCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${T.t('Add Phone Number')} - $name'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: phoneCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: T.t('Mobile number'),
+              prefixText: '+91 ',
+              hintText: '9876543210',
+            ),
+            validator: (v) {
+              final cleaned = (v ?? '').replaceAll(RegExp(r'\D'), '');
+              if (cleaned.length < 10) return T.t('Please enter a valid phone number');
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(T.t('Cancel')),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() == true) {
+                Navigator.of(ctx).pop(phoneCtrl.text.replaceAll(RegExp(r'\D'), ''));
+              }
+            },
+            child: Text(T.t('Save')),
+          ),
+        ],
+      ),
+    );
+
+    if (saved != null && saved.isNotEmpty) {
+      try {
+        await widget.api.updateCustomer(cid, {'phoneNumber': saved});
+        customer['phoneNumber'] = saved;
+        await _loadData();
+        if (mounted) {
+          _sendSingleWhatsApp(item);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating phone: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _sendSingleWhatsApp(Map<String, dynamic> item) async {
     final customer = item['customer'] as Map? ?? {};
     final cid = '${customer['id']}';
@@ -225,12 +302,7 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
     final phone = '${customer['phoneNumber'] ?? ''}'.trim();
     final cleanPhone = _cleanPhone(phone);
     if (cleanPhone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(T.t('Please enter a valid phone number')),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
+      await _promptEnterPhone(item);
       return;
     }
 
@@ -259,7 +331,14 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
               content: Text(
                 '${T.t('Failed to send WhatsApp message')}: ${res['error'] ?? 'Unknown error'}',
               ),
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: Colors.amber.shade900,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: T.t('Open in WhatsApp'),
+                textColor: Colors.white,
+                onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
+              ),
             ),
           );
         }
@@ -269,7 +348,14 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${T.t('Error sending WhatsApp message')}: $e'),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: Colors.amber.shade900,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: T.t('Open in WhatsApp'),
+              textColor: Colors.white,
+              onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
+            ),
           ),
         );
       }
@@ -1630,13 +1716,30 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                   ),
                                 ],
                                 const SizedBox(height: 4),
+                                if (hasEntry && _hasValidPhone(customer)) ...[
+                                  IconButton(
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    tooltip: T.t('Open in WhatsApp'),
+                                    icon: const Icon(
+                                      LucideIcons.messageCircle,
+                                      color: Color(0xff25D366),
+                                      size: 20,
+                                    ),
+                                    onPressed: () => _launchDirectWhatsApp(
+                                      _cleanPhone('${customer['phoneNumber']}'),
+                                      _buildQuickMessage(item),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                ],
                                 IconButton(
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                   tooltip: !hasEntry
                                       ? T.t('No milk entry for today')
                                       : (!_hasValidPhone(customer)
-                                          ? T.t('No valid phone number')
+                                          ? T.t('Add phone number to send WhatsApp')
                                           : T.t('Send WhatsApp message')),
                                   icon: _sendingCustomerId == cid
                                       ? DairyMilkLoader.mini(
@@ -1644,14 +1747,17 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
                                           size: 20,
                                         )
                                       : Icon(
-                                          LucideIcons.send,
-                                          color: (hasEntry && _hasValidPhone(customer))
-                                              ? const Color(0xff2d7a55)
-                                              : Colors.grey.shade400,
+                                          !_hasValidPhone(customer)
+                                              ? LucideIcons.phoneCall
+                                              : LucideIcons.send,
+                                          color: !hasEntry
+                                              ? Colors.grey.shade400
+                                              : (!_hasValidPhone(customer)
+                                                  ? Colors.amber.shade800
+                                                  : const Color(0xff2d7a55)),
                                           size: 20,
                                         ),
                                   onPressed: !hasEntry ||
-                                          !_hasValidPhone(customer) ||
                                           _sendingCustomerId != null ||
                                           _bulkSending
                                       ? null

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/dashboard_controller.dart';
 import '../services/api_service.dart';
@@ -394,6 +395,8 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
     final recordedTotal = (entry?['total'] as num?)?.toDouble() ??
         (recordedLiters * recordedPrice);
 
+    final phone = '${customer['phoneNumber'] ?? ''}'.trim();
+
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () => _openRecordMilkDialog(
@@ -401,8 +404,10 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
         customerId: customerId,
         name: name,
         number: number,
-        defaultLiters: hasEntry ? recordedLiters : defaultLiters,
+        defaultLiters: defaultLiters,
         defaultPrice: hasEntry ? recordedPrice : defaultPrice,
+        existingEntry: hasEntry ? entry : null,
+        phoneNumber: phone,
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -529,6 +534,8 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                   number: number,
                   defaultLiters: defaultLiters,
                   defaultPrice: defaultPrice,
+                  existingEntry: null,
+                  phoneNumber: phone,
                 ),
                 child: Text(
                   '+ ${T.t("Record")}',
@@ -539,26 +546,259 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                 ),
               )
             else
-              IconButton(
-                icon: const Icon(
-                  LucideIcons.pencil,
-                  size: 18,
-                  color: Color(0xff2d7a55),
-                ),
-                tooltip: T.t('Edit'),
-                onPressed: () => _openRecordMilkDialog(
-                  context,
-                  customerId: customerId,
-                  name: name,
-                  number: number,
-                  defaultLiters: recordedLiters,
-                  defaultPrice: recordedPrice,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      LucideIcons.messageCircle,
+                      size: 20,
+                      color: Color(0xff25D366),
+                    ),
+                    tooltip: T.t('Send WhatsApp receipt'),
+                    onPressed: () => _sendQuickWhatsApp(
+                      context: context,
+                      customer: customer,
+                      entry: entry,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      LucideIcons.pencil,
+                      size: 18,
+                      color: Color(0xff2d7a55),
+                    ),
+                    tooltip: T.t('Edit / Re-enter'),
+                    onPressed: () => _openRecordMilkDialog(
+                      context,
+                      customerId: customerId,
+                      name: name,
+                      number: number,
+                      defaultLiters: defaultLiters,
+                      defaultPrice: recordedPrice,
+                      existingEntry: entry,
+                      phoneNumber: phone,
+                    ),
+                  ),
+                ],
               ),
           ],
         ),
       ),
     );
+  }
+
+  String _buildDailyWhatsAppMessage({
+    required String customerName,
+    required double liters,
+    required double price,
+    required double total,
+    required String dateFormatted,
+  }) {
+    final dairy = widget.controller.dairyName.value.trim();
+    final dairyName = dairy.isNotEmpty ? dairy : 'Dairy Desk';
+    final langController = Get.isRegistered<AppLanguageController>()
+        ? Get.find<AppLanguageController>()
+        : null;
+    final lang = langController?.language.value ?? 'en';
+
+    final lStr = liters == liters.truncateToDouble()
+        ? liters.toStringAsFixed(0)
+        : liters.toStringAsFixed(2);
+    final pStr = price == price.truncateToDouble()
+        ? price.toStringAsFixed(0)
+        : price.toStringAsFixed(2);
+    final tStr = total.toStringAsFixed(2);
+
+    if (lang == 'gu') {
+      return 'નમસ્તે $customerName,\n\n'
+          'આજની દૂધની વિગત ($dateFormatted):\n\n'
+          'કુલ દૂધ: $lStr લીટર\n'
+          'દૂધનો દર: ₹$pStr/લીટર\n'
+          'કુલ રકમ: ₹$tStr\n\n'
+          'આભાર!\n'
+          '$dairyName';
+    } else if (lang == 'hi') {
+      return 'नमस्ते $customerName,\n\n'
+          'आज का दूध विवरण ($dateFormatted):\n\n'
+          'कुल दूध: $lStr लीटर\n'
+          'दर: ₹$pStr/लीटर\n'
+          'कुल राशि: ₹$tStr\n\n'
+          'धन्यवाद!\n'
+          '$dairyName';
+    } else {
+      return 'Hello $customerName,\n\n'
+          'Today\'s Milk Details ($dateFormatted):\n\n'
+          'Total Milk: $lStr Liters\n'
+          'Rate: ₹$pStr/Liter\n'
+          'Total Amount: ₹$tStr\n\n'
+          'Thank you!\n'
+          '$dairyName';
+    }
+  }
+
+  Future<void> _launchDirectWhatsApp(String cleanPhone, String message) async {
+    final encoded = Uri.encodeComponent(message);
+    final nativeUri = Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encoded');
+    final webUri = Uri.parse('https://wa.me/$cleanPhone?text=$encoded');
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _sendQuickWhatsApp({
+    required BuildContext context,
+    required Map customer,
+    required Map? entry,
+  }) async {
+    final customerId = '${customer['id'] ?? ''}';
+    final name = '${customer['name'] ?? 'Customer'}'.trim();
+    final phone = '${customer['phoneNumber'] ?? ''}'.trim();
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+
+    if (cleanPhone.length < 10) {
+      _promptAddPhoneNumber(
+        context,
+        customerId: customerId,
+        customerName: name,
+        entry: entry,
+      );
+      return;
+    }
+
+    final dateFormatted = widget.controller.selectedDate.value.toIso8601String().substring(0, 10);
+    final liters = (entry?['liters'] as num?)?.toDouble() ?? 0.0;
+    final price = (entry?['price'] as num?)?.toDouble() ?? 0.0;
+    final total = (entry?['total'] as num?)?.toDouble() ?? (liters * price);
+
+    final message = _buildDailyWhatsAppMessage(
+      customerName: name,
+      liters: liters,
+      price: price,
+      total: total,
+      dateFormatted: dateFormatted,
+    );
+
+    try {
+      final res = await widget.controller.api.sendDailyWhatsAppEntry(
+        customerId: customerId,
+        date: dateFormatted,
+        message: message,
+      );
+
+      if (context.mounted) {
+        if (res['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${T.t('WhatsApp message sent to')} $name via Business API!'),
+              backgroundColor: const Color(0xff2d7a55),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${T.t('Failed to send WhatsApp message')}: ${res['error'] ?? 'API Error'}'),
+              backgroundColor: Colors.amber.shade900,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: T.t('Open in WhatsApp'),
+                textColor: Colors.white,
+                onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${T.t('Error sending WhatsApp message')}: $e'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: T.t('Open in WhatsApp'),
+              textColor: Colors.white,
+              onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _promptAddPhoneNumber(
+    BuildContext context, {
+    required String customerId,
+    required String customerName,
+    Map? entry,
+  }) async {
+    final phoneCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${T.t('Add Phone Number')} - $customerName'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: phoneCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: T.t('Mobile number'),
+              prefixText: '+91 ',
+              hintText: '9876543210',
+            ),
+            validator: (v) {
+              final cleaned = (v ?? '').replaceAll(RegExp(r'\D'), '');
+              if (cleaned.length < 10) return T.t('Please enter a valid phone number');
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(T.t('Cancel')),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() != true) return;
+              try {
+                final cleaned = phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+                await widget.controller.api.updateCustomer(customerId, {
+                  'phoneNumber': cleaned,
+                });
+                await widget.controller.loadCustomers();
+                if (ctx.mounted) Navigator.of(ctx).pop(true);
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Error saving phone: $e')),
+                  );
+                }
+              }
+            },
+            child: Text(T.t('Save')),
+          ),
+        ],
+      ),
+    );
+
+    if (updated == true && entry != null && context.mounted) {
+      final customer = widget.controller.customers.firstWhereOrNull(
+        (c) => '${c['id']}' == customerId,
+      ) ?? {'id': customerId, 'name': customerName, 'phoneNumber': phoneCtrl.text};
+      _sendQuickWhatsApp(context: context, customer: customer, entry: entry);
+    }
   }
 
   Widget _buildPresetBadge({
@@ -594,288 +834,620 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
     required String number,
     required double defaultLiters,
     required double defaultPrice,
+    Map? existingEntry,
+    String? phoneNumber,
   }) async {
+    final double existingLiters =
+        (existingEntry?['liters'] as num?)?.toDouble() ?? 0.0;
+    final double existingPrice =
+        (existingEntry?['price'] as num?)?.toDouble() ?? defaultPrice;
+    final double existingTotal = (existingEntry?['total'] as num?)?.toDouble() ??
+        (existingLiters * existingPrice);
+
+    String mode = 'add'; // 'add' (accumulate with last entry) or 'replace'
+    String currentPhone = (phoneNumber ?? '').trim();
+    String cleanPhone = currentPhone.replaceAll(RegExp(r'\D'), '');
+    bool sendWhatsApp = cleanPhone.length >= 10;
+
+    final initialLiters = (existingEntry != null)
+        ? defaultLiters
+        : defaultLiters;
     final litersCtrl = TextEditingController(
-      text: defaultLiters == defaultLiters.truncateToDouble()
-          ? defaultLiters.toStringAsFixed(0)
-          : defaultLiters.toStringAsFixed(2),
+      text: initialLiters == initialLiters.truncateToDouble()
+          ? initialLiters.toStringAsFixed(0)
+          : initialLiters.toStringAsFixed(2),
     );
     final priceCtrl = TextEditingController(
-      text: defaultPrice == defaultPrice.truncateToDouble()
-          ? defaultPrice.toStringAsFixed(0)
-          : defaultPrice.toStringAsFixed(2),
+      text: existingPrice == existingPrice.truncateToDouble()
+          ? existingPrice.toStringAsFixed(0)
+          : existingPrice.toStringAsFixed(2),
     );
     final formKey = GlobalKey<FormState>();
-    double curLiters = defaultLiters;
+    double curLiters = initialLiters;
+    double curPrice = existingPrice;
 
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          titlePadding: const EdgeInsets.fromLTRB(16, 16, 12, 0),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xffdcefe3),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  LucideIcons.milk,
-                  size: 18,
-                  color: Color(0xff2d7a55),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+        builder: (ctx, setDialogState) {
+          final double previewLiters = (existingEntry != null && mode == 'add')
+              ? (existingLiters + curLiters)
+              : curLiters;
+          final double previewTotal = previewLiters * curPrice;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 12, 0),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffdcefe3),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: const Icon(
+                    LucideIcons.milk,
+                    size: 18,
+                    color: Color(0xff2d7a55),
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                tooltip: T.t('Close'),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () => Navigator.of(dialogCtx).pop(false),
-              ),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Material(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: curLiters > 0
-                              ? () {
-                                  setDialogState(() {
-                                    curLiters = (curLiters - 0.25).clamp(0.0, 999.0);
-                                    curLiters = double.parse(curLiters.toStringAsFixed(2));
-                                    litersCtrl.text =
-                                        curLiters == curLiters.truncateToDouble()
-                                            ? curLiters.toStringAsFixed(0)
-                                            : curLiters.toStringAsFixed(2);
-                                  });
-                                }
-                              : null,
-                          child: SizedBox(
-                            width: 44,
-                            height: 44,
-                            child: Icon(Icons.remove, color: Colors.red.shade400),
-                          ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  tooltip: T.t('Close'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(false),
+                ),
+              ],
+            ),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Existing Entry Banner & Mode Switcher
+                    if (existingEntry != null) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xfff0fdf4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xffbbf7d0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${T.t('Earlier Today')}:',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff166534),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  '${existingLiters.toStringAsFixed(1)} L • ₹${existingTotal.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xff166534),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      '+ ${T.t("Add with Last Entry")}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: mode == 'add'
+                                            ? Colors.white
+                                            : const Color(0xff166534),
+                                      ),
+                                    ),
+                                    selected: mode == 'add',
+                                    selectedColor: const Color(0xff2d7a55),
+                                    backgroundColor: Colors.white,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setDialogState(() {
+                                          mode = 'add';
+                                          curLiters = defaultLiters;
+                                          litersCtrl.text = defaultLiters == defaultLiters.truncateToDouble()
+                                              ? defaultLiters.toStringAsFixed(0)
+                                              : defaultLiters.toStringAsFixed(2);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      T.t('Replace Entry'),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: mode == 'replace'
+                                            ? Colors.white
+                                            : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    selected: mode == 'replace',
+                                    selectedColor: Colors.orange.shade800,
+                                    backgroundColor: Colors.white,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setDialogState(() {
+                                          mode = 'replace';
+                                          curLiters = existingLiters;
+                                          litersCtrl.text = existingLiters == existingLiters.truncateToDouble()
+                                              ? existingLiters.toStringAsFixed(0)
+                                              : existingLiters.toStringAsFixed(2);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: litersCtrl,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: T.t('Liters'),
-                            suffixText: 'L',
-                          ),
-                          onChanged: (val) {
-                            final parsed = double.tryParse(val.trim());
-                            if (parsed != null && parsed >= 0) {
-                              setDialogState(() => curLiters = parsed);
-                            }
-                          },
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) {
-                              return T.t('Required');
-                            }
-                            if (double.tryParse(val.trim()) == null) {
-                              return T.t('Invalid number');
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Material(
-                        color: const Color(0xffdcefe3),
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
+                    ],
+
+                    Row(
+                      children: [
+                        Material(
+                          color: Colors.red.shade50,
                           borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: curLiters > 0
+                                ? () {
+                                    setDialogState(() {
+                                      curLiters = (curLiters - 0.25).clamp(0.0, 999.0);
+                                      curLiters = double.parse(curLiters.toStringAsFixed(2));
+                                      litersCtrl.text =
+                                          curLiters == curLiters.truncateToDouble()
+                                              ? curLiters.toStringAsFixed(0)
+                                              : curLiters.toStringAsFixed(2);
+                                    });
+                                  }
+                                : null,
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Icon(Icons.remove, color: Colors.red.shade400),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: litersCtrl,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: (existingEntry != null && mode == 'add')
+                                  ? T.t('Liters to add (+)')
+                                  : (existingEntry != null)
+                                      ? T.t('Total Liters (Replace)')
+                                      : T.t('Liters'),
+                              suffixText: 'L',
+                            ),
+                            onChanged: (val) {
+                              final parsed = double.tryParse(val.trim());
+                              if (parsed != null && parsed >= 0) {
+                                setDialogState(() => curLiters = parsed);
+                              }
+                            },
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return T.t('Required');
+                              }
+                              if (double.tryParse(val.trim()) == null) {
+                                return T.t('Invalid number');
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Material(
+                          color: const Color(0xffdcefe3),
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              setDialogState(() {
+                                curLiters = curLiters + 0.25;
+                                curLiters = double.parse(curLiters.toStringAsFixed(2));
+                                litersCtrl.text =
+                                    curLiters == curLiters.truncateToDouble()
+                                        ? curLiters.toStringAsFixed(0)
+                                        : curLiters.toStringAsFixed(2);
+                              });
+                            },
+                            child: const SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Icon(Icons.add, color: Color(0xff2d7a55)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Presets
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _buildPresetBadge(
+                          label: '+250 ml',
                           onTap: () {
                             setDialogState(() {
-                              curLiters = curLiters + 0.25;
-                              curLiters = double.parse(curLiters.toStringAsFixed(2));
+                              curLiters = double.parse(
+                                (curLiters + 0.25).toStringAsFixed(2),
+                              );
                               litersCtrl.text =
                                   curLiters == curLiters.truncateToDouble()
                                       ? curLiters.toStringAsFixed(0)
                                       : curLiters.toStringAsFixed(2);
                             });
                           },
-                          child: const SizedBox(
-                            width: 44,
-                            height: 44,
-                            child: Icon(Icons.add, color: Color(0xff2d7a55)),
-                          ),
+                        ),
+                        _buildPresetBadge(
+                          label: '+500 ml',
+                          onTap: () {
+                            setDialogState(() {
+                              curLiters = double.parse(
+                                (curLiters + 0.50).toStringAsFixed(2),
+                              );
+                              litersCtrl.text =
+                                  curLiters == curLiters.truncateToDouble()
+                                      ? curLiters.toStringAsFixed(0)
+                                      : curLiters.toStringAsFixed(2);
+                            });
+                          },
+                        ),
+                        _buildPresetBadge(
+                          label: '+750 ml',
+                          onTap: () {
+                            setDialogState(() {
+                              curLiters = double.parse(
+                                (curLiters + 0.75).toStringAsFixed(2),
+                              );
+                              litersCtrl.text =
+                                  curLiters == curLiters.truncateToDouble()
+                                      ? curLiters.toStringAsFixed(0)
+                                      : curLiters.toStringAsFixed(2);
+                            });
+                          },
+                        ),
+                        _buildPresetBadge(
+                          label: '+1 L',
+                          onTap: () {
+                            setDialogState(() {
+                              curLiters = double.parse(
+                                (curLiters + 1.00).toStringAsFixed(2),
+                              );
+                              litersCtrl.text =
+                                  curLiters == curLiters.truncateToDouble()
+                                      ? curLiters.toStringAsFixed(0)
+                                      : curLiters.toStringAsFixed(2);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: priceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: T.t('Price per liter'),
+                        prefixText: '₹ ',
+                      ),
+                      onChanged: (val) {
+                        final parsed = double.tryParse(val.trim());
+                        if (parsed != null && parsed >= 0) {
+                          setDialogState(() => curPrice = parsed);
+                        }
+                      },
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return T.t('Required');
+                        }
+                        if (double.tryParse(val.trim()) == null) {
+                          return T.t('Invalid number');
+                        }
+                        return null;
+                      },
+                    ),
+
+                    // Final Total Preview Banner
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: mode == 'add' ? const Color(0xffecfdf5) : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: mode == 'add' ? const Color(0xffa7f3d0) : Colors.orange.shade200,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${T.t("Final Today")}: ${previewLiters.toStringAsFixed(1)} L',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: mode == 'add' ? const Color(0xff065f46) : Colors.orange.shade900,
+                            ),
+                          ),
+                          Text(
+                            '₹${previewTotal.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: mode == 'add' ? const Color(0xff065f46) : Colors.orange.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                  // Presets
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      _buildPresetBadge(
-                        label: '+250 ml',
-                        onTap: () {
-                          setDialogState(() {
-                            curLiters = double.parse(
-                              (curLiters + 0.25).toStringAsFixed(2),
-                            );
-                            litersCtrl.text =
-                                curLiters == curLiters.truncateToDouble()
-                                    ? curLiters.toStringAsFixed(0)
-                                    : curLiters.toStringAsFixed(2);
-                          });
-                        },
+                    // WhatsApp Notification Toggle
+                    const SizedBox(height: 10),
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      activeThumbColor: const Color(0xff2d7a55),
+                      title: Row(
+                        children: [
+                          const Icon(LucideIcons.messageCircle, size: 16, color: Color(0xff2d7a55)),
+                          const SizedBox(width: 6),
+                          Text(
+                            T.t('Send WhatsApp receipt'),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ],
                       ),
-                      _buildPresetBadge(
-                        label: '+500 ml',
-                        onTap: () {
-                          setDialogState(() {
-                            curLiters = double.parse(
-                              (curLiters + 0.50).toStringAsFixed(2),
-                            );
-                            litersCtrl.text =
-                                curLiters == curLiters.truncateToDouble()
-                                    ? curLiters.toStringAsFixed(0)
-                                    : curLiters.toStringAsFixed(2);
-                          });
-                        },
+                      subtitle: Text(
+                        cleanPhone.isNotEmpty
+                            ? '+91 $cleanPhone'
+                            : T.t('No phone number saved'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cleanPhone.isNotEmpty ? Colors.black54 : Colors.red.shade600,
+                        ),
                       ),
-                      _buildPresetBadge(
-                        label: '+750 ml',
-                        onTap: () {
-                          setDialogState(() {
-                            curLiters = double.parse(
-                              (curLiters + 0.75).toStringAsFixed(2),
-                            );
-                            litersCtrl.text =
-                                curLiters == curLiters.truncateToDouble()
-                                    ? curLiters.toStringAsFixed(0)
-                                    : curLiters.toStringAsFixed(2);
-                          });
-                        },
-                      ),
-                      _buildPresetBadge(
-                        label: '+1 L',
-                        onTap: () {
-                          setDialogState(() {
-                            curLiters = double.parse(
-                              (curLiters + 1.00).toStringAsFixed(2),
-                            );
-                            litersCtrl.text =
-                                curLiters == curLiters.truncateToDouble()
-                                    ? curLiters.toStringAsFixed(0)
-                                    : curLiters.toStringAsFixed(2);
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: priceCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                      value: sendWhatsApp && cleanPhone.isNotEmpty,
+                      onChanged: cleanPhone.isNotEmpty
+                          ? (val) => setDialogState(() => sendWhatsApp = val)
+                          : null,
                     ),
-                    decoration: InputDecoration(
-                      labelText: T.t('Price per liter'),
-                      prefixText: '₹ ',
-                    ),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) {
-                        return T.t('Required');
-                      }
-                      if (double.tryParse(val.trim()) == null) {
-                        return T.t('Invalid number');
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-          actions: [
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xff2d7a55),
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(42),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+
+                    if (cleanPhone.isEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(LucideIcons.phoneCall, size: 14, color: Color(0xff2d7a55)),
+                          label: Text(
+                            T.t('Add phone number to send WhatsApp'),
+                            style: const TextStyle(fontSize: 12, color: Color(0xff2d7a55)),
+                          ),
+                          onPressed: () async {
+                            final phoneInputCtrl = TextEditingController();
+                            final phoneSaved = await showDialog<String>(
+                              context: ctx,
+                              builder: (pCtx) => AlertDialog(
+                                title: Text(T.t('Add Phone Number')),
+                                content: TextField(
+                                  controller: phoneInputCtrl,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: InputDecoration(
+                                    labelText: T.t('Mobile number'),
+                                    prefixText: '+91 ',
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(pCtx).pop(null),
+                                    child: Text(T.t('Cancel')),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () {
+                                      final raw = phoneInputCtrl.text.replaceAll(RegExp(r'\D'), '');
+                                      if (raw.length >= 10) {
+                                        Navigator.of(pCtx).pop(raw);
+                                      }
+                                    },
+                                    child: Text(T.t('Save')),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (phoneSaved != null && phoneSaved.isNotEmpty) {
+                              try {
+                                await widget.controller.api.updateCustomer(customerId, {
+                                  'phoneNumber': phoneSaved,
+                                });
+                                await widget.controller.loadCustomers();
+                                setDialogState(() {
+                                  currentPhone = phoneSaved;
+                                  cleanPhone = phoneSaved;
+                                  sendWhatsApp = true;
+                                });
+                              } catch (_) {}
+                            }
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              onPressed: () {
-                if (formKey.currentState?.validate() != true) return;
-                Navigator.of(dialogCtx).pop(true);
-              },
-              child: Text(
-                T.t('Save Entry'),
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
             ),
-          ],
-        ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            actions: [
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xff2d7a55),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(42),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.of(dialogCtx).pop(true);
+                },
+                child: Text(
+                  T.t('Save Entry'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
 
     if (saved == true) {
-      final liters = double.tryParse(litersCtrl.text.trim()) ?? defaultLiters;
-      final price = double.tryParse(priceCtrl.text.trim()) ?? defaultPrice;
+      final inputLiters = double.tryParse(litersCtrl.text.trim()) ?? defaultLiters;
+      final inputPrice = double.tryParse(priceCtrl.text.trim()) ?? defaultPrice;
+
       final success = await widget.controller.saveCustomerMilkEntry(
         customerId,
-        liters,
-        price,
+        inputLiters,
+        inputPrice,
+        mode: existingEntry != null ? mode : null,
       );
+
+      final double finalLiters = (existingEntry != null && mode == 'add')
+          ? (existingLiters + inputLiters)
+          : inputLiters;
+      final double finalTotal = finalLiters * inputPrice;
+      final dateFormatted = widget.controller.selectedDate.value.toIso8601String().substring(0, 10);
 
       if (context.mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$name: ${liters.toStringAsFixed(1)} L • ₹${(liters * price).toStringAsFixed(0)}'),
-              backgroundColor: const Color(0xff2d7a55),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          if (sendWhatsApp && cleanPhone.length >= 10) {
+            final message = _buildDailyWhatsAppMessage(
+              customerName: name,
+              liters: finalLiters,
+              price: inputPrice,
+              total: finalTotal,
+              dateFormatted: dateFormatted,
+            );
+
+            try {
+              final res = await widget.controller.api.sendDailyWhatsAppEntry(
+                customerId: customerId,
+                date: dateFormatted,
+                message: message,
+              );
+
+              if (context.mounted) {
+                if (res['success'] == true) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$name: ${finalLiters.toStringAsFixed(1)} L • ₹${finalTotal.toStringAsFixed(0)} | WhatsApp Sent! ✓'),
+                      backgroundColor: const Color(0xff2d7a55),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$name saved! WhatsApp: ${res['error'] ?? 'API failed'}'),
+                      backgroundColor: Colors.amber.shade900,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 5),
+                      action: SnackBarAction(
+                        label: T.t('Open in WhatsApp'),
+                        textColor: Colors.white,
+                        onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
+                      ),
+                    ),
+                  );
+                }
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$name saved! WhatsApp error: $e'),
+                    backgroundColor: Colors.amber.shade900,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: T.t('Open in WhatsApp'),
+                      textColor: Colors.white,
+                      onPressed: () => _launchDirectWhatsApp(cleanPhone, message),
+                    ),
+                  ),
+                );
+              }
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('$name: ${finalLiters.toStringAsFixed(1)} L • ₹${finalTotal.toStringAsFixed(0)}'),
+                backgroundColor: const Color(0xff2d7a55),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

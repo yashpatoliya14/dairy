@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/app_language.dart';
@@ -158,6 +159,28 @@ class _CustomerMessageDetailsScreenState
     return digits;
   }
 
+  Future<void> _openInWhatsAppDirect() async {
+    final phone = _phoneController.text.trim();
+    final clean = _cleanPhoneNumber(phone);
+    if (clean.length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(T.t('Please enter a valid phone number'))),
+      );
+      return;
+    }
+    final message = _messageController.text;
+    final encoded = Uri.encodeComponent(message);
+    final nativeUri = Uri.parse('whatsapp://send?phone=$clean&text=$encoded');
+    final webUri = Uri.parse('https://wa.me/$clean?text=$encoded');
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _sendWhatsAppMessage() async {
     final customer = widget.customerItem['customer'] as Map? ?? {};
     final phone = _phoneController.text.trim();
@@ -210,7 +233,14 @@ class _CustomerMessageDetailsScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('${T.t('Failed to send WhatsApp message')}: ${res['error'] ?? 'Unknown error'}'),
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: Colors.amber.shade900,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: T.t('Open in WhatsApp'),
+                textColor: Colors.white,
+                onPressed: _openInWhatsAppDirect,
+              ),
             ),
           );
           await widget.onStatusUpdated();
@@ -223,7 +253,14 @@ class _CustomerMessageDetailsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${T.t('Error sending WhatsApp message')}: $e'),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: Colors.amber.shade900,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: T.t('Open in WhatsApp'),
+              textColor: Colors.white,
+              onPressed: _openInWhatsAppDirect,
+            ),
           ),
         );
         await widget.onStatusUpdated();
@@ -622,6 +659,23 @@ class _CustomerMessageDetailsScreenState
                     builder: (context, constraints) {
                       final isNarrow = constraints.maxWidth < 460;
 
+                      final openAppBtn = OutlinedButton.icon(
+                        onPressed: _openInWhatsAppDirect,
+                        icon: const Icon(LucideIcons.messageCircle, size: 18, color: Color(0xff25D366)),
+                        label: Text(
+                          T.t('Open in WhatsApp'),
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xff166534)),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(46),
+                          side: const BorderSide(color: Color(0xff86efac)),
+                          backgroundColor: const Color(0xfff0fdf4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      );
+
                       final copyBtn = OutlinedButton.icon(
                         onPressed: _copyMessage,
                         icon: const Icon(LucideIcons.copy, size: 18),
@@ -666,16 +720,25 @@ class _CustomerMessageDetailsScreenState
                           children: [
                             sendBtn,
                             const SizedBox(height: 10),
+                            openAppBtn,
+                            const SizedBox(height: 10),
                             copyBtn,
                           ],
                         );
                       }
 
-                      return Row(
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(child: copyBtn),
-                          const SizedBox(width: 12),
-                          Expanded(flex: 2, child: sendBtn),
+                          sendBtn,
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(child: copyBtn),
+                              const SizedBox(width: 12),
+                              Expanded(child: openAppBtn),
+                            ],
+                          ),
                         ],
                       );
                     },

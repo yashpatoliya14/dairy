@@ -329,6 +329,7 @@ class DashboardController extends GetxController {
     double liters,
     double price, {
     DateTime? date,
+    String? mode,
   }) async {
     try {
       await api.addMilkEntry(
@@ -336,6 +337,7 @@ class DashboardController extends GetxController {
         date: date ?? selectedDate.value,
         liters: liters,
         price: price,
+        mode: mode,
       );
       await Future.wait([
         loadTodaySummary(),

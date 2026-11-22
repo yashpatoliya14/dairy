@@ -86,6 +86,7 @@ class _FakeApiService extends ApiService {
     required DateTime date,
     required double liters,
     required double price,
+    String? mode,
   }) async {
     return {'success': true};
   }

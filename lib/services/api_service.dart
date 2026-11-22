@@ -342,18 +342,23 @@ class ApiService {
     required DateTime date,
     required double liters,
     required double price,
+    String? mode,
   }) async {
     if (customerId.trim().isEmpty) {
       throw const ApiException(0, 'Cannot save entry: customer ID is missing.');
     }
+    final body = <String, dynamic>{
+      'entryDate': date.toIso8601String().substring(0, 10),
+      'liters': liters,
+      'price': price,
+    };
+    if (mode != null && mode.isNotEmpty) {
+      body['mode'] = mode;
+    }
     final response = await _send(
       'POST',
       '/customers/$customerId/entries',
-      body: {
-        'entryDate': date.toIso8601String().substring(0, 10),
-        'liters': liters,
-        'price': price,
-      },
+      body: body,
       showLoader: true,
       loaderMessage: 'Saving milk entry...',
     );
