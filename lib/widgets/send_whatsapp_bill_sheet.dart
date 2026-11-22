@@ -437,7 +437,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
         final monthToDate = double.tryParse(_monthToDateBillController.text) ?? todayAmount;
         final totalPayable = monthToDate + pastOverdue;
 
-        await widget.api.sendWhatsAppBill({
+        final res = await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
           'type': 'daily',
@@ -455,6 +455,22 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'templateName': 'daily_milk_delivery_update',
           'languageCode': 'en',
         });
+        if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp API delivery failed';
+          setState(() {
+            _errorMessage = '$errStr';
+            _successMessage = null;
+          });
+          return;
+        }
+        if (res['messageId'] == null && res['success'] != true) {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp message not accepted by provider';
+          setState(() {
+            _errorMessage = '$errStr';
+            _successMessage = null;
+          });
+          return;
+        }
       } else {
         final totalLiters =
             double.tryParse(_monthlyLitersController.text) ?? 0.0;
@@ -473,7 +489,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
             pastOverdue > credit ? (pastOverdue - credit) : 0.0;
         final netPayable = currentDue + remainingPastDue;
 
-        await widget.api.sendWhatsAppBill({
+        final res = await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
           'customerName': _customerName,
           'type': 'monthly',
@@ -494,10 +510,27 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'templateName': 'monthly_milk_bill_settlement',
           'languageCode': 'en',
         });
+        if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp API delivery failed';
+          setState(() {
+            _errorMessage = '$errStr';
+            _successMessage = null;
+          });
+          return;
+        }
+        if (res['messageId'] == null && res['success'] != true) {
+          final errStr = res['message'] ?? res['error'] ?? 'WhatsApp message not accepted by provider';
+          setState(() {
+            _errorMessage = '$errStr';
+            _successMessage = null;
+          });
+          return;
+        }
       }
 
       setState(() {
         _successMessage = T.t('WhatsApp template message sent successfully! 🚀');
+        _errorMessage = null;
       });
     } catch (e) {
       setState(() {
@@ -729,30 +762,40 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                                     ]
                                   : null,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  LucideIcons.sunMedium,
-                                  size: 16,
-                                  color: _billType == BillType.daily
-                                      ? const Color(0xff075e54)
-                                      : Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  T.t('Daily Milk Update'),
-                                  style: TextStyle(
-                                    fontWeight: _billType == BillType.daily
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.sunMedium,
+                                    size: 15,
                                     color: _billType == BillType.daily
                                         ? const Color(0xff075e54)
-                                        : Colors.grey.shade700,
-                                    fontSize: 13,
+                                        : Colors.grey.shade600,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        T.t('Daily Milk Update'),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontWeight: _billType == BillType.daily
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: _billType == BillType.daily
+                                              ? const Color(0xff075e54)
+                                              : Colors.grey.shade700,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -785,30 +828,40 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                                     ]
                                   : null,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  LucideIcons.receiptText,
-                                  size: 16,
-                                  color: _billType == BillType.monthly
-                                      ? const Color(0xff075e54)
-                                      : Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  T.t('Monthly Bill Statement'),
-                                  style: TextStyle(
-                                    fontWeight: _billType == BillType.monthly
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.receiptText,
+                                    size: 15,
                                     color: _billType == BillType.monthly
                                         ? const Color(0xff075e54)
-                                        : Colors.grey.shade700,
-                                    fontSize: 13,
+                                        : Colors.grey.shade600,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        T.t('Monthly Bill Statement'),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontWeight: _billType == BillType.monthly
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: _billType == BillType.monthly
+                                              ? const Color(0xff075e54)
+                                              : Colors.grey.shade700,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -855,20 +908,48 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xfffecaca)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(LucideIcons.circleAlert,
-                            color: Color(0xffdc2626), size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                              color: Color(0xff991b1b),
-                              fontSize: 13,
+                        Row(
+                          children: [
+                            const Icon(LucideIcons.circleAlert,
+                                color: Color(0xffdc2626), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xff991b1b),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_hasValidPhone) ...[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _openWhatsAppDirect,
+                            icon: const Icon(LucideIcons.messageCircle,
+                                size: 16, color: Color(0xff16a34a)),
+                            label: Text(
+                              T.t('Send directly via WhatsApp App instead'),
+                              style: const TextStyle(
+                                color: Color(0xff16a34a),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

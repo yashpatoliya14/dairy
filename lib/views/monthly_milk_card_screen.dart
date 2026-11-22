@@ -909,6 +909,7 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
                                         date: dateObj,
                                         liters: l,
                                         price: p,
+                                        mode: entry != null ? 'set' : 'add',
                                       );
 
                                       // Update local cache
@@ -917,7 +918,9 @@ class _MonthlyMilkCardScreenState extends State<MonthlyMilkCardScreen> {
                                             entry?['id'] ??
                                             '',
                                         'entryDate': dateKey,
-                                        'liters': l,
+                                        'liters': result['liters'] != null
+                                            ? _asDouble(result['liters'], l)
+                                            : l,
                                         'price': p,
                                         'total': result['total'] != null
                                             ? _asDouble(result['total'], l * p)
