@@ -2041,11 +2041,57 @@ class _CustomerTile extends StatelessWidget {
       final savedLiters = entryRes['liters'] != null
           ? double.tryParse('${entryRes['liters']}')?.toStringAsFixed(1) ?? '$litersValue'
           : '$litersValue';
+      final phone = (customer['phoneNumber'] ?? customer['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             '${T.t('Milk entry saved')} ($savedLiters L)',
           ),
+          action: phone.length >= 10
+              ? SnackBarAction(
+                  label: 'WhatsApp',
+                  textColor: Colors.amberAccent,
+                  onPressed: () async {
+                    try {
+                      final dateStr = DateTime.now().toIso8601String().split('T').first;
+                      final res = await api.sendDailyWhatsAppEntry(
+                        customerId: customerId,
+                        date: dateStr,
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              res['success'] == true
+                                  ? 'WhatsApp receipt sent!'
+                                  : 'Could not send: ${res['error'] ?? 'Opening WhatsApp...'}',
+                            ),
+                          ),
+                        );
+                      }
+                      if (res['success'] != true) {
+                        final clean = phone.startsWith('91') ? phone : '91$phone';
+                        final text = Uri.encodeComponent(
+                          'Milk Delivery Update\nCustomer: ${customer['name']}\nQuantity: $savedLiters L\nDairy Desk',
+                        );
+                        final uri = Uri.parse('whatsapp://send?phone=$clean&text=$text');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      }
+                    } catch (e) {
+                      final clean = phone.startsWith('91') ? phone : '91$phone';
+                      final text = Uri.encodeComponent(
+                        'Milk Delivery Update\nCustomer: ${customer['name']}\nQuantity: $savedLiters L\nDairy Desk',
+                      );
+                      final uri = Uri.parse('whatsapp://send?phone=$clean&text=$text');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    }
+                  },
+                )
+              : null,
         ),
       );
     } catch (error) {
