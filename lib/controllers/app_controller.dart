@@ -34,8 +34,8 @@ class AppController extends GetxController with WidgetsBindingObserver {
 
     // Periodically verify session validity when running in production
     if (!Platform.environment.containsKey('FLUTTER_TEST')) {
-      _sessionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        checkSessionValidity();
+      _sessionCheckTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        checkSessionValidity(remote: true);
       });
 
       // Periodic background checks for updates
@@ -56,16 +56,26 @@ class AppController extends GetxController with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      checkSessionValidity();
+      checkSessionValidity(remote: true);
       if (!Platform.environment.containsKey('FLUTTER_TEST')) {
         updateService.checkForUpdate(silent: true);
       }
     }
   }
 
-  void checkSessionValidity() {
-    if (ready.value && api.hasSession && api.isTokenExpired) {
+  Future<void> checkSessionValidity({bool remote = false}) async {
+    if (!ready.value || !api.hasSession || _isRedirecting) return;
+    if (api.isTokenExpired) {
       handleSessionExpired(reason: 'Session expired. Please log in again.');
+      return;
+    }
+    if (remote && !Platform.environment.containsKey('FLUTTER_TEST')) {
+      try {
+        await api.getProfile();
+      } catch (_) {
+        // If 401 Unauthorized, api.onSessionExpired is invoked automatically by ApiService._send.
+        // Network/offline failures are safely ignored so offline collection continues smoothly.
+      }
     }
   }
 
@@ -95,12 +105,17 @@ class AppController extends GetxController with WidgetsBindingObserver {
           Get.offAllNamed('/auth');
         }
 
+        final isDeactivated =
+            reason?.toLowerCase().contains('deactivated') == true;
+        final title =
+            isDeactivated ? 'Account Deactivated' : 'Session Expired';
+
         Get.snackbar(
-          T.t('Session Expired'),
+          T.t(title),
           T.t(reason ?? 'Your session has expired. Please log in again.'),
           snackPosition: SnackPosition.BOTTOM,
           margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 5),
         );
       });
     } finally {
