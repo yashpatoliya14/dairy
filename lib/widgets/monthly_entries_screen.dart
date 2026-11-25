@@ -109,11 +109,12 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
           // Small Professional Bill and Table
           Expanded(
             child: Obx(() {
-              if (controller.loading.value && controller.entries.isEmpty) {
-                return const Center(
+              if (controller.loading.value) {
+                return Center(
                   child: DairyMilkLoader(
                     size: 48,
-                    message: 'Loading monthly entries...',
+                    message:
+                        'Loading ${_monthLabel(controller.selectedMonth.value, controller.selectedYear.value)}...',
                   ),
                 );
               }
@@ -217,24 +218,32 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
+          Obx(() => IconButton(
             tooltip: T.t('Previous month'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             iconSize: 18,
-            onPressed: controller.previousMonth,
+            onPressed: controller.loading.value ? null : controller.previousMonth,
             icon: const Icon(LucideIcons.chevronLeft),
-          ),
+          )),
           Obx(() => InkWell(
-            onTap: () => _pickMonthYear(context),
+            onTap: controller.loading.value ? null : () => _pickMonthYear(context),
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(LucideIcons.calendarDays, size: 14, color: Color(0xff2d7a55)),
-                  const SizedBox(width: 6),
+                  if (controller.loading.value)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: DairyMilkLoader.mini(size: 14),
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.only(right: 6),
+                      child: Icon(LucideIcons.calendarDays, size: 14, color: Color(0xff2d7a55)),
+                    ),
                   Text(
                     _monthLabel(
                       controller.selectedMonth.value,
@@ -250,14 +259,14 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
               ),
             ),
           )),
-          IconButton(
+          Obx(() => IconButton(
             tooltip: T.t('Next month'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             iconSize: 18,
-            onPressed: controller.nextMonth,
+            onPressed: controller.loading.value ? null : controller.nextMonth,
             icon: const Icon(LucideIcons.chevronRight),
-          ),
+          )),
         ],
       ),
     );

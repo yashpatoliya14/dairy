@@ -240,11 +240,17 @@ class MonthlyEntriesController extends GetxController {
     loading.value = true;
     error.value = '';
     try {
-      final data = await api.getMilkEntriesForMonth(
-        customerId,
-        year: selectedYear.value,
-        month: selectedMonth.value,
-      );
+      final results = await Future.wait([
+        api.getMilkEntriesForMonth(
+          customerId,
+          year: selectedYear.value,
+          month: selectedMonth.value,
+        ),
+        loadPayment(),
+        loadBillSummary(),
+        refreshCustomer(),
+      ]);
+      final data = results[0] as Map<String, dynamic>;
       daysInMonth.value = data['daysInMonth'] as int? ?? 30;
       totalLiters.value = _asDouble(data['totalLiters'], 0.0);
       totalAmount.value = _asDouble(data['totalAmount'], 0.0);
@@ -256,10 +262,6 @@ class MonthlyEntriesController extends GetxController {
             .map((e) => Map<String, dynamic>.from(e))
             .toList(),
       );
-      // Load payment, past ledger summary, and refresh latest customer profile (e.g. edited default price)
-      await loadPayment();
-      await loadBillSummary();
-      await refreshCustomer();
     } catch (e) {
       error.value = e.toString();
       developer.log('Failed to load month: $e', name: 'MonthlyEntries');
