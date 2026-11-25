@@ -101,7 +101,6 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
   late final TextEditingController _advanceCreditController;
 
   DateTime _selectedDate = DateTime.now();
-  String _session = 'Morning';
 
   bool _sending = false;
   String? _errorMessage;
@@ -131,16 +130,22 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     );
 
     final initialTodayAmt = defaultLiters * effectiveRate;
+    final seedMtd = widget.initialMonthToDateBill ??
+        (customer['thisMonthBill'] != null
+            ? double.tryParse('${customer['thisMonthBill']}')
+            : null) ??
+        initialTodayAmt;
     _monthToDateBillController = TextEditingController(
-      text: widget.initialMonthToDateBill != null
-          ? widget.initialMonthToDateBill!.toStringAsFixed(2)
-          : initialTodayAmt.toStringAsFixed(2),
+      text: seedMtd.toStringAsFixed(2),
     );
 
+    final seedPastDue = widget.initialPreviousDue ??
+        (customer['pastMonthsDue'] != null || customer['grossPastDue'] != null
+            ? double.tryParse('${customer['pastMonthsDue'] ?? customer['grossPastDue']}')
+            : null) ??
+        0.0;
     _pastOverdueController = TextEditingController(
-      text: widget.initialPreviousDue != null
-          ? widget.initialPreviousDue!.toStringAsFixed(2)
-          : '0.00',
+      text: seedPastDue.toStringAsFixed(2),
     );
 
     // Monthly defaults (strictly calculated based on actual entries; if 0 entries, bill is ₹0.00)
@@ -155,36 +160,95 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     _totalDaysController = TextEditingController(
       text: widget.initialTotalDays != null
           ? '${widget.initialTotalDays}'
-          : '0',
+          : (customer['activeDays'] != null ? '${customer['activeDays']}' : '0'),
     );
     _monthlyLitersController = TextEditingController(
       text: widget.initialMonthlyLiters != null
           ? widget.initialMonthlyLiters!.toStringAsFixed(2)
-          : '0.00',
+          : (customer['totalLiters'] != null
+              ? _asDouble(customer['totalLiters'], 0.0).toStringAsFixed(2)
+              : '0.00'),
     );
-    final initialMonthAmt = widget.initialMonthlyAmount != null
-        ? widget.initialMonthlyAmount!
-        : (widget.initialMonthlyLiters != null && widget.initialRate != null
+    final initialMonthAmt = widget.initialMonthlyAmount ??
+        (customer['thisMonthBill'] != null
+            ? double.tryParse('${customer['thisMonthBill']}')
+            : null) ??
+        (widget.initialMonthlyLiters != null && widget.initialRate != null
             ? double.parse((widget.initialMonthlyLiters! * widget.initialRate!)
                 .toStringAsFixed(2))
             : 0.0);
     _monthlyAmountController = TextEditingController(
       text: initialMonthAmt.toStringAsFixed(2),
     );
-    final initialPaid = widget.initialPaidAmount ?? 0.0;
+    final seedPaid = widget.initialPaidAmount ??
+        (customer['thisMonthPaid'] != null
+            ? double.tryParse('${customer['thisMonthPaid']}')
+            : null) ??
+        0.0;
     _paidAmountController = TextEditingController(
-      text: initialPaid > 0 ? initialPaid.toStringAsFixed(2) : '0.00',
+      text: seedPaid > 0 ? seedPaid.toStringAsFixed(2) : '0.00',
     );
+    final seedAdvance = widget.initialAdvanceCredit ??
+        (customer['advanceApplied'] != null || customer['grossPastAdvance'] != null || customer['netAdvance'] != null
+            ? double.tryParse('${customer['advanceApplied'] ?? customer['grossPastAdvance'] ?? customer['netAdvance']}')
+            : null) ??
+        0.0;
     _advanceCreditController = TextEditingController(
-      text: widget.initialAdvanceCredit != null
-          ? widget.initialAdvanceCredit!.toStringAsFixed(2)
-          : '0.00',
+      text: seedAdvance.toStringAsFixed(2),
     );
 
-    _session = now.hour < 14 ? 'Morning' : 'Evening';
+    _loadCustomerBalanceAndEntries();
+  }
 
+  Future<void> _loadCustomerBalanceAndEntries() async {
+    final customerId =
+        '${widget.customer['id'] ?? widget.customer['cid'] ?? ''}'.trim();
+    if (customerId.isEmpty) return;
+    final now = DateTime.now();
+
+    try {
+      // 1. Fetch exact customer ledger summary from backend
+      final summary = await widget.api.getCustomerBillSummary(
+        customerId: customerId,
+        year: now.year,
+        month: now.month,
+      );
+
+      if (mounted && summary.isNotEmpty) {
+        final mtd = double.tryParse('${summary['thisMonthBill']}');
+        final past = double.tryParse('${summary['pastMonthsDue'] ?? summary['grossPastDue']}');
+        final adv = double.tryParse('${summary['advanceApplied'] ?? summary['grossPastAdvance'] ?? summary['netAdvance']}');
+        final paid = double.tryParse('${summary['thisMonthPaid']}');
+        final totLiters = double.tryParse('${summary['totalLiters']}');
+        final days = summary['activeDays'] ?? summary['deliveryDays'];
+
+        setState(() {
+          if (mtd != null && mtd > 0) {
+            _monthToDateBillController.text = mtd.toStringAsFixed(2);
+            _monthlyAmountController.text = mtd.toStringAsFixed(2);
+          }
+          if (past != null) {
+            _pastOverdueController.text = past.toStringAsFixed(2);
+          }
+          if (adv != null) {
+            _advanceCreditController.text = adv.toStringAsFixed(2);
+          }
+          if (paid != null) {
+            _paidAmountController.text = paid.toStringAsFixed(2);
+          }
+          if (totLiters != null && totLiters > 0) {
+            _monthlyLitersController.text = totLiters.toStringAsFixed(2);
+          }
+          if (days != null && '$days' != '0') {
+            _totalDaysController.text = '$days';
+          }
+        });
+      }
+    } catch (_) {}
+
+    // 2. Fetch monthly entries if monthly amount was not directly provided
     if (widget.initialMonthlyAmount == null) {
-      _loadMonthlyEntriesForBill();
+      await _loadMonthlyEntriesForBill();
     }
   }
 
@@ -201,13 +265,6 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       );
       final entriesList = monthData['entries'] as List? ?? [];
       if (entriesList.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _totalDaysController.text = '0';
-            _monthlyLitersController.text = '0.0';
-            _monthlyAmountController.text = '0.00';
-          });
-        }
         return;
       }
       double totalLiters = 0.0;
@@ -234,7 +291,12 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
         setState(() {
           _totalDaysController.text = '${activeDaysSet.length}';
           _monthlyLitersController.text = totalLiters.toStringAsFixed(2);
-          _monthlyAmountController.text = totalAmount.toStringAsFixed(2);
+          if (double.tryParse(_monthlyAmountController.text) == 0.0 || _monthlyAmountController.text.isEmpty) {
+            _monthlyAmountController.text = totalAmount.toStringAsFixed(2);
+          }
+          if (double.tryParse(_monthToDateBillController.text) == 0.0 || _monthToDateBillController.text.isEmpty) {
+            _monthToDateBillController.text = totalAmount.toStringAsFixed(2);
+          }
         });
       }
     } catch (_) {}
@@ -278,14 +340,6 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
   }
 
   void _onDailyLitersOrRateChanged() {
-    final liters = double.tryParse(_dailyLitersController.text) ?? 0.0;
-    final rate = double.tryParse(_rateController.text) ?? 0.0;
-    final todayAmount = liters * rate;
-    // Auto-update month-to-date bill if it's matching today amount
-    final currentMtd = double.tryParse(_monthToDateBillController.text) ?? 0.0;
-    if (currentMtd <= todayAmount || currentMtd == 0) {
-      _monthToDateBillController.text = todayAmount.toStringAsFixed(2);
-    }
     setState(() {});
   }
 
@@ -339,26 +393,24 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       final monthToDate = double.tryParse(_monthToDateBillController.text) ?? todayAmount;
       final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
       final totalPayable = monthToDate + pastOverdue;
-      final dateShift = '${_formatDate(_selectedDate)} • $_session';
+      final dateStr = _formatDate(_selectedDate);
 
-      return '🥛 *DAILY MILK DELIVERY UPDATE* 🥛\n'
+      return '🥛 *DAILY MILK COLLECTION UPDATE* 🥛\n'
           '━━━━━━━━━━━━━━━━━━━━\n'
           'Hello *$name*,\n\n'
-          'Here is your milk delivery summary for *$dateShift*:\n\n'
-          '📋 *TODAY\'S DELIVERY:*\n'
-          '• Milk Quantity: ${liters.toStringAsFixed(2)} L\n'
-          '• Rate per Liter: ₹${rate.toStringAsFixed(2)}/L\n'
-          '• Today\'s Amount: ₹${todayAmount.toStringAsFixed(2)}\n\n'
-          '💰 *ACCOUNT BALANCE:*\n'
-          '• Month-to-date Bill: ₹${monthToDate.toStringAsFixed(2)}\n'
+          'Your milk delivery has been recorded successfully:\n\n'
+          '📅 *Date:* $dateStr\n'
+          '🥛 *Today\'s Milk:* ${liters.toStringAsFixed(1)} L @ ₹${rate.toStringAsFixed(2)}/L\n'
+          '💵 *Today\'s Amount:* ₹${todayAmount.toStringAsFixed(2)}\n\n'
+          '📊 *ACCOUNT BALANCE STATUS:*\n'
+          '• Current Month (Till Date): ₹${monthToDate.toStringAsFixed(2)}\n'
           '• Past Overdue: ₹${pastOverdue.toStringAsFixed(2)}\n'
           '━━━━━━━━━━━━━━━━━━━━\n'
-          '⭐ *TOTAL AMOUNT TO PAY: ₹${totalPayable.toStringAsFixed(2)}*\n'
+          '💳 *TOTAL AMOUNT TO PAY: ₹${totalPayable.toStringAsFixed(2)}*\n'
           '━━━━━━━━━━━━━━━━━━━━\n\n'
-          '📞 *Dairy Owner Contact:*\n'
-          '• Name: $distributorName\n'
-          '• Contact: $distributorPhone\n\n'
-          'Thank you for choosing our dairy service! 🥛';
+          '📞 *For queries or corrections:*\n'
+          '$distributorName ($distributorPhone)\n\n'
+          'Thank you! 🥛';
     } else {
       final month = _monthNameController.text.trim();
       final days = int.tryParse(_totalDaysController.text) ?? 30;
@@ -440,7 +492,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'customerName': _customerName,
           'type': 'daily',
           'date': _formatDate(_selectedDate),
-          'deliverySession': _session,
+          'deliverySession': '',
           'liters': liters,
           'ratePerLiter': rate,
           'totalAmount': todayAmount,
@@ -1000,56 +1052,25 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
 
                 // MODE SPECIFIC INPUT FIELDS
                 if (_billType == BillType.daily) ...[
-                  // Date and Session
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: _pickDate,
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: T.t('Date'),
-                              prefixIcon:
-                                  const Icon(LucideIcons.calendar, size: 18),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: Text(
-                              _formatDate(_selectedDate),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
+                  // Date Picker (Clean, without Shift selector)
+                  InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: T.t('Delivery Date'),
+                        prefixIcon: const Icon(LucideIcons.calendar, size: 18),
+                        suffixIcon: const Icon(LucideIcons.calendarClock, size: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _session,
-                          decoration: InputDecoration(
-                            labelText: T.t('Shift'),
-                            prefixIcon:
-                                const Icon(LucideIcons.clock, size: 18),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                                value: 'Morning', child: Text('🌅 Morning')),
-                            DropdownMenuItem(
-                                value: 'Evening', child: Text('🌇 Evening')),
-                            DropdownMenuItem(
-                                value: 'Full Day', child: Text('☀️ Full Day')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) setState(() => _session = val);
-                          },
-                        ),
+                      child: Text(
+                        _formatDate(_selectedDate),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                       ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 12),
 
@@ -1063,7 +1084,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                               decimal: true),
                           onChanged: (_) => _onDailyLitersOrRateChanged(),
                           decoration: InputDecoration(
-                            labelText: T.t('Today Liters'),
+                            labelText: T.t('Today Milk'),
                             prefixIcon:
                                 const Icon(LucideIcons.droplet, size: 18),
                             suffixText: 'L',
@@ -1085,6 +1106,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                             labelText: T.t('Rate / Liter'),
                             prefixIcon:
                                 const Icon(LucideIcons.indianRupee, size: 18),
+                            prefixText: '₹',
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 12),
                             border: OutlineInputBorder(
@@ -1094,9 +1116,29 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xfff0fdf4),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xffbbf7d0)),
+                      ),
+                      child: Text(
+                        "${T.t('Today Amount')}: ₹${((double.tryParse(_dailyLitersController.text) ?? 0.0) * (double.tryParse(_rateController.text) ?? 0.0)).toStringAsFixed(2)}",
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xff166534),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
 
-                  // Month-to-date Bill & Past Overdue
+                  // Current Month (Till Date) & Past Overdue
                   Row(
                     children: [
                       Expanded(
@@ -1106,7 +1148,8 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                               decimal: true),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            labelText: T.t('Month-to-Date Bill'),
+                            labelText: T.t('Current Month'),
+                            helperText: T.t('Till Date Bill'),
                             prefixIcon:
                                 const Icon(LucideIcons.calendarDays, size: 18),
                             prefixText: '₹',
@@ -1126,6 +1169,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
                             labelText: T.t('Past Overdue'),
+                            helperText: T.t('Unpaid Balance'),
                             prefixIcon:
                                 const Icon(LucideIcons.history, size: 18),
                             prefixText: '₹',

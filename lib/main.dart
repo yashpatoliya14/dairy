@@ -2522,6 +2522,10 @@ class _CustomerTile extends StatelessWidget {
                             context,
                             api: api,
                             customer: customer,
+                            initialMonthToDateBill: double.tryParse('${customer['thisMonthBill']}'),
+                            initialPreviousDue: double.tryParse('${customer['pastMonthsDue'] ?? customer['grossPastDue']}'),
+                            initialAdvanceCredit: double.tryParse('${customer['advanceApplied'] ?? customer['grossPastAdvance'] ?? customer['netAdvance']}'),
+                            initialPaidAmount: double.tryParse('${customer['thisMonthPaid']}'),
                           );
                         }
                         if (value == 'edit') _edit(context);
@@ -3006,6 +3010,18 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
               context,
               api: widget.api,
               customer: _customer,
+              initialMonthToDateBill: _billSummary != null
+                  ? double.tryParse('${_billSummary!['thisMonthBill']}')
+                  : double.tryParse('${_customer['thisMonthBill']}'),
+              initialPreviousDue: _billSummary != null
+                  ? double.tryParse('${_billSummary!['pastMonthsDue'] ?? _billSummary!['grossPastDue']}')
+                  : double.tryParse('${_customer['pastMonthsDue'] ?? _customer['grossPastDue']}'),
+              initialAdvanceCredit: _billSummary != null
+                  ? double.tryParse('${_billSummary!['advanceApplied'] ?? _billSummary!['grossPastAdvance'] ?? _billSummary!['netAdvance']}')
+                  : double.tryParse('${_customer['advanceApplied'] ?? _customer['grossPastAdvance'] ?? _customer['netAdvance']}'),
+              initialPaidAmount: _billSummary != null
+                  ? double.tryParse('${_billSummary!['thisMonthPaid']}')
+                  : double.tryParse('${_customer['thisMonthPaid']}'),
             ),
             icon: const Icon(
               LucideIcons.messageCircle,
@@ -3662,6 +3678,18 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   context,
                   api: widget.api,
                   customer: _customer,
+                  initialMonthToDateBill: _billSummary != null
+                      ? double.tryParse('${_billSummary!['thisMonthBill']}')
+                      : double.tryParse('${_customer['thisMonthBill']}'),
+                  initialPreviousDue: _billSummary != null
+                      ? double.tryParse('${_billSummary!['pastMonthsDue'] ?? _billSummary!['grossPastDue']}')
+                      : double.tryParse('${_customer['pastMonthsDue'] ?? _customer['grossPastDue']}'),
+                  initialAdvanceCredit: _billSummary != null
+                      ? double.tryParse('${_billSummary!['advanceApplied'] ?? _billSummary!['grossPastAdvance'] ?? _billSummary!['netAdvance']}')
+                      : double.tryParse('${_customer['advanceApplied'] ?? _customer['grossPastAdvance'] ?? _customer['netAdvance']}'),
+                  initialPaidAmount: _billSummary != null
+                      ? double.tryParse('${_billSummary!['thisMonthPaid']}')
+                      : double.tryParse('${_customer['thisMonthPaid']}'),
                 ),
               ),
             ),

@@ -237,6 +237,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                   initialMonthlyAmount: totalAmount,
                   initialPaidAmount: c.hasPayment.value ? c.paymentReceived.value : 0.0,
                   initialPreviousDue: c.pastMonthsDue.value,
+                  initialMonthToDateBill: totalAmount,
                   initialAdvanceCredit: c.grossPastAdvance.value > 0 ? c.grossPastAdvance.value : c.netAdvance.value,
                 );
               },
@@ -533,6 +534,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                           initialMonthlyAmount: totalAmount,
                           initialPaidAmount: c.hasPayment.value ? c.paymentReceived.value : 0.0,
                           initialPreviousDue: c.pastMonthsDue.value,
+                          initialMonthToDateBill: totalAmount,
                           initialAdvanceCredit: c.grossPastAdvance.value > 0 ? c.grossPastAdvance.value : c.netAdvance.value,
                         );
                       },

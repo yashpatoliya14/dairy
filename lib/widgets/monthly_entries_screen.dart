@@ -803,6 +803,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                                   : 0.0,
                               initialPreviousDue: controller.pastMonthsDue.value,
                               initialAdvanceCredit: controller.netAdvance.value,
+                              initialMonthToDateBill: totalAmount,
                             );
                           },
                           icon: const Icon(LucideIcons.messageCircle, size: 15),
