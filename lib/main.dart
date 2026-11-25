@@ -2292,6 +2292,85 @@ class _CustomerTile extends StatelessWidget {
         '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
     final isWhatsApp = channel == 'whatsapp';
 
+    final double netDue = double.tryParse('${customer['netBalanceDue'] ?? 0}') ?? 0.0;
+    final double netAdv = double.tryParse('${customer['netAdvance'] ?? 0}') ?? 0.0;
+
+    Widget buildBalanceTag() {
+      if (netDue > 0) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+          decoration: BoxDecoration(
+            color: const Color(0xfffef2f2),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xfffecaca), width: 0.8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(LucideIcons.circleAlert, size: 11, color: Color(0xffdc2626)),
+              const SizedBox(width: 3.5),
+              Text(
+                '${T.t("Due")}: ₹${netDue.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xffdc2626),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else if (netAdv > 0) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+          decoration: BoxDecoration(
+            color: const Color(0xfff0fdf4),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xffbbf7d0), width: 0.8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(LucideIcons.checkCircle2, size: 11, color: Color(0xff16a34a)),
+              const SizedBox(width: 3.5),
+              Text(
+                '${T.t("Advance")}: ₹${netAdv.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xff16a34a),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+          decoration: BoxDecoration(
+            color: const Color(0xfff8fafc),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xffe2e8f0), width: 0.8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(LucideIcons.check, size: 11, color: Color(0xff059669)),
+              const SizedBox(width: 3.5),
+              Text(
+                T.t('Settled'),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xff059669),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -2416,6 +2495,8 @@ class _CustomerTile extends StatelessWidget {
                               ],
                             ),
                           ],
+                          const SizedBox(height: 5),
+                          buildBalanceTag(),
                         ],
                       ),
                     ),
@@ -2737,11 +2818,55 @@ class CustomerDetailsPage extends StatefulWidget {
 
 class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   late Map<String, dynamic> _customer;
+  Map<String, dynamic>? _billSummary;
 
   @override
   void initState() {
     super.initState();
     _customer = Map<String, dynamic>.from(widget.customer);
+    _loadBalanceSummary();
+  }
+
+  Future<void> _loadBalanceSummary() async {
+    final customerId = '${_customer['id'] ?? _customer['cid'] ?? ''}'.trim();
+    if (customerId.isEmpty) return;
+    try {
+      final now = DateTime.now();
+      final summary = await widget.api.getCustomerBillSummary(
+        customerId: customerId,
+        year: now.year,
+        month: now.month,
+      );
+      if (mounted && summary.isNotEmpty) {
+        setState(() {
+          _billSummary = summary;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildBalanceRow(String label, String value, Color valueColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _editCustomer() async {
@@ -3045,6 +3170,199 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+
+            // ACCOUNT BALANCE & LEDGER OVERVIEW
+            Builder(builder: (ctx) {
+              final summary = _billSummary;
+              final double netDue = summary != null
+                  ? (double.tryParse('${summary['netBalanceDue']}') ?? 0.0)
+                  : (double.tryParse('${customer['netBalanceDue']}') ?? 0.0);
+              final double netAdv = summary != null
+                  ? (double.tryParse('${summary['netAdvance']}') ?? 0.0)
+                  : (double.tryParse('${customer['netAdvance']}') ?? 0.0);
+              final double thisMonthBill = summary != null
+                  ? (double.tryParse('${summary['thisMonthBill']}') ?? 0.0)
+                  : (double.tryParse('${customer['thisMonthBill']}') ?? 0.0);
+              final double thisMonthPaid = summary != null
+                  ? (double.tryParse('${summary['thisMonthPaid']}') ?? 0.0)
+                  : (double.tryParse('${customer['thisMonthPaid']}') ?? 0.0);
+              final double pastDue = summary != null
+                  ? (double.tryParse('${summary['pastMonthsDue'] ?? summary['grossPastDue']}') ?? 0.0)
+                  : (double.tryParse('${customer['pastMonthsDue'] ?? customer['grossPastDue']}') ?? 0.0);
+              final double advCredit = summary != null
+                  ? (double.tryParse('${summary['advanceApplied'] ?? summary['grossPastAdvance']}') ?? 0.0)
+                  : (double.tryParse('${customer['advanceApplied'] ?? customer['grossPastAdvance']}') ?? 0.0);
+
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: netDue > 0
+                        ? const Color(0xfffecaca)
+                        : (netAdv > 0 ? const Color(0xffbbf7d0) : const Color(0xffe2e8f0)),
+                    width: 1.2,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: netDue > 0
+                                      ? const Color(0xfffee2e2)
+                                      : (netAdv > 0 ? const Color(0xffdcfce7) : const Color(0xfff1f5f9)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  LucideIcons.wallet,
+                                  size: 16,
+                                  color: netDue > 0
+                                      ? const Color(0xffdc2626)
+                                      : (netAdv > 0 ? const Color(0xff16a34a) : const Color(0xff475569)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                T.t('Account Balance Overview'),
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.grey.shade200 : const Color(0xff1e293b),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: netDue > 0
+                                  ? const Color(0xfffee2e2)
+                                  : (netAdv > 0 ? const Color(0xffdcfce7) : const Color(0xfff1f5f9)),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              netDue > 0
+                                  ? T.t('Due')
+                                  : (netAdv > 0 ? T.t('Advance') : T.t('Settled')),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: netDue > 0
+                                    ? const Color(0xffb91c1c)
+                                    : (netAdv > 0 ? const Color(0xff15803d) : const Color(0xff475569)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: netDue > 0
+                                ? [const Color(0xffef4444), const Color(0xffdc2626)]
+                                : (netAdv > 0
+                                    ? [const Color(0xff10b981), const Color(0xff059669)]
+                                    : [const Color(0xff2d7a55), const Color(0xff1b4d36)]),
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  netDue > 0
+                                      ? T.t('Total Amount Due')
+                                      : (netAdv > 0 ? T.t('Available Advance') : T.t('Account Settled')),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '₹${(netDue > 0 ? netDue : (netAdv > 0 ? netAdv : 0.0)).toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xff1b4d36),
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              icon: const Icon(LucideIcons.receiptText, size: 14),
+                              label: Text(
+                                T.t('Bill'),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              onPressed: () => Get.to(
+                                () => MonthlyEntriesScreen(
+                                  api: widget.api,
+                                  customer: _customer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey.shade900 : const Color(0xfff8fafc),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xffe2e8f0)),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildBalanceRow(T.t('This Month Bill'), '₹${thisMonthBill.toStringAsFixed(2)}', const Color(0xff1e293b)),
+                            if (pastDue > 0) ...[
+                              const SizedBox(height: 5),
+                              _buildBalanceRow(T.t('Past Overdue'), '+₹${pastDue.toStringAsFixed(2)}', const Color(0xffdc2626)),
+                            ],
+                            if (advCredit > 0) ...[
+                              const SizedBox(height: 5),
+                              _buildBalanceRow(T.t('Advance Credit Applied'), '-₹${advCredit.toStringAsFixed(2)}', const Color(0xff16a34a)),
+                            ],
+                            if (thisMonthPaid > 0) ...[
+                              const SizedBox(height: 5),
+                              _buildBalanceRow(T.t('Amount Received'), '-₹${thisMonthPaid.toStringAsFixed(2)}', const Color(0xff2563eb)),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
             const SizedBox(height: 12),
 
             // SECOND TILE: COMPACT & PROFESSIONAL MILK DEFAULTS

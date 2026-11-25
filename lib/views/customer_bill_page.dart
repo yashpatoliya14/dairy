@@ -218,7 +218,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                   initialMonthlyAmount: totalAmount,
                   initialPaidAmount: c.hasPayment.value ? c.paymentReceived.value : 0.0,
                   initialPreviousDue: c.pastMonthsDue.value,
-                  initialAdvanceCredit: c.netAdvance.value,
+                  initialAdvanceCredit: c.grossPastAdvance.value > 0 ? c.grossPastAdvance.value : c.netAdvance.value,
                 );
               },
             ),
@@ -391,11 +391,13 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                         color: const Color(0xffdc2626),
                       ),
                     ],
-                    if (c.netAdvance.value > 0) ...[
+                    if ((c.grossPastAdvance.value > 0
+                            ? c.grossPastAdvance.value
+                            : c.netAdvance.value) > 0) ...[
                       const SizedBox(height: 6),
                       _detailRow(
                         T.t('Advance Credit'),
-                        '-₹${c.netAdvance.value.toStringAsFixed(2)}',
+                        '-₹${(c.grossPastAdvance.value > 0 ? c.grossPastAdvance.value : c.netAdvance.value).toStringAsFixed(2)}',
                         color: const Color(0xff16a34a),
                       ),
                     ],
@@ -512,7 +514,7 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
                           initialMonthlyAmount: totalAmount,
                           initialPaidAmount: c.hasPayment.value ? c.paymentReceived.value : 0.0,
                           initialPreviousDue: c.pastMonthsDue.value,
-                          initialAdvanceCredit: c.netAdvance.value,
+                          initialAdvanceCredit: c.grossPastAdvance.value > 0 ? c.grossPastAdvance.value : c.netAdvance.value,
                         );
                       },
                       icon: const Icon(LucideIcons.messageCircle, size: 16),

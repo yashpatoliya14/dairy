@@ -541,7 +541,7 @@ class MonthlyEntriesController extends GetxController {
     if (netBalanceDue.value > 0) return netBalanceDue.value;
     final past = pastMonthsDue.value;
     final cur = currentMonthDue;
-    final adv = netAdvance.value;
+    final adv = grossPastAdvance.value > 0 ? grossPastAdvance.value : netAdvance.value;
     final net = cur + past - adv;
     return net > 0 ? double.parse(net.toStringAsFixed(2)) : 0.0;
   }

@@ -369,17 +369,15 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
       final pastOverdue = double.tryParse(_pastOverdueController.text) ?? 0.0;
       final advanceCredit = double.tryParse(_advanceCreditController.text) ?? 0.0;
 
-      final currentDue = monthlyAmount >= paidAmount ? (monthlyAmount - paidAmount) : 0.0;
-      final excess = paidAmount > monthlyAmount ? (paidAmount - monthlyAmount) : 0.0;
-      final credit = advanceCredit + excess;
-      final remainingPastDue = pastOverdue > credit ? (pastOverdue - credit) : 0.0;
-      final netPayable = currentDue + remainingPastDue;
+      final gross = monthlyAmount + pastOverdue;
+      final totalCredits = advanceCredit + paidAmount;
+      final netPayable = gross > totalCredits ? (gross - totalCredits) : 0.0;
 
       final paidRow = paidAmount > 0
           ? '• Amount Received: ₹${paidAmount.toStringAsFixed(2)}\n'
           : '';
-      final currentDueRow = (paidAmount > 0 && currentDue > 0)
-          ? '• Current Month Balance: ₹${currentDue.toStringAsFixed(2)}\n'
+      final advanceRow = advanceCredit > 0
+          ? '• Advance Credit Applied: -₹${advanceCredit.toStringAsFixed(2)}\n'
           : '';
 
       return '🧾 *MILK BILL STATEMENT* 🧾\n'
@@ -392,9 +390,9 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           '• Rate per Liter: ₹${rate.toStringAsFixed(2)}/L\n\n'
           '💰 *BILL BREAKDOWN:*\n'
           '• Monthly Milk Bill: ₹${monthlyAmount.toStringAsFixed(2)}\n'
-          '$paidRow$currentDueRow'
-          '• Past Overdue: ₹${pastOverdue.toStringAsFixed(2)}\n'
-          '• Advance / Credits: ₹${advanceCredit.toStringAsFixed(2)}\n'
+          '${pastOverdue > 0 ? "• Past Overdue: +₹${pastOverdue.toStringAsFixed(2)}\\n" : ""}'
+          '$advanceRow'
+          '$paidRow'
           '━━━━━━━━━━━━━━━━━━━━\n'
           '⭐ *NET TOTAL PAYABLE: ₹${(netPayable > 0 ? netPayable : 0.0).toStringAsFixed(2)}${netPayable == 0 && (monthlyAmount > 0 || pastOverdue > 0) ? ' (Fully Settled)' : ''}*\n'
           '━━━━━━━━━━━━━━━━━━━━\n\n'
@@ -480,14 +478,9 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
         final paidAmount = double.tryParse(_paidAmountController.text) ?? 0.0;
         final advanceCredit =
             double.tryParse(_advanceCreditController.text) ?? 0.0;
-        final currentDue =
-            monthlyAmount >= paidAmount ? (monthlyAmount - paidAmount) : 0.0;
-        final excess =
-            paidAmount > monthlyAmount ? (paidAmount - monthlyAmount) : 0.0;
-        final credit = advanceCredit + excess;
-        final remainingPastDue =
-            pastOverdue > credit ? (pastOverdue - credit) : 0.0;
-        final netPayable = currentDue + remainingPastDue;
+        final gross = monthlyAmount + pastOverdue;
+        final totalCredits = advanceCredit + paidAmount;
+        final netPayable = gross > totalCredits ? (gross - totalCredits) : 0.0;
 
         final res = await widget.api.sendWhatsAppBill({
           'to': cleanPhone,
@@ -507,7 +500,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
           'distributorName': distributorName,
           'distributorPhone': distributorPhone,
           'useTemplate': true,
-          'templateName': 'dairy_milk_bill_update',
+          'templateName': 'monthly_milk_bill_settlement',
           'languageCode': 'en',
         });
         if (res['error'] != null || res['success'] == false || res['status'] == 'failed') {
