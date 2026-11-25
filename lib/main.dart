@@ -1412,6 +1412,8 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> {
   int _currentTab = 0;
   late final DashboardController controller;
+  final GlobalKey<WhatsAppMessagingScreenState> _messagesKey =
+      GlobalKey<WhatsAppMessagingScreenState>();
 
   @override
   void initState() {
@@ -1432,7 +1434,8 @@ class _DashboardState extends State<Dashboard> {
 
   Future<void> _openAddCustomer(
       BuildContext context, DashboardController controller) async {
-    await controller.loadSettings();
+    // Fire background settings load without blocking UI navigation
+    controller.loadSettings().catchError((_) {});
     final added = await Get.to<bool>(
       () => CreateCustomerPage(
         api: widget.api,
@@ -1466,11 +1469,16 @@ class _DashboardState extends State<Dashboard> {
             DashboardScreen(
               api: widget.api,
               controller: controller,
-              onNavigateTab: (tabIndex) => setState(() => _currentTab = tabIndex),
+              onNavigateTab: (tabIndex) {
+                if (tabIndex == 2) {
+                  _messagesKey.currentState?.reload();
+                }
+                setState(() => _currentTab = tabIndex);
+              },
               onOpenAddCustomer: () => _openAddCustomer(context, controller),
             ),
             _buildCustomersView(context, controller),
-            WhatsAppMessagingScreen(api: widget.api),
+            WhatsAppMessagingScreen(key: _messagesKey, api: widget.api),
             SettingsPage(
               api: widget.api,
               defaultLiters: controller.defaultLiters.value,
@@ -1493,6 +1501,9 @@ class _DashboardState extends State<Dashboard> {
             backgroundColor: const Color(0xff1b4d36),
             selectedIndex: _currentTab,
             onDestinationSelected: (index) {
+              if (index == 2) {
+                _messagesKey.currentState?.reload();
+              }
               setState(() => _currentTab = index);
             },
             destinations: [
@@ -2832,6 +2843,24 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     _loadBalanceSummary();
   }
 
+  Future<void> _refreshCustomerDetails() async {
+    final customerId = '${_customer['id'] ?? _customer['cid'] ?? ''}'.trim();
+    if (customerId.isNotEmpty) {
+      try {
+        final list = await widget.api.getCustomers();
+        for (final c in list) {
+          if ('${c['id'] ?? c['cid']}'.trim() == customerId) {
+            if (mounted) {
+              setState(() => _customer = Map<String, dynamic>.from(c));
+            }
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+    await _loadBalanceSummary();
+  }
+
   Future<void> _loadBalanceSummary() async {
     final customerId = '${_customer['id'] ?? _customer['cid'] ?? ''}'.trim();
     if (customerId.isEmpty) return;
@@ -3040,14 +3069,17 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.symmetric(
-          horizontal: _pagePadding(context).horizontal / 2,
-          vertical: 12,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: RefreshIndicator(
+        onRefresh: _refreshCustomerDetails,
+        color: const Color(0xff1b4d36),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: _pagePadding(context).horizontal / 2,
+            vertical: 12,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // FIRST TILE: COMPACT CUSTOMER PROFILE & CONTACT
             Card(
@@ -3695,6 +3727,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -23,10 +23,10 @@ class WhatsAppMessagingScreen extends StatefulWidget {
 
   @override
   State<WhatsAppMessagingScreen> createState() =>
-      _WhatsAppMessagingScreenState();
+      WhatsAppMessagingScreenState();
 }
 
-class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
+class WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
   late DateTime _selectedDate;
   bool _loading = true;
   String _searchQuery = '';
@@ -52,11 +52,23 @@ class _WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate ?? DateTime.now();
+    widget.api.addEntryChangeListener(_handleExternalEntryChange);
+    _loadData();
+  }
+
+  void _handleExternalEntryChange() {
+    if (mounted) {
+      _loadData(silent: true);
+    }
+  }
+
+  void reload() {
     _loadData();
   }
 
   @override
   void dispose() {
+    widget.api.removeEntryChangeListener(_handleExternalEntryChange);
     _jobPollTimer?.cancel();
     super.dispose();
   }

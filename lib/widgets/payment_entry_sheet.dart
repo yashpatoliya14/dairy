@@ -189,19 +189,6 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
     });
   }
 
-  void _selectMode(String mode) {
-    setState(() {
-      if (_selectedMode == mode) {
-        _selectedMode = '';
-      } else {
-        _selectedMode = mode;
-        if (_noteController.text.trim().isEmpty) {
-          _noteController.text = mode;
-        }
-      }
-    });
-  }
-
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -916,45 +903,6 @@ class _PaymentEntrySheetState extends State<PaymentEntrySheet> {
                         ),
                       );
                     },
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // ─── PAYMENT MODE SELECTION ────────────────────────────────
-                  Text(
-                    T.t('Payment Mode'),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xff374151),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      for (final mode in [
-                        'Cash',
-                        'UPI',
-                        'Bank Transfer',
-                        'Cheque'
-                      ])
-                        ChoiceChip(
-                          label: Text(T.t(mode)),
-                          selected: _selectedMode == mode,
-                          onSelected: (_) => _selectMode(mode),
-                          selectedColor: const Color(0xffdcfce7),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            fontWeight: _selectedMode == mode
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: _selectedMode == mode
-                                ? const Color(0xff166534)
-                                : const Color(0xff374151),
-                          ),
-                        ),
-                    ],
                   ),
 
                   const SizedBox(height: 14),

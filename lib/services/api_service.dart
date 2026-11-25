@@ -362,6 +362,7 @@ class ApiService {
       showLoader: true,
       loaderMessage: 'Saving milk entry...',
     );
+    notifyEntryChanged();
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
@@ -440,6 +441,7 @@ class ApiService {
       loaderMessage: 'Deleting milk entry...',
     );
     final body = response.body.trim();
+    notifyEntryChanged();
     if (body.isEmpty) return {'success': true};
     try {
       final decoded = jsonDecode(body);
@@ -792,6 +794,26 @@ class ApiService {
     for (final cb in List.of(_paymentListeners)) {
       try {
         cb(customerId, year, month);
+      } catch (_) {}
+    }
+  }
+
+  final List<void Function()> _entryListeners = [];
+
+  void addEntryChangeListener(void Function() listener) {
+    if (!_entryListeners.contains(listener)) {
+      _entryListeners.add(listener);
+    }
+  }
+
+  void removeEntryChangeListener(void Function() listener) {
+    _entryListeners.remove(listener);
+  }
+
+  void notifyEntryChanged() {
+    for (final cb in List.of(_entryListeners)) {
+      try {
+        cb();
       } catch (_) {}
     }
   }
