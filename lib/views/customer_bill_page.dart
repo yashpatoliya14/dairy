@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../controllers/monthly_entries_controller.dart';
 import '../services/api_service.dart';
 import '../services/app_language.dart';
+import '../widgets/dairy_milk_loader.dart';
 import '../widgets/send_whatsapp_bill_sheet.dart' as whatsapp_sheet;
 import '../widgets/payment_entry_sheet.dart';
 
@@ -164,6 +165,24 @@ class _CustomerBillPageState extends State<CustomerBillPage> {
     final c = widget.controller;
 
     return Obx(() {
+      // Show loader while data is being fetched
+      if (c.loading.value) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(
+              '${T.t('Bill')} - ${c.customerName}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xff166534),
+            elevation: 0,
+          ),
+          body: const Center(
+            child: DairyMilkLoader(size: 48, message: 'Loading bill...'),
+          ),
+        );
+      }
+
       final monthName = _monthLabel(c.selectedMonth.value, c.selectedYear.value);
       final daysInMonth = c.daysInMonth.value;
       final totalLiters = c.totalLiters.value;

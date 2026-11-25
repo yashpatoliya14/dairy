@@ -2819,6 +2819,7 @@ class CustomerDetailsPage extends StatefulWidget {
 class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   late Map<String, dynamic> _customer;
   Map<String, dynamic>? _billSummary;
+  bool _summaryLoaded = false;
 
   @override
   void initState() {
@@ -2840,9 +2841,14 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
       if (mounted && summary.isNotEmpty) {
         setState(() {
           _billSummary = summary;
+          _summaryLoaded = true;
         });
+      } else if (mounted) {
+        setState(() => _summaryLoaded = true);
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _summaryLoaded = true);
+    }
   }
 
   Widget _buildBalanceRow(String label, String value, Color valueColor) {
@@ -3174,6 +3180,19 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
 
             // ACCOUNT BALANCE & LEDGER OVERVIEW
             Builder(builder: (ctx) {
+              if (!_summaryLoaded && _billSummary == null) {
+                return Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: const Color(0xffe2e8f0)),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: DairyMilkLoader(size: 32, message: 'Loading balance...')),
+                  ),
+                );
+              }
               final summary = _billSummary;
               final double netDue = summary != null
                   ? (double.tryParse('${summary['netBalanceDue']}') ?? 0.0)
