@@ -1072,17 +1072,13 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
         : (existingEntry != null
             ? _asDouble(existingEntry['price'])
             : defaultPrice);
-    final double existingTotal = existingEntry != null
-        ? _asDouble(existingEntry['total'], existingLiters * existingPrice)
-        : 0.0;
     final bool hasExisting = existingEntry != null && existingLiters > 0;
 
     final double defaultLiters = controller.customerDefaultLiters > 0
         ? controller.customerDefaultLiters
         : 1.0;
 
-    String mode = 'add'; // 'add' (accumulate with last entry) or 'replace'
-    final initialLiters = hasExisting ? defaultLiters : defaultLiters;
+    final double initialLiters = hasExisting ? existingLiters : defaultLiters;
 
     final litersCtrl = TextEditingController(
       text: initialLiters.toStringAsFixed(2),
@@ -1101,9 +1097,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final double previewLiters = (hasExisting && mode == 'add')
-              ? (existingLiters + curLiters)
-              : curLiters;
+          final double previewLiters = curLiters;
           final double previewTotal = previewLiters * curPrice;
 
           return AlertDialog(
@@ -1167,103 +1161,6 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Existing Entry Banner & Mode Switcher
-                    if (hasExisting) ...[
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xfff0fdf4),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xffbbf7d0)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '${T.t('Earlier Today')}:',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xff166534),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                Text(
-                                  '${existingLiters.toStringAsFixed(2)} L • ₹${existingTotal.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xff166534),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ChoiceChip(
-                                    label: Text(
-                                      '+ ${T.t("Add with Last Entry")}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: mode == 'add'
-                                            ? Colors.white
-                                            : const Color(0xff166534),
-                                      ),
-                                    ),
-                                    selected: mode == 'add',
-                                    selectedColor: const Color(0xff2d7a55),
-                                    backgroundColor: Colors.white,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setDialogState(() {
-                                          mode = 'add';
-                                          curLiters = defaultLiters;
-                                          litersCtrl.text = defaultLiters.toStringAsFixed(2);
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ChoiceChip(
-                                    label: Text(
-                                      T.t('Replace Entry'),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: mode == 'replace'
-                                            ? Colors.white
-                                            : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                    selected: mode == 'replace',
-                                    selectedColor: Colors.orange.shade800,
-                                    backgroundColor: Colors.white,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setDialogState(() {
-                                          mode = 'replace';
-                                          curLiters = existingLiters;
-                                          litersCtrl.text = existingLiters.toStringAsFixed(2);
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
                     Row(
                       children: [
                         Material(
@@ -1300,11 +1197,7 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                               decimal: true,
                             ),
                             decoration: InputDecoration(
-                              labelText: (hasExisting && mode == 'add')
-                                  ? T.t('Liters to add (+)')
-                                  : (hasExisting)
-                                      ? T.t('Total Liters (Replace)')
-                                      : T.t('Liters'),
+                              labelText: T.t('Liters'),
                               suffixText: 'L',
                             ),
                             onChanged: (val) {
@@ -1432,10 +1325,10 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
-                        color: mode == 'add' ? const Color(0xffecfdf5) : Colors.orange.shade50,
+                        color: const Color(0xffecfdf5),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: mode == 'add' ? const Color(0xffa7f3d0) : Colors.orange.shade200,
+                          color: const Color(0xffa7f3d0),
                         ),
                       ),
                       child: Row(
@@ -1443,18 +1336,18 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
                         children: [
                           Text(
                             '${T.t("Final Today")}: ${previewLiters.toStringAsFixed(2)} L',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 13,
-                              color: mode == 'add' ? const Color(0xff065f46) : Colors.orange.shade900,
+                              color: Color(0xff065f46),
                             ),
                           ),
                           Text(
                             '₹${previewTotal.toStringAsFixed(2)}',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
-                              color: mode == 'add' ? const Color(0xff065f46) : Colors.orange.shade900,
+                              color: Color(0xff065f46),
                             ),
                           ),
                         ],
@@ -1499,20 +1392,18 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
       day: day,
       liters: curLiters,
       price: curPrice,
-      mode: hasExisting ? mode : 'add',
+      mode: 'replace',
     );
 
     if (!mounted) return;
 
-    final double finalLiters = (hasExisting && mode == 'add')
-        ? (existingLiters + curLiters)
-        : curLiters;
+    final double finalLiters = curLiters;
     final double finalTotal = finalLiters * curPrice;
 
     if (success) {
       messenger.clearSnackBars();
       final actionMessage = hasExisting
-          ? (mode == 'add' ? T.t('Milk entry added successfully') : T.t('Milk entry updated successfully'))
+          ? T.t('Milk entry updated successfully')
           : T.t('Milk entry added successfully');
       messenger.showSnackBar(
         SnackBar(
