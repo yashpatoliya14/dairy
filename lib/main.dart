@@ -412,17 +412,24 @@ class _AuthPageState extends State<AuthPage> {
     setState(() => busy = true);
     try {
       if (signup) {
+        final targetEmail = email.text.trim();
         await widget.api.signup(
           firstName.text.trim(),
           lastName.text.trim(),
-          email.text.trim(),
+          targetEmail,
           password.text,
           dairyName.text.trim(),
         );
-        if (widget.api.token == null) {
-          await widget.api.login(email.text.trim(), password.text);
-        }
-        await widget.api.saveLastAccountEmail(email.text.trim());
+        await widget.api.saveLastAccountEmail(targetEmail);
+        if (!mounted) return;
+        setState(() => busy = false);
+        await Get.to(
+          () => VerifyEmailPage(
+            api: widget.api,
+            email: targetEmail,
+          ),
+        );
+        return;
       } else {
         await widget.api.login(email.text.trim(), password.text);
         await widget.api.saveLastAccountEmail(email.text.trim());
@@ -438,7 +445,20 @@ class _AuthPageState extends State<AuthPage> {
       if (!mounted) return;
       Get.offAll(() => Dashboard(api: widget.api));
     } catch (error) {
-      if (mounted) _showMessage(error.toString());
+      final errStr = error.toString();
+      if (errStr.contains('verify your email') || errStr.contains('Email not verified')) {
+        final targetEmail = email.text.trim();
+        if (targetEmail.isNotEmpty) {
+          Get.to(
+            () => VerifyEmailPage(
+              api: widget.api,
+              email: targetEmail,
+            ),
+          );
+          return;
+        }
+      }
+      if (mounted) _showMessage(errStr);
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -1364,6 +1384,9 @@ class _CodePage extends StatelessWidget {
             fontWeight: FontWeight.bold,
             letterSpacing: 8,
           ),
+          onChanged: (val) {
+            if (val.trim().length == 6 && !busy) onSubmit();
+          },
           decoration: InputDecoration(
             labelText: T.t('6-digit code'),
             hintText: '123456',

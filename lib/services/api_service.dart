@@ -137,7 +137,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
-    return _postAuth(
+    return _authenticate(
       '/auth/verify-email',
       {'email': email, 'code': code},
       loaderMessage: 'Verifying code...',
