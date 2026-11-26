@@ -86,13 +86,6 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
             onPressed: controller.loadMonth,
             icon: const Icon(LucideIcons.refreshCw, color: Colors.white),
           ),
-          Obx(() => controller.undoStack.isNotEmpty
-              ? IconButton(
-                  tooltip: T.t('Undo'),
-                  onPressed: controller.saving.value ? null : _handleUndo,
-                  icon: const Icon(LucideIcons.undo2, color: Colors.white),
-                )
-              : const SizedBox.shrink()),
           IconButton(
             tooltip: T.t('Select month'),
             onPressed: () => _pickMonthYear(context),
@@ -1518,43 +1511,30 @@ class _MonthlyEntriesScreenState extends State<MonthlyEntriesScreen> {
 
     if (success) {
       messenger.clearSnackBars();
+      final actionMessage = hasExisting
+          ? (mode == 'add' ? T.t('Milk entry added successfully') : T.t('Milk entry updated successfully'))
+          : T.t('Milk entry added successfully');
       messenger.showSnackBar(
         SnackBar(
-          content: Text('${T.t('Milk entry saved')} (${finalLiters.toStringAsFixed(2)} L • ₹${finalTotal.toStringAsFixed(2)})'),
-          backgroundColor: const Color(0xff2d7a55),
-          behavior: SnackBarBehavior.floating,
-          action: SnackBarAction(
-            label: T.t('Undo'),
-            textColor: Colors.amberAccent,
-            onPressed: _handleUndo,
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('$actionMessage (${finalLiters.toStringAsFixed(2)} L • ₹${finalTotal.toStringAsFixed(2)})'),
+              ),
+            ],
           ),
-          duration: const Duration(seconds: 6),
+          backgroundColor: const Color(0xff166534),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
         ),
       );
     } else {
       messenger.showSnackBar(
         SnackBar(
           content: Text(T.t('Could not save entry. Try again.')),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    }
-  }
-
-  Future<void> _handleUndo() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final success = await controller.undo();
-    if (!mounted) return;
-
-    if (success) {
-      messenger.clearSnackBars();
-      messenger.showSnackBar(
-        SnackBar(content: Text(T.t('Entry undone'))),
-      );
-    } else {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(T.t('Undo failed. Entry is unchanged.')),
           backgroundColor: Colors.red.shade700,
         ),
       );

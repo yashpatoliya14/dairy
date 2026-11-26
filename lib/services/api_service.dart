@@ -106,6 +106,7 @@ class ApiService {
   }
 
   bool get hasSession => _token != null && !isTokenExpired;
+  String? get token => _token;
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     return _authenticate(

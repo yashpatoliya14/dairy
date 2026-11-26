@@ -355,7 +355,18 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
 
   bool get _hasValidPhone {
     final clean = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    return clean.length >= 10;
+    if (clean.isEmpty) return false;
+    if (clean.startsWith('91') && clean.length >= 12) {
+      final after91 = clean.substring(2);
+      return after91.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(after91);
+    }
+    if (clean.length == 10) {
+      return RegExp(r'^[6-9]\d{9}$').hasMatch(clean);
+    }
+    if (clean.length == 11 && RegExp(r'^[6-9]').hasMatch(clean)) {
+      return false;
+    }
+    return clean.length >= 10 && clean.length <= 15;
   }
 
   String _formatDate(DateTime d) {
@@ -636,8 +647,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
     if (_billType == BillType.daily) {
       final liters = double.tryParse(_dailyLitersController.text) ?? 0.0;
       final todayAmount = liters * rate;
-      final mtd = double.tryParse(_monthToDateBillController.text) ?? todayAmount;
-      calculatedTotal = mtd + pastOverdue;
+      calculatedTotal = todayAmount;
     } else {
       final totalLiters = double.tryParse(_monthlyLitersController.text) ?? 0.0;
       final monthlyAmount = double.tryParse(_monthlyAmountController.text) ??
@@ -1035,6 +1045,10 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(15),
+                  ],
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: T.t('Recipient WhatsApp Number'),
@@ -1383,7 +1397,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                           const SizedBox(height: 2),
                           Text(
                             _billType == BillType.daily
-                                ? '${T.t('Month Bill')} + ${T.t('Past Overdue')}'
+                                ? '${T.t("Today's Milk")} (${(double.tryParse(_dailyLitersController.text) ?? 0.0).toStringAsFixed(1)} L @ ₹${rate.toStringAsFixed(2)}/L)'
                                 : '${T.t('Bill')} + ${T.t('Past Overdue')} - ${T.t('Advance')}',
                             style: TextStyle(
                               fontSize: 11,

@@ -419,14 +419,10 @@ class _AuthPageState extends State<AuthPage> {
           password.text,
           dairyName.text.trim(),
         );
-        if (!mounted) return;
-        await Get.to(
-          () => VerifyEmailPage(
-            api: widget.api,
-            email: email.text.trim(),
-          ),
-        );
-        return;
+        if (widget.api.token == null) {
+          await widget.api.login(email.text.trim(), password.text);
+        }
+        await widget.api.saveLastAccountEmail(email.text.trim());
       } else {
         await widget.api.login(email.text.trim(), password.text);
         await widget.api.saveLastAccountEmail(email.text.trim());
@@ -3003,9 +2999,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     final phone = '${customer['phoneNumber'] ?? ''}'.trim();
     final hasPhone =
         phone.isNotEmpty && phone != 'null' && phone != 'Not provided';
-    final channel =
-        '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
-    final isSms = channel == 'sms';
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -3170,37 +3163,27 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: isSms
-                                      ? const Color(0xffeff6ff)
-                                      : const Color(0xfff0fdf4),
+                                  color: const Color(0xfff0fdf4),
                                   borderRadius: BorderRadius.circular(5),
                                   border: Border.all(
-                                    color: isSms
-                                        ? const Color(0xffbfdbfe)
-                                        : const Color(0xffbbf7d0),
+                                    color: const Color(0xffbbf7d0),
                                   ),
                                 ),
-                                child: Row(
+                                child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      isSms
-                                          ? LucideIcons.messageSquare
-                                          : LucideIcons.messageCircle,
+                                      LucideIcons.messageCircle,
                                       size: 11.5,
-                                      color: isSms
-                                          ? const Color(0xff2563eb)
-                                          : const Color(0xff16a34a),
+                                      color: Color(0xff16a34a),
                                     ),
-                                    const SizedBox(width: 3.5),
+                                    SizedBox(width: 3.5),
                                     Text(
-                                      isSms ? 'SMS' : 'WhatsApp',
+                                      'WhatsApp',
                                       style: TextStyle(
                                         fontSize: 10.5,
                                         fontWeight: FontWeight.w600,
-                                        color: isSms
-                                            ? const Color(0xff1e40af)
-                                            : const Color(0xff15803d),
+                                        color: Color(0xff15803d),
                                       ),
                                     ),
                                   ],
@@ -4549,43 +4532,6 @@ class _SettingsSectionTitle extends StatelessWidget {
   );
 }
 
-class _ChoiceSelector<Option> extends StatelessWidget {
-  const _ChoiceSelector({
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-    this.enabled = true,
-  });
-  final String label;
-  final Option value;
-  final Map<Option, String> options;
-  final ValueChanged<Option> onChanged;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: Theme.of(context).textTheme.labelLarge),
-      const SizedBox(height: 8),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: options.entries
-            .map(
-              (entry) => ChoiceChip(
-                label: Text(entry.value),
-                selected: entry.key == value,
-                onSelected: enabled ? (_) => onChanged(entry.key) : null,
-              ),
-            )
-            .toList(),
-      ),
-    ],
-  );
-}
-
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, required this.api});
   final ApiService api;
@@ -5464,14 +5410,23 @@ class _CreateCustomerPageState extends State<CreateCustomerPage> {
           TextFormField(
             controller: phone,
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              if (selectedCountryCode == '+91' || selectedCountryCode.isEmpty)
+                LengthLimitingTextInputFormatter(10)
+              else
+                LengthLimitingTextInputFormatter(15),
+            ],
             decoration: InputDecoration(
               labelText: T.t('Customer phone number'),
               hintText: selectedCountryCode.isNotEmpty
-                  ? '98765 43210'
+                  ? (selectedCountryCode == '+91' ? '98765 43210' : 'Phone number')
                   : '+91 98765 43210',
-              helperText: T.t(
-                '10-digit number or country-wise format (e.g. +91 98765 43210)',
-              ),
+              helperText: selectedCountryCode == '+91' || selectedCountryCode.isEmpty
+                  ? T.t('10-digit mobile number')
+                  : T.t(
+                      '10-digit number or country-wise format (e.g. +91 98765 43210)',
+                    ),
               helperMaxLines: 2,
               prefixIcon: Padding(
                 padding: const EdgeInsets.only(left: 10, right: 4),
@@ -5595,7 +5550,7 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
     final parsed = parseCustomerPhone(rawPhone);
     selectedCountryCode = parsed.$1;
     phone = TextEditingController(text: parsed.$2);
-    channel = '${widget.customer['notificationChannel'] ?? 'whatsapp'}';
+    channel = 'whatsapp';
   }
 
   Future<void> save() async {
@@ -5606,7 +5561,7 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
         'name': name.text.trim(),
         'liters': double.parse(liters.text.trim()),
         'price': double.parse(price.text.trim()),
-        'notificationChannel': channel,
+        'notificationChannel': 'whatsapp',
       };
       final phoneValue = phone.text.trim();
       if (phoneValue.isNotEmpty) {
@@ -5660,14 +5615,23 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
           TextFormField(
             controller: phone,
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              if (selectedCountryCode == '+91' || selectedCountryCode.isEmpty)
+                LengthLimitingTextInputFormatter(10)
+              else
+                LengthLimitingTextInputFormatter(15),
+            ],
             decoration: InputDecoration(
               labelText: T.t('Customer phone number'),
               hintText: selectedCountryCode.isNotEmpty
-                  ? '98765 43210'
+                  ? (selectedCountryCode == '+91' ? '98765 43210' : 'Phone number')
                   : '+91 98765 43210',
-              helperText: T.t(
-                '10-digit number or country-wise format (e.g. +91 98765 43210)',
-              ),
+              helperText: selectedCountryCode == '+91' || selectedCountryCode.isEmpty
+                  ? T.t('10-digit mobile number')
+                  : T.t(
+                      '10-digit number or country-wise format (e.g. +91 98765 43210)',
+                    ),
               helperMaxLines: 2,
               prefixIcon: Padding(
                 padding: const EdgeInsets.only(left: 10, right: 4),
@@ -5741,17 +5705,6 @@ class _EditCustomerPageState extends State<EditCustomerPage> {
               selectedCountryCode,
               required: false,
             ),
-          ),
-          const SizedBox(height: 14),
-          _ChoiceSelector<String>(
-            label: T.t('Message channel'),
-            value: channel,
-            options: {
-              'whatsapp': T.t('WhatsApp'),
-              'sms': T.t('SMS / Messages'),
-            },
-            enabled: !busy,
-            onChanged: (value) => setState(() => channel = value),
           ),
           const SizedBox(height: 28),
           FilledButton(
@@ -5846,6 +5799,18 @@ bool isValidCustomerPhoneNumber(String? value) {
   // Must have between 10 and 15 digits (ITU-T E.164 recommendation)
   if (digits.length < 10 || digits.length > 15) return false;
 
+  // Specific check for India (+91 or starts with 91 followed by digits)
+  if (clean.startsWith('+91') || (clean.startsWith('91') && digits.length >= 12)) {
+    final after91 = digits.startsWith('91') ? digits.substring(2) : digits;
+    if (after91.length != 10) return false;
+    return RegExp(r'^[6-9]\d{9}$').hasMatch(after91);
+  }
+
+  // Reject Indian numbers entered with 11 digits starting with 6-9
+  if (!clean.startsWith('+') && digits.length == 11 && RegExp(r'^[6-9]').hasMatch(digits)) {
+    return false;
+  }
+
   // Case 1: If starts with '+', country code cannot start with '0'
   if (clean.startsWith('+')) {
     final withoutPlus = clean.substring(1).replaceAll(RegExp(r'\D'), '');
@@ -5914,6 +5879,20 @@ String? _validateCustomerPhone(
 }) {
   if (value == null || value.trim().isEmpty) {
     return required ? T.t('Required') : null;
+  }
+
+  final clean = value.trim();
+  final digits = clean.replaceAll(RegExp(r'\D'), '');
+
+  // For India (+91 or default 10-digit mobile number)
+  if (countryCode == '+91' || countryCode == '91' || (countryCode.isEmpty && !clean.startsWith('+'))) {
+    if (digits.length != 10) {
+      return T.t('Enter a valid 10-digit mobile number');
+    }
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) {
+      return T.t('Indian mobile numbers must start with 6, 7, 8, or 9');
+    }
+    return null;
   }
 
   final fullNumber = buildCustomerPhoneNumber(value, countryCode);

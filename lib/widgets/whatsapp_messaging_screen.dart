@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -182,7 +183,18 @@ class WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
   bool _hasValidPhone(Map customer) {
     final raw = '${customer['phoneNumber'] ?? customer['phone'] ?? ''}'.trim();
     final digits = raw.replaceAll(RegExp(r'\D'), '');
-    return digits.length >= 10;
+    if (digits.isEmpty) return false;
+    if (raw.startsWith('+91') || (raw.startsWith('91') && digits.length >= 12)) {
+      final after91 = digits.startsWith('91') ? digits.substring(2) : digits;
+      return after91.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(after91);
+    }
+    if (digits.length == 10) {
+      return RegExp(r'^[6-9]\d{9}$').hasMatch(digits);
+    }
+    if (digits.length == 11 && RegExp(r'^[6-9]').hasMatch(digits)) {
+      return false;
+    }
+    return digits.length >= 10 && digits.length <= 15;
   }
 
   String _buildQuickMessage(Map<String, dynamic> item) {
@@ -262,6 +274,10 @@ class WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
           child: TextFormField(
             controller: phoneCtrl,
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
             decoration: InputDecoration(
               labelText: T.t('Mobile number'),
               prefixText: '+91 ',
@@ -269,7 +285,10 @@ class WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
             ),
             validator: (v) {
               final cleaned = (v ?? '').replaceAll(RegExp(r'\D'), '');
-              if (cleaned.length < 10) return T.t('Please enter a valid phone number');
+              if (cleaned.length != 10) return T.t('Enter a valid 10-digit mobile number');
+              if (!RegExp(r'^[6-9]\d{9}$').hasMatch(cleaned)) {
+                return T.t('Indian mobile numbers must start with 6, 7, 8, or 9');
+              }
               return null;
             },
           ),
@@ -282,7 +301,7 @@ class WhatsAppMessagingScreenState extends State<WhatsAppMessagingScreen> {
           FilledButton(
             onPressed: () {
               if (formKey.currentState?.validate() == true) {
-                Navigator.of(ctx).pop(phoneCtrl.text.replaceAll(RegExp(r'\D'), ''));
+                Navigator.of(ctx).pop('+91${phoneCtrl.text.replaceAll(RegExp(r'\D'), '')}');
               }
             },
             child: Text(T.t('Save')),
