@@ -1789,7 +1789,7 @@ class _CustomerTile extends StatelessWidget {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final double previewLiters = (hasExisting && mode == 'add')
+          final double previewLiters = (mode == 'add')
               ? (existingLiters + curLiters)
               : curLiters;
           final double previewTotal = previewLiters * curPrice;
@@ -1841,102 +1841,100 @@ class _CustomerTile extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Existing Entry Banner & Mode Switcher
-                    if (hasExisting) ...[
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xfff0fdf4),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xffbbf7d0)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '${T.t('Earlier Today')}:',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xff166534),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                Text(
-                                  '${existingLiters.toStringAsFixed(2)} L • ₹${existingTotal.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xff166534),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ChoiceChip(
-                                    label: Text(
-                                      '+ ${T.t("Add with Last Entry")}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: mode == 'add'
-                                            ? Colors.white
-                                            : const Color(0xff166534),
-                                      ),
-                                    ),
-                                    selected: mode == 'add',
-                                    selectedColor: const Color(0xff2d7a55),
-                                    backgroundColor: Colors.white,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setDialogState(() {
-                                          mode = 'add';
-                                          curLiters = defaultLiters;
-                                          litersCtrl.text = _formatLiters(curLiters);
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ChoiceChip(
-                                    label: Text(
-                                      T.t('Replace Entry'),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: mode == 'replace'
-                                            ? Colors.white
-                                            : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                    selected: mode == 'replace',
-                                    selectedColor: Colors.orange.shade800,
-                                    backgroundColor: Colors.white,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setDialogState(() {
-                                          mode = 'replace';
-                                          curLiters = existingLiters;
-                                          litersCtrl.text = _formatLiters(curLiters);
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                    // Existing Entry Banner & Mode Switcher (Always available)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xfff0fdf4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xffbbf7d0)),
                       ),
-                    ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${T.t('Earlier Today')}:',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff166534),
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                '${existingLiters.toStringAsFixed(2)} L • ₹${existingTotal.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xff166534),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ChoiceChip(
+                                  label: Text(
+                                    '+ ${T.t("Add with Last Entry")}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: mode == 'add'
+                                          ? Colors.white
+                                          : const Color(0xff166534),
+                                    ),
+                                  ),
+                                  selected: mode == 'add',
+                                  selectedColor: const Color(0xff2d7a55),
+                                  backgroundColor: Colors.white,
+                                  onSelected: (selected) {
+                                    if (selected) {
+                                      setDialogState(() {
+                                        mode = 'add';
+                                        curLiters = defaultLiters;
+                                        litersCtrl.text = _formatLiters(curLiters);
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ChoiceChip(
+                                  label: Text(
+                                    T.t('Replace Entry'),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: mode == 'replace'
+                                          ? Colors.white
+                                          : Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  selected: mode == 'replace',
+                                  selectedColor: Colors.orange.shade800,
+                                  backgroundColor: Colors.white,
+                                  onSelected: (selected) {
+                                    if (selected) {
+                                      setDialogState(() {
+                                        mode = 'replace';
+                                        curLiters = existingLiters > 0 ? existingLiters : defaultLiters;
+                                        litersCtrl.text = _formatLiters(curLiters);
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
 
                     Row(
                       children: [
@@ -1974,11 +1972,9 @@ class _CustomerTile extends StatelessWidget {
                               decimal: true,
                             ),
                             decoration: InputDecoration(
-                              labelText: (hasExisting && mode == 'add')
+                              labelText: mode == 'add'
                                   ? T.t('Liters to add (+)')
-                                  : (hasExisting)
-                                      ? T.t('Total Liters (Replace)')
-                                      : T.t('Liters'),
+                                  : T.t('Total Liters (Replace)'),
                               suffixText: 'L',
                             ),
                             onChanged: (val) {
@@ -2166,7 +2162,7 @@ class _CustomerTile extends StatelessWidget {
         date: DateTime.now(),
         liters: curLiters,
         price: curPrice,
-        mode: hasExisting ? mode : 'add',
+        mode: mode,
       );
       if (!context.mounted) return;
       await onChanged();

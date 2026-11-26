@@ -1385,7 +1385,7 @@ class _SendWhatsAppBillSheetState extends State<SendWhatsAppBillSheet> {
                         children: [
                           Text(
                             _billType == BillType.daily
-                                ? T.t('TOTAL AMOUNT TO PAY')
+                                ? T.t("TODAY'S TOTAL AMOUNT")
                                 : T.t('NET TOTAL PAYABLE'),
                             style: const TextStyle(
                               fontSize: 11,

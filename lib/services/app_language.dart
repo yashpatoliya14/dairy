@@ -440,6 +440,8 @@ class T {
       'Total Liters (Replace)': 'कुल लीटर (बदलें)',
       'WhatsApp message sent to': 'व्हाट्सऐप संदेश भेजा गया:',
       'Failed to send WhatsApp message': 'व्हाट्सऐप संदेश भेजने में विफल',
+      "TODAY'S TOTAL AMOUNT": 'आज की कुल राशि',
+      'NET TOTAL PAYABLE': 'कुल देय राशि',
     },
     'gu': {
       'Loading dashboard...': 'ડેશબોર્ડ લોડ થઈ રહ્યું છે...',
@@ -857,6 +859,8 @@ class T {
       'Total Liters (Replace)': 'કુલ લીટર (બદલો)',
       'WhatsApp message sent to': 'વોટ્સએપ સંદેશ મોકલ્યો:',
       'Failed to send WhatsApp message': 'વોટ્સએપ સંદેશ મોકલવામાં નિષ્ફળ',
+      "TODAY'S TOTAL AMOUNT": 'આજની કુલ રકમ',
+      'NET TOTAL PAYABLE': 'કુલ ચૂકવવાપાત્ર રકમ',
     },
   };
 
