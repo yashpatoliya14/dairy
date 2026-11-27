@@ -16,12 +16,14 @@ class DashboardScreen extends StatelessWidget {
     required this.controller,
     required this.onNavigateTab,
     required this.onOpenAddCustomer,
+    required this.onOpenBulkAdd,
   });
 
   final ApiService api;
   final DashboardController controller;
   final void Function(int tabIndex) onNavigateTab;
   final VoidCallback onOpenAddCustomer;
+  final VoidCallback onOpenBulkAdd;
 
   String _formatDateTitle(DateTime date) {
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -395,6 +397,15 @@ class DashboardScreen extends StatelessWidget {
                       label: T.t('Add customer'),
                       color: const Color(0xff2d7a55),
                       onTap: onOpenAddCustomer,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildActionTile(
+                      icon: LucideIcons.images,
+                      label: T.t('Bulk Add'),
+                      color: const Color(0xff16a34a),
+                      onTap: onOpenBulkAdd,
                     ),
                   ),
                   const SizedBox(width: 8),

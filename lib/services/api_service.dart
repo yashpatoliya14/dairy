@@ -343,14 +343,20 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> scanCustomerCards(
-    List<String> base64Images,
-  ) async {
+    List<String> base64Images, {
+    String? apiKey,
+  }) async {
+    final Map<String, dynamic> body = {'images': base64Images};
+    if (apiKey != null && apiKey.trim().isNotEmpty) {
+      body['apiKey'] = apiKey.trim();
+    }
     final response = await _send(
       'POST',
       '/customers/scan-cards',
-      body: {'images': base64Images},
+      body: body,
       showLoader: true,
       loaderMessage: 'Analyzing card images...',
+      timeout: const Duration(seconds: 60),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }

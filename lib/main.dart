@@ -19,8 +19,10 @@ import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
 import 'widgets/monthly_entries_screen.dart';
 import 'widgets/send_whatsapp_bill_sheet.dart';
+import 'widgets/reminder_settings_sheet.dart';
 import 'widgets/support_bottom_sheet.dart';
 import 'widgets/whatsapp_messaging_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1499,9 +1501,14 @@ class _DashboardState extends State<Dashboard> {
 
     NotificationService.instance.initialize(
       onNotificationTap: (payload) {
-        if (payload == 'whatsapp_messages' && mounted) {
+        if (!mounted) return;
+        if (payload == 'whatsapp_messages') {
           setState(() => _currentTab = 2);
           _messagesKey.currentState?.reload();
+        } else if (payload == 'check_ledger') {
+          setState(() => _currentTab = 0);
+        } else if (payload == 'morning_delivery') {
+          setState(() => _currentTab = 1);
         }
       },
     );
@@ -1551,6 +1558,15 @@ class _DashboardState extends State<Dashboard> {
                 setState(() => _currentTab = tabIndex);
               },
               onOpenAddCustomer: () => _openAddCustomer(context, controller),
+              onOpenBulkAdd: () => Get.to(
+                () => BulkAddCustomersScreen(
+                  api: widget.api,
+                  onSuccess: () async {
+                    await controller.loadCustomers();
+                    await controller.loadTodaySummary();
+                  },
+                ),
+              ),
             ),
             _buildCustomersView(context, controller),
             WhatsAppMessagingScreen(key: _messagesKey, api: widget.api),
@@ -1653,21 +1669,7 @@ class _DashboardState extends State<Dashboard> {
                 ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(LucideIcons.images, color: Colors.white, size: 20),
-              tooltip: T.t('Bulk Milk Card Upload'),
-              onPressed: () => Get.to(
-                () => BulkAddCustomersScreen(
-                  api: widget.api,
-                  onSuccess: () async {
-                    await controller.loadCustomers();
-                    await controller.loadTodaySummary();
-                  },
-                ),
-              ),
-            ),
-          ],
+          actions: const [],
         ),
         body: RefreshIndicator(
           onRefresh: controller.load,
@@ -1716,78 +1718,7 @@ class _DashboardState extends State<Dashboard> {
                   ),
                 ),
               ),
-              // Bulk Add Quick Card
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => Get.to(
-                      () => BulkAddCustomersScreen(
-                        api: widget.api,
-                        onSuccess: () async {
-                          await controller.loadCustomers();
-                          await controller.loadTodaySummary();
-                        },
-                      ),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xffbbf7d0)),
-                        color: const Color(0xfff0fdf4),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xffdcfce7),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              LucideIcons.images,
-                              color: Color(0xff16a34a),
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  T.t('Bulk Add Customers from Milk Cards'),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12.5,
-                                    color: Color(0xff166534),
-                                  ),
-                                ),
-                                Text(
-                                  T.t('Upload card photos to add up to 100 customers instantly'),
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(
-                            LucideIcons.chevronRight,
-                            size: 16,
-                            color: Color(0xff16a34a),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              // shortcut: Bulk Add banner moved to Dashboard Quick Actions
               if (controller.loading.value && controller.customers.isEmpty)
                     Center(
                       child: Padding(
@@ -2453,7 +2384,6 @@ class _CustomerTile extends StatelessWidget {
         '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'.trim();
     final phone =
         '${customer['phoneNumber'] ?? customer['mobileNumber'] ?? customer['phone'] ?? ''}'.trim();
-    final price = (customer['todayPrice'] ?? customer['price'] ?? customer['defaultPrice'] ?? 0);
     final channel =
         '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
     final isWhatsApp = channel == 'whatsapp';
@@ -2789,124 +2719,46 @@ class _CustomerTile extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
-                // Bottom Row: Metrics & Quick Action Buttons (Adaptive Wrap)
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
+                // Bottom Row: Entry Button Only
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // Metrics: Rate pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xfff0fdf4),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: const Color(0xffbbf7d0),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Text(
-                        '₹$price/L',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xff166534),
-                        ),
-                      ),
-                    ),
-
-                    // Action buttons: Entry & Bill
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Save Milk Entry Button
-                        Tooltip(
-                          message: T.t('Save entry'),
-                          child: Material(
-                            color: const Color(0xff2d7a55),
-                            borderRadius: BorderRadius.circular(8),
-                            child: InkWell(
-                              onTap: () => _addMilk(context),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
+                    // Save Milk Entry Button
+                    Tooltip(
+                      message: T.t('Save entry'),
+                      child: Material(
+                        color: const Color(0xff2d7a55),
+                        borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
+                          onTap: () => _addMilk(context),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  LucideIcons.circlePlus,
+                                  size: 13,
+                                  color: Colors.white,
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      LucideIcons.circlePlus,
-                                      size: 13,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      T.t('Entry'),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  T.t('Entry'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
-
-                        // Bill & Entries Button
-                        Tooltip(
-                          message: T.t('Bill & Entries'),
-                          child: Material(
-                            color: const Color(0xfff0fdf4),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              side: const BorderSide(
-                                color: Color(0xff86efac),
-                                width: 1,
-                              ),
-                            ),
-                            child: InkWell(
-                              onTap: _openBillAndEntries,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      LucideIcons.receiptText,
-                                      size: 13,
-                                      color: Color(0xff166534),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      T.t('Bill'),
-                                      style: const TextStyle(
-                                        color: Color(0xff166534),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -3965,11 +3817,130 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late String language;
+  String _reminderSubtitle = 'Daily at 02:00 PM & 10:00 PM';
+  String _geminiKey = '';
 
   @override
   void initState() {
     super.initState();
     language = Get.find<AppLanguageController>().language.value;
+    _refreshReminderSummary();
+    _loadGeminiKey();
+  }
+
+  Future<void> _refreshReminderSummary() async {
+    final slots = await NotificationService.instance.getSavedSlots();
+    final active = slots.where((s) => s.isEnabled).toList();
+    if (mounted) {
+      setState(() {
+        if (active.isEmpty) {
+          _reminderSubtitle = T.t('Reminders Disabled');
+        } else {
+          final times = active.map((s) => s.formattedTime).join(', ');
+          _reminderSubtitle = '${active.length} ${T.t("reminders active")} • $times';
+        }
+      });
+    }
+  }
+
+  Future<void> _loadGeminiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _geminiKey = prefs.getString('gemini_api_key') ?? '';
+      });
+    }
+  }
+
+  Future<void> _showGeminiKeyDialog() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentKey = prefs.getString('gemini_api_key') ?? '';
+    final ctrl = TextEditingController(text: currentKey);
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(LucideIcons.sparkles, color: Color(0xff1b4332)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                T.t('Google Gemini API Key'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              T.t('Used for AI milk card scanning (Customer OCR). You can get a free key from Google AI Studio (aistudio.google.com).'),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              decoration: InputDecoration(
+                labelText: T.t('Gemini API Key'),
+                hintText: 'AIzaSy...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                suffixIcon: IconButton(
+                  icon: const Icon(LucideIcons.clipboardPaste, size: 20),
+                  onPressed: () async {
+                    final data = await Clipboard.getData(Clipboard.kTextPlain);
+                    if (data?.text != null) {
+                      ctrl.text = data!.text!.trim();
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(T.t('Cancel')),
+          ),
+          if (currentKey.isNotEmpty)
+            TextButton(
+              onPressed: () async {
+                await prefs.remove('gemini_api_key');
+                if (ctx.mounted) Navigator.pop(ctx);
+                _loadGeminiKey();
+                Get.snackbar(T.t('Removed'), 'API Key cleared');
+              },
+              child: const Text('Clear', style: TextStyle(color: Colors.red)),
+            ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xff1b4332)),
+            onPressed: () async {
+              final newKey = ctrl.text.trim();
+              if (newKey.isNotEmpty) {
+                await prefs.setString('gemini_api_key', newKey);
+              } else {
+                await prefs.remove('gemini_api_key');
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+              _loadGeminiKey();
+              Get.snackbar(
+                T.t('Saved'),
+                'Gemini API Key updated successfully',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xffdcfce7),
+                colorText: const Color(0xff166534),
+              );
+            },
+            child: Text(T.t('Save')),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmLogout() async {
@@ -4249,7 +4220,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         const SizedBox(height: 22),
 
-        // Daily Reminder Notification Settings
+        // Daily Reminder & AI Settings
         Card(
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -4263,35 +4234,25 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: LucideIcons.bellRing,
                 iconBg: const Color(0xffdcfce7),
                 iconColor: const Color(0xff16a34a),
-                title: T.t('Daily WhatsApp Evening Reminder'),
-                subtitle: 'Daily at 10:00 PM • Reminds to send WhatsApp messages',
-                onTap: () {
-                  Get.snackbar(
-                    T.t('Daily Reminder Active'),
-                    'Dairy Desk automatically sends an evening notification at 10:00 PM every day.',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: const Color(0xffdcfce7),
-                    colorText: const Color(0xff166534),
+                title: T.t('Daily Reminders'),
+                subtitle: _reminderSubtitle,
+                onTap: () async {
+                  await ReminderSettingsSheet.show(
+                    context,
+                    onSaved: _refreshReminderSummary,
                   );
                 },
               ),
               const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
               _SettingsListTile(
-                icon: LucideIcons.send,
+                icon: LucideIcons.sparkles,
                 iconBg: const Color(0xfff0fdf4),
                 iconColor: const Color(0xff2d7a55),
-                title: T.t('Send Test Notification'),
-                subtitle: 'Tap to test how the reminder arrives on your phone',
-                onTap: () async {
-                  await NotificationService.instance.showTestNotification();
-                  Get.snackbar(
-                    T.t('Notification Sent'),
-                    'Check your phone status bar for the Dairy Desk reminder!',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: const Color(0xffdcfce7),
-                    colorText: const Color(0xff166534),
-                  );
-                },
+                title: T.t('Google Gemini API Key'),
+                subtitle: _geminiKey.isNotEmpty
+                    ? 'API Key Configured • Tap to change'
+                    : 'Tap to configure free Gemini API key for milk card OCR',
+                onTap: _showGeminiKeyDialog,
               ),
             ],
           ),
