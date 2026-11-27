@@ -73,6 +73,23 @@ class MockApiService extends ApiService {
     deletedEntryIds.add(entryId);
     return {'success': true};
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCustomers() async => [];
+
+  @override
+  Future<Map<String, dynamic>> getCustomerBillSummary({
+    required String customerId,
+    required int year,
+    required int month,
+  }) async => {};
+
+  @override
+  Future<Map<String, dynamic>?> getPaymentEntry({
+    required String customerId,
+    required int year,
+    required int month,
+  }) async => null;
 }
 
 void main() {
@@ -341,7 +358,9 @@ void main() {
           },
         ),
       ));
-      await tester.pumpAndSettle();
+      for (int i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
       // 1. FIRST: Small Professional Bill Card
       expect(find.text('Gokul Dairy'), findsOneWidget);

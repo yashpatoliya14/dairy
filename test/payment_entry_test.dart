@@ -36,15 +36,13 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       api = MockApiService();
       controller = MonthlyEntriesController(api);
-      controller.setCustomer({
+      await controller.setCustomer({
         'id': 'cust_123',
         'name': 'Ramesh Kumar',
         'uniqueNumber': '42',
         'liters': 2.0,
         'price': 60.0,
       });
-      // Wait for loadMonth to finish
-      await controller.loadMonth();
     });
 
     test('Initial payment state is clean / unpaid', () {

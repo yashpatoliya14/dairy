@@ -164,12 +164,12 @@ class MonthlyEntriesController extends GetxController {
   }
 
   /// Set the customer and load the current month's data.
-  void setCustomer(Map<String, dynamic> c) {
+  Future<void> setCustomer(Map<String, dynamic> c) async {
     customer.value = c;
     selectedYear.value = DateTime.now().year;
     selectedMonth.value = DateTime.now().month;
     loadProfile();
-    loadMonth();
+    await loadMonth();
   }
 
   /// Load distributor / dairy profile if session is present.
