@@ -12,7 +12,9 @@ import 'controllers/dashboard_controller.dart';
 import 'services/app_language.dart';
 import 'services/app_update_service.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 import 'views/app_update_screen.dart';
+import 'views/bulk_add_customers_screen.dart';
 import 'widgets/dairy_milk_loader.dart';
 import 'widgets/dashboard_screen.dart';
 import 'widgets/monthly_entries_screen.dart';
@@ -26,6 +28,12 @@ Future<void> main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+  try {
+    await NotificationService.instance.initialize();
+    await NotificationService.instance.requestPermissions();
+  } catch (e) {
+    debugPrint('NotificationService init error: $e');
+  }
   runApp(const DairyApp());
 }
 
@@ -390,6 +398,7 @@ class _AuthPageState extends State<AuthPage> {
   final formKey = GlobalKey<FormState>();
   final firstName = TextEditingController();
   final lastName = TextEditingController();
+  final phone = TextEditingController();
   late final TextEditingController email;
   final password = TextEditingController();
   final dairyName = TextEditingController();
@@ -419,6 +428,7 @@ class _AuthPageState extends State<AuthPage> {
           targetEmail,
           password.text,
           dairyName.text.trim(),
+          phoneNumber: phone.text.trim(),
         );
         await widget.api.saveLastAccountEmail(targetEmail);
         if (!mounted) return;
@@ -758,6 +768,43 @@ class _AuthPageState extends State<AuthPage> {
                                 ),
                               ),
                               validator: _required,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: phone,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              decoration: InputDecoration(
+                                labelText: T.t('Mobile number'),
+                                hintText: '9876543210',
+                                prefixIcon: const Icon(LucideIcons.phone, size: 18),
+                                prefixText: '+91 ',
+                                prefixStyle: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xff111827),
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xfff8fafc),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xffcbd5e1)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xff166534), width: 2),
+                                ),
+                              ),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return T.t('Required');
+                                final digits = v.replaceAll(RegExp(r'\D'), '');
+                                if (digits.length != 10) {
+                                  return T.t('Enter a valid 10-digit mobile number');
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 14),
                           ],
@@ -1449,6 +1496,15 @@ class _DashboardState extends State<Dashboard> {
         return;
       }
     }
+
+    NotificationService.instance.initialize(
+      onNotificationTap: (payload) {
+        if (payload == 'whatsapp_messages' && mounted) {
+          setState(() => _currentTab = 2);
+          _messagesKey.currentState?.reload();
+        }
+      },
+    );
   }
 
   Future<void> _openAddCustomer(
@@ -1597,6 +1653,21 @@ class _DashboardState extends State<Dashboard> {
                 ),
             ],
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(LucideIcons.images, color: Colors.white, size: 20),
+              tooltip: T.t('Bulk Milk Card Upload'),
+              onPressed: () => Get.to(
+                () => BulkAddCustomersScreen(
+                  api: widget.api,
+                  onSuccess: () async {
+                    await controller.loadCustomers();
+                    await controller.loadTodaySummary();
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
         body: RefreshIndicator(
           onRefresh: controller.load,
@@ -1611,7 +1682,7 @@ class _DashboardState extends State<Dashboard> {
             children: [
               Container(
                 height: 36,
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: const EdgeInsets.only(bottom: 10),
                 child: TextField(
                   onChanged: controller.setSearch,
                   style: const TextStyle(fontSize: 13),
@@ -1642,6 +1713,78 @@ class _DashboardState extends State<Dashboard> {
                     ),
                     fillColor: Colors.white,
                     filled: true,
+                  ),
+                ),
+              ),
+              // Bulk Add Quick Card
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => Get.to(
+                      () => BulkAddCustomersScreen(
+                        api: widget.api,
+                        onSuccess: () async {
+                          await controller.loadCustomers();
+                          await controller.loadTodaySummary();
+                        },
+                      ),
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xffbbf7d0)),
+                        color: const Color(0xfff0fdf4),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xffdcfce7),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              LucideIcons.images,
+                              color: Color(0xff16a34a),
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  T.t('Bulk Add Customers from Milk Cards'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12.5,
+                                    color: Color(0xff166534),
+                                  ),
+                                ),
+                                Text(
+                                  T.t('Upload card photos to add up to 100 customers instantly'),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            LucideIcons.chevronRight,
+                            size: 16,
+                            color: Color(0xff16a34a),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -2310,9 +2453,6 @@ class _CustomerTile extends StatelessWidget {
         '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'.trim();
     final phone =
         '${customer['phoneNumber'] ?? customer['mobileNumber'] ?? customer['phone'] ?? ''}'.trim();
-    final hasTodayEntry = customer['hasTodayEntry'] == true || customer['todayLiters'] != null;
-    final todayLiters = customer['todayLiters'] ?? (hasTodayEntry ? customer['liters'] : null);
-    final liters = (todayLiters ?? customer['liters'] ?? customer['defaultLiters'] ?? 0);
     final price = (customer['todayPrice'] ?? customer['price'] ?? customer['defaultPrice'] ?? 0);
     final channel =
         '${customer['notificationChannel'] ?? 'whatsapp'}'.toLowerCase();
@@ -2656,82 +2796,28 @@ class _CustomerTile extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    // Metrics row: Liters pill & Rate pill
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: hasTodayEntry ? const Color(0xffdcfce7) : const Color(0xffdcefe3),
-                            borderRadius: BorderRadius.circular(6),
-                            border: hasTodayEntry ? Border.all(color: const Color(0xff86efac), width: 0.8) : null,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                LucideIcons.droplets,
-                                size: 12,
-                                color: Color(0xff2d7a55),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$liters L',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xff2d7a55),
-                                ),
-                              ),
-                              if (hasTodayEntry) ...[
-                                const SizedBox(width: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xff2d7a55),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    T.t('Today'),
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                    // Metrics: Rate pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xfff0fdf4),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: const Color(0xffbbf7d0),
+                          width: 0.8,
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xfff0fdf4),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(0xffbbf7d0),
-                              width: 0.8,
-                            ),
-                          ),
-                          child: Text(
-                            '₹$price/L',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xff166534),
-                            ),
-                          ),
+                      ),
+                      child: Text(
+                        '₹$price/L',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xff166534),
                         ),
-                      ],
+                      ),
                     ),
 
                     // Action buttons: Entry & Bill
@@ -4157,6 +4243,55 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: T.t('Check for updates'),
                 subtitle: 'v${AppUpdateService.currentVersion} • ${T.t("Tap to check")}',
                 onTap: () => _checkForUpdates(context),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+
+        // Daily Reminder Notification Settings
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xffe2e8f0)),
+          ),
+          color: Colors.white,
+          child: Column(
+            children: [
+              _SettingsListTile(
+                icon: LucideIcons.bellRing,
+                iconBg: const Color(0xffdcfce7),
+                iconColor: const Color(0xff16a34a),
+                title: T.t('Daily WhatsApp Evening Reminder'),
+                subtitle: 'Daily at 10:00 PM • Reminds to send WhatsApp messages',
+                onTap: () {
+                  Get.snackbar(
+                    T.t('Daily Reminder Active'),
+                    'Dairy Desk automatically sends an evening notification at 10:00 PM every day.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: const Color(0xffdcfce7),
+                    colorText: const Color(0xff166534),
+                  );
+                },
+              ),
+              const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
+              _SettingsListTile(
+                icon: LucideIcons.send,
+                iconBg: const Color(0xfff0fdf4),
+                iconColor: const Color(0xff2d7a55),
+                title: T.t('Send Test Notification'),
+                subtitle: 'Tap to test how the reminder arrives on your phone',
+                onTap: () async {
+                  await NotificationService.instance.showTestNotification();
+                  Get.snackbar(
+                    T.t('Notification Sent'),
+                    'Check your phone status bar for the Dairy Desk reminder!',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: const Color(0xffdcfce7),
+                    colorText: const Color(0xff166534),
+                  );
+                },
               ),
             ],
           ),

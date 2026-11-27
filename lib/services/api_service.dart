@@ -121,17 +121,22 @@ class ApiService {
     String lastName,
     String email,
     String password,
-    String dairyName,
-  ) async {
+    String dairyName, {
+    String? phoneNumber,
+  }) async {
+    final payload = <String, dynamic>{
+      'firstName': firstName,
+      'lastName': lastName,
+      'email': email,
+      'password': password,
+      'dairyName': dairyName,
+    };
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      payload['phoneNumber'] = phoneNumber.trim();
+    }
     return _authenticate(
       '/auth/signup',
-      {
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': email,
-        'password': password,
-        'dairyName': dairyName,
-      },
+      payload,
       loaderMessage: 'Creating dairy account...',
     );
   }
@@ -320,6 +325,32 @@ class ApiService {
       body: customer,
       showLoader: true,
       loaderMessage: 'Adding customer...',
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> bulkCreateCustomers(
+    List<Map<String, dynamic>> customers,
+  ) async {
+    final response = await _send(
+      'POST',
+      '/customers/bulk',
+      body: {'customers': customers},
+      showLoader: true,
+      loaderMessage: 'Adding customers in bulk...',
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> scanCustomerCards(
+    List<String> base64Images,
+  ) async {
+    final response = await _send(
+      'POST',
+      '/customers/scan-cards',
+      body: {'images': base64Images},
+      showLoader: true,
+      loaderMessage: 'Analyzing card images...',
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
