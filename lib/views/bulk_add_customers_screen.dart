@@ -119,7 +119,7 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
       final res = await widget.api.scanCustomerCards(base64Images);
 
       if (res['success'] == false) {
-        final msg = res['message'] ?? 'Could not extract customer details from cards.';
+        final msg = res['message'] ?? T.t('No customer records could be identified in the card image(s).');
         if (mounted) {
           Get.snackbar(
             T.t('Card Scanning Note'),
@@ -134,12 +134,15 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
       }
 
       final rawList = res['customers'] as List<dynamic>? ?? [];
+      final rejectedCount = res['rejectedCount'] as int? ?? 0;
       if (rawList.isEmpty) {
         if (mounted) {
           Get.snackbar(
             T.t('No Customers Found'),
-            'No customer records could be identified in the card image(s).',
+            T.t('No customer records could be identified in the card image(s).'),
             snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: const Color(0xfffee2e2),
+            colorText: const Color(0xff991b1b),
           );
         }
         return;
@@ -170,9 +173,12 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
 
       if (mounted) {
         setState(() {});
+        final successMsg = rejectedCount > 0
+            ? '${T.t("Extracted Customers")}: ${rawList.length} (${rejectedCount} ${T.t("invalid/empty cards skipped")})'
+            : '${T.t("Extracted Customers")}: ${rawList.length}. ${T.t("Please review before adding.")}';
         Get.snackbar(
           T.t('Card Analysis Complete'),
-          'Extracted ${rawList.length} customer records. Please review before adding.',
+          successMsg,
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: const Color(0xffdcfce7),
           colorText: const Color(0xff166534),
@@ -212,10 +218,6 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
     setState(() {
       final removed = _drafts.removeAt(index);
       removed.dispose();
-      // Re-index remaining drafts
-      for (int i = 0; i < _drafts.length; i++) {
-        _drafts[i].uniqueNumber = '${i + 1}';
-      }
     });
   }
 

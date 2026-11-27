@@ -29,8 +29,8 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
   @override
   void initState() {
     super.initState();
-    // Default to 'missing' (Pending) so distributors see who still needs milk recorded
-    widget.controller.setDailyFilter('missing');
+    // Default to 'all' so distributors see all customers
+    widget.controller.setDailyFilter('all');
   }
 
   @override
@@ -72,8 +72,8 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
 
       final filteredByTab = allItems.where((item) {
         final hasEntry = item['hasEntry'] == true || item['entry'] != null;
-        if (filter == 'missing') return !hasEntry;
         if (filter == 'completed') return hasEntry;
+        // 'all' includes all customers
         return true;
       }).toList();
 
@@ -95,29 +95,47 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
       final query = normalizeDigits(rawQuery);
       final queryDigitsOnly = query.replaceAll(RegExp(r'[^0-9]'), '');
 
+      // Check if user is searching for a numeric customer ID (e.g. "5", "10", "#5", "#10", "૫", "૧૦")
+      final isNumericQuery = queryDigitsOnly.isNotEmpty &&
+          (query == queryDigitsOnly ||
+              query == '#$queryDigitsOnly' ||
+              query == 'no.$queryDigitsOnly' ||
+              query == 'no $queryDigitsOnly');
+
       final displayedItems = filteredByTab.where((item) {
         if (query.isEmpty) return true;
         final customer = item['customer'] as Map? ?? {};
         final name = '${customer['name'] ?? ''}'.toLowerCase();
-        final rawNumber = normalizeDigits('${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'.trim().toLowerCase());
+        final rawNumber = normalizeDigits(
+            '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'
+                .trim()
+                .toLowerCase());
         final cleanNumber = rawNumber.replaceAll(RegExp(r'[^0-9]'), '');
         final phone = '${customer['phoneNumber'] ?? ''}'.toLowerCase();
+
+        if (isNumericQuery) {
+          // Exact number match: searching 5 strictly matches #5, searching 10 strictly matches #10
+          if (cleanNumber == queryDigitsOnly) return true;
+          final custNum = int.tryParse(cleanNumber);
+          final qNum = int.tryParse(queryDigitsOnly);
+          if (custNum != null && qNum != null && custNum == qNum) return true;
+          // Match phone only if 7 or more digits entered
+          if (queryDigitsOnly.length >= 7 && phone.contains(queryDigitsOnly)) return true;
+          return false;
+        }
 
         // 1. Name match (matches English or Gujarati name)
         if (name.contains(query) || name.contains(rawQuery)) return true;
 
-        // 2. Direct Unique Number match (e.g. user typed "1", "#1", "૧", "#૧")
-        if (rawNumber == query || ('#$rawNumber') == query || rawNumber.contains(query)) return true;
+        // 2. Direct Unique Number match
+        if (rawNumber == query || ('#$rawNumber') == query) return true;
 
-        // 3. Numeric query match on uniqueNumber (e.g. user typed 1, 2, 3...)
-        if (queryDigitsOnly.isNotEmpty && cleanNumber.isNotEmpty) {
-          if (cleanNumber == queryDigitsOnly || cleanNumber.startsWith(queryDigitsOnly)) {
-            return true;
-          }
+        // 3. Phone number match
+        if (phone.isNotEmpty &&
+            (phone.contains(query) ||
+                (queryDigitsOnly.length >= 4 && phone.contains(queryDigitsOnly)))) {
+          return true;
         }
-
-        // 4. Phone number match
-        if (phone.contains(query) || (queryDigitsOnly.length >= 3 && phone.contains(queryDigitsOnly))) return true;
 
         return false;
       }).toList();
@@ -246,31 +264,25 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Filter Chips (Pending, Completed, All)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip(
-                      label: '⚠️ ${T.t("Pending")} ($missingCount)',
-                      selected: filter == 'missing',
-                      highlight: missingCount > 0,
-                      onSelected: () => controller.setDailyFilter('missing'),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      label: '✓ ${T.t("Completed")} ($completedCount)',
-                      selected: filter == 'completed',
-                      onSelected: () => controller.setDailyFilter('completed'),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
+              // Filter Chips: Strictly 2 tabs (All, Completed)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildFilterChip(
                       label: '${T.t("All")} (${allItems.length})',
                       selected: filter == 'all',
                       onSelected: () => controller.setDailyFilter('all'),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildFilterChip(
+                      label: '✓ ${T.t("Completed")} ($completedCount)',
+                      selected: filter == 'completed',
+                      onSelected: () => controller.setDailyFilter('completed'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
 
@@ -332,23 +344,17 @@ class _DailyCollectionScreenState extends State<DailyCollectionScreen> {
                   child: Column(
                     children: [
                       Icon(
-                        filter == 'missing'
-                            ? LucideIcons.partyPopper
-                            : filter == 'completed'
-                                ? LucideIcons.inbox
-                                : LucideIcons.users,
+                        filter == 'completed'
+                            ? LucideIcons.inbox
+                            : LucideIcons.users,
                         size: 40,
-                        color: filter == 'missing'
-                            ? const Color(0xff2d7a55)
-                            : Colors.grey.shade400,
+                        color: Colors.grey.shade400,
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        filter == 'missing'
-                            ? T.t('All customer entries completed')
-                            : filter == 'completed'
-                                ? T.t('No entries recorded for this date')
-                                : T.t('No customers found'),
+                        filter == 'completed'
+                            ? T.t('No entries recorded for this date')
+                            : T.t('No customers found'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 14,

@@ -491,6 +491,10 @@ class T {
       'Search (Name, #Number)': 'खोजें (नाम, #नंबर)',
       'Search': 'खोजें',
       'must have a name': 'का नाम होना आवश्यक है',
+      'Please review before adding.': 'कृपया जोड़ने से पहले समीक्षा करें।',
+      'invalid/empty cards skipped': 'अमान्य/खाली कार्ड छोड़ दिए गए',
+      'Could not extract customer details from cards.': 'कार्ड से ग्राहक विवरण नहीं निकाला जा सका।',
+      'No customer records could be identified in the card image(s).': 'कार्ड में कोई ग्राहक विवरण नहीं मिला। कृपया भरा हुआ कार्ड अपलोड करें।',
     },
     'gu': {
       'Loading dashboard...': 'ડેશબોર્ડ લોડ થઈ રહ્યું છે...',
@@ -959,6 +963,10 @@ class T {
       'Search (Name, #Number)': 'શોધો (નામ, #નંબર)',
       'Search': 'શોધો',
       'must have a name': 'નામ હોવું જરૂરી છે',
+      'Please review before adding.': 'કૃપા કરીને ઉમેરતા પહેલાં ચકાસી લો.',
+      'invalid/empty cards skipped': 'અમાન્ય/ખાલી કાર્ડ છોડી દીધા',
+      'Could not extract customer details from cards.': 'કાર્ડમાંથી ગ્રાહકની વિગતો મેળવી શકાઈ નથી.',
+      'No customer records could be identified in the card image(s).': 'કાર્ડમાં ગ્રાહકનું નામ અથવા મોબાઈલ નંબર મળ્યો નથી. કૃપા કરીને ભરેલું દૂધ કાર્ડ અપલોડ કરો.',
     },
   };
 
