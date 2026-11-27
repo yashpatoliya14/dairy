@@ -1623,15 +1623,39 @@ class _DashboardState extends State<Dashboard> {
   Widget _buildCustomersView(
       BuildContext context, DashboardController controller) {
     return Obx(() {
-      final query = controller.searchQuery.value;
+      final query = controller.searchQuery.value.trim().toLowerCase();
+      final cleanQuery = query.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+      final isQueryNumeric = RegExp(r'^\d+$').hasMatch(cleanQuery);
+
       final visible = controller.customers.where((customer) {
+        if (query.isEmpty) return true;
         final name = '${customer['name'] ?? customer['fullName'] ?? ''}'
             .toLowerCase();
-        final number =
+        final rawNumber =
             '${customer['uniqueNumber'] ?? customer['customerNumber'] ?? customer['number'] ?? ''}'
+                .trim()
                 .toLowerCase();
-        return name.contains(query) || number.contains(query);
+        final cleanNumber = rawNumber.replaceAll(RegExp(r'[^0-9]'), '');
+        final phone = '${customer['phoneNumber'] ?? ''}'.toLowerCase();
+
+        if (name.contains(query) || phone.contains(query)) return true;
+        if (rawNumber == query || ('#$rawNumber') == query || rawNumber.contains(query)) return true;
+        if (isQueryNumeric && cleanNumber.isNotEmpty) {
+          if (cleanNumber == cleanQuery || cleanNumber.startsWith(cleanQuery)) {
+            return true;
+          }
+        }
+        return false;
       }).toList();
+
+      visible.sort((a, b) {
+        final rawNumA = '${a['uniqueNumber'] ?? a['customerNumber'] ?? a['number'] ?? ''}'.trim();
+        final rawNumB = '${b['uniqueNumber'] ?? b['customerNumber'] ?? b['number'] ?? ''}'.trim();
+        final numA = int.tryParse(rawNumA.replaceAll(RegExp(r'[^0-9]'), '')) ?? 999999;
+        final numB = int.tryParse(rawNumB.replaceAll(RegExp(r'[^0-9]'), '')) ?? 999999;
+        if (numA != numB) return numA.compareTo(numB);
+        return '${a['name']}'.compareTo('${b['name']}');
+      });
 
       return Scaffold(
         backgroundColor: const Color(0xfff1f5f9),
@@ -3781,6 +3805,9 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     language = Get.find<AppLanguageController>().language.value;
     _refreshReminderSummary();
+    if (Get.isRegistered<DashboardController>()) {
+      Get.find<DashboardController>().loadSettings().catchError((_) {});
+    }
   }
 
   Future<void> _refreshReminderSummary() async {
@@ -3896,34 +3923,41 @@ class _SettingsPageState extends State<SettingsPage> {
           title: T.t('Dairy configuration'),
           icon: LucideIcons.milk,
         ),
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: Color(0xffe2e8f0)),
-          ),
-          color: Colors.white,
-          child: _SettingsListTile(
-            icon: LucideIcons.milk,
-            iconBg: const Color(0xffe8f5e9),
-            iconColor: const Color(0xff2d7a55),
-            title: T.t('Default milk & price'),
-            subtitle:
-                '${_formatNumber(widget.defaultLiters)} L • ₹${_formatNumber(widget.defaultPrice)} / L',
-            onTap: () async {
-              final updated = await Get.to<bool>(
-                () => DefaultMilkPricePage(
-                  api: widget.api,
-                  defaultLiters: widget.defaultLiters,
-                  defaultPrice: widget.defaultPrice,
-                ),
-              );
-              if (updated == true && mounted) {
-                Get.back(result: true);
-              }
-            },
-          ),
-        ),
+        Obx(() {
+          final dashCtrl = Get.isRegistered<DashboardController>()
+              ? Get.find<DashboardController>()
+              : null;
+          final currentLiters = dashCtrl?.defaultLiters.value ?? widget.defaultLiters;
+          final currentPrice = dashCtrl?.defaultPrice.value ?? widget.defaultPrice;
+          return Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Color(0xffe2e8f0)),
+            ),
+            color: Colors.white,
+            child: _SettingsListTile(
+              icon: LucideIcons.milk,
+              iconBg: const Color(0xffe8f5e9),
+              iconColor: const Color(0xff2d7a55),
+              title: T.t('Default milk & price'),
+              subtitle:
+                  '${_formatNumber(currentLiters)} L • ₹${_formatNumber(currentPrice)} / L',
+              onTap: () async {
+                await Get.to<bool>(
+                  () => DefaultMilkPricePage(
+                    api: widget.api,
+                    defaultLiters: currentLiters,
+                    defaultPrice: currentPrice,
+                  ),
+                );
+                if (dashCtrl != null) {
+                  await dashCtrl.loadSettings();
+                }
+              },
+            ),
+          );
+        }),
         const SizedBox(height: 18),
 
         // 2. Language & Localization
@@ -4265,10 +4299,18 @@ class _DefaultMilkPricePageState extends State<DefaultMilkPricePage> {
     if (!formKey.currentState!.validate()) return;
     setState(() => busy = true);
     try {
+      final updatedLiters = double.parse(liters.text.trim());
+      final updatedPrice = double.parse(price.text.trim());
       await widget.api.updateSettings(
-        defaultLiters: double.parse(liters.text.trim()),
-        defaultPrice: double.parse(price.text.trim()),
+        defaultLiters: updatedLiters,
+        defaultPrice: updatedPrice,
       );
+      if (Get.isRegistered<DashboardController>()) {
+        final dashCtrl = Get.find<DashboardController>();
+        dashCtrl.defaultLiters.value = updatedLiters;
+        dashCtrl.defaultPrice.value = updatedPrice;
+        dashCtrl.loadSettings().catchError((_) {});
+      }
       if (mounted) Get.back(result: true);
     } catch (error) {
       if (mounted) {

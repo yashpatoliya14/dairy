@@ -35,8 +35,8 @@ class DashboardController extends GetxController {
   final todayNotSentCount = 0.obs;
   final dailyCustomerItems = <Map<String, dynamic>>[].obs;
 
-  // Daily list filter: 'all', 'missing', 'completed' - defaults to 'completed' (milk entry done today)
-  final dailyFilter = 'completed'.obs;
+  // Daily list filter: 'all', 'completed' - defaults to 'all'
+  final dailyFilter = 'all'.obs;
 
   static const _cacheDairyNameKey = 'dash_cache_dairy_name';
   static const _cacheOwnerNameKey = 'dash_cache_owner_name';
@@ -270,10 +270,21 @@ class DashboardController extends GetxController {
     todayFailedCount.value = int.tryParse('${summary['failedCount']}') ?? 0;
     todayNotSentCount.value = int.tryParse('${summary['notSentCount']}') ?? 0;
 
-    final rawList = summaryRes['customers'] as List? ?? [];
-    dailyCustomerItems.assignAll(
-      rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
-    );
+    final rawList = (summaryRes['customers'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    rawList.sort((a, b) {
+      final cA = a['customer'] as Map? ?? {};
+      final cB = b['customer'] as Map? ?? {};
+      final rawNumA = '${cA['uniqueNumber'] ?? cA['customerNumber'] ?? ''}'.trim();
+      final rawNumB = '${cB['uniqueNumber'] ?? cB['customerNumber'] ?? ''}'.trim();
+      final aNum = int.tryParse(rawNumA.replaceAll(RegExp(r'[^0-9]'), '')) ?? 999999;
+      final bNum = int.tryParse(rawNumB.replaceAll(RegExp(r'[^0-9]'), '')) ?? 999999;
+      if (aNum != bNum) return aNum.compareTo(bNum);
+      return '${cA['name']}'.compareTo('${cB['name']}');
+    });
+    dailyCustomerItems.assignAll(rawList);
   }
 
   Future<void> loadTodaySummary() async {
@@ -305,7 +316,16 @@ class DashboardController extends GetxController {
   Future<void> loadCustomers() async {
     if (_isUpdatePending) return;
     try {
-      customers.assignAll(await api.getCustomers());
+      final list = await api.getCustomers();
+      list.sort((a, b) {
+        final rawNumA = '${a['uniqueNumber'] ?? a['customerNumber'] ?? ''}'.trim();
+        final rawNumB = '${b['uniqueNumber'] ?? b['customerNumber'] ?? ''}'.trim();
+        final aNum = int.tryParse(rawNumA.replaceAll(RegExp(r'[^0-9]'), '')) ?? 999999;
+        final bNum = int.tryParse(rawNumB.replaceAll(RegExp(r'[^0-9]'), '')) ?? 999999;
+        if (aNum != bNum) return aNum.compareTo(bNum);
+        return '${a['name']}'.compareTo('${b['name']}');
+      });
+      customers.assignAll(list);
       _saveCache();
     } catch (exception) {
       error.value = exception.toString();
