@@ -38,9 +38,9 @@ class AppController extends GetxController with WidgetsBindingObserver {
         checkSessionValidity(remote: true);
       });
 
-      // Periodic background checks for updates
+      // Periodic background checks for updates (checked every 1 minute for instant OTA)
       updateService.startPeriodicBackgroundChecks(
-        interval: const Duration(minutes: 15),
+        interval: const Duration(minutes: 1),
       );
     }
   }

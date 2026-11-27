@@ -138,9 +138,9 @@ class AppUpdateService {
     }
   }
 
-  /// Start background interval checks (e.g. every 15 minutes)
+  /// Start background interval checks (e.g. every 1 minute)
   void startPeriodicBackgroundChecks({
-    Duration interval = const Duration(minutes: 15),
+    Duration interval = const Duration(minutes: 1),
   }) {
     _checkTimer?.cancel();
     _checkTimer = Timer.periodic(interval, (_) {
@@ -159,14 +159,15 @@ class AppUpdateService {
     hasUpdate.value = true;
     latestInfo.value = info;
 
-    if (_isScreenOpened) return;
-    _isScreenOpened = true;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Get.offAll(() => AppUpdateScreen(
-        info: info,
-        updateService: this,
-      ));
+      if (Get.currentRoute == '/AppUpdateScreen') return;
+      Get.offAll(
+        () => AppUpdateScreen(
+          info: info,
+          updateService: this,
+        ),
+        routeName: '/AppUpdateScreen',
+      );
     });
   }
 
