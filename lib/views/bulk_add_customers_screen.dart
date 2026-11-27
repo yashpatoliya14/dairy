@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../services/app_language.dart';
@@ -110,9 +109,6 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
   Future<void> _analyzeImages(List<XFile> files) async {
     setState(() => _isAnalyzing = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      String? savedApiKey = prefs.getString('gemini_api_key');
-
       final List<String> base64Images = [];
       for (final file in files) {
         final bytes = await File(file.path).readAsBytes();
@@ -120,26 +116,7 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
         base64Images.add('data:image/jpeg;base64,$base64Str');
       }
 
-      var res = await widget.api.scanCustomerCards(
-        base64Images,
-        apiKey: savedApiKey,
-      );
-
-      // If backend reports apiKeyRequired or no key is present
-      if (res['apiKeyRequired'] == true) {
-        if (mounted) setState(() => _isAnalyzing = false);
-        final entered = await _showGeminiKeyPromptDialog();
-        if (entered != null && entered.trim().isNotEmpty) {
-          savedApiKey = entered.trim();
-          setState(() => _isAnalyzing = true);
-          res = await widget.api.scanCustomerCards(
-            base64Images,
-            apiKey: savedApiKey,
-          );
-        } else {
-          return;
-        }
-      }
+      final res = await widget.api.scanCustomerCards(base64Images);
 
       if (res['success'] == false) {
         final msg = res['message'] ?? 'Could not extract customer details from cards.';
@@ -214,80 +191,6 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
     } finally {
       if (mounted) setState(() => _isAnalyzing = false);
     }
-  }
-
-  Future<String?> _showGeminiKeyPromptDialog() async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentKey = prefs.getString('gemini_api_key') ?? '';
-    final ctrl = TextEditingController(text: currentKey);
-
-    if (!mounted) return null;
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(LucideIcons.sparkles, color: Color(0xff1b4332)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                T.t('Gemini API Key Required'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              T.t(
-                'To automatically read customer cards using AI, enter your free Google Gemini API Key from Google AI Studio (aistudio.google.com).',
-              ),
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: ctrl,
-              decoration: InputDecoration(
-                labelText: T.t('Paste Gemini API Key'),
-                hintText: 'AIzaSy...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                suffixIcon: IconButton(
-                  icon: const Icon(LucideIcons.clipboardPaste, size: 20),
-                  onPressed: () async {
-                    final data = await Clipboard.getData(Clipboard.kTextPlain);
-                    if (data?.text != null) {
-                      ctrl.text = data!.text!.trim();
-                    }
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: Text(T.t('Cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xff1b4332)),
-            onPressed: () async {
-              final key = ctrl.text.trim();
-              if (key.isNotEmpty) {
-                await prefs.setString('gemini_api_key', key);
-                if (ctx.mounted) Navigator.pop(ctx, key);
-              }
-            },
-            child: Text(T.t('Save & Scan')),
-          ),
-        ],
-      ),
-    );
   }
 
   void _addNewDraftRow() {
@@ -394,11 +297,6 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
         backgroundColor: const Color(0xff1b4d36),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.keyRound, size: 20),
-            tooltip: T.t('Gemini API Key'),
-            onPressed: _showGeminiKeyPromptDialog,
-          ),
           if (_drafts.isNotEmpty)
             IconButton(
               icon: const Icon(LucideIcons.userPlus),

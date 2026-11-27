@@ -22,7 +22,6 @@ import 'widgets/send_whatsapp_bill_sheet.dart';
 import 'widgets/reminder_settings_sheet.dart';
 import 'widgets/support_bottom_sheet.dart';
 import 'widgets/whatsapp_messaging_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -2591,8 +2590,6 @@ class _CustomerTile extends StatelessWidget {
                               ],
                             ),
                           ],
-                          const SizedBox(height: 5),
-                          buildBalanceTag(),
                         ],
                       ),
                     ),
@@ -2717,12 +2714,14 @@ class _CustomerTile extends StatelessWidget {
                   ],
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
-                // Bottom Row: Entry Button Only
+                // Bottom Row: Balance status on left, Entry button on right
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    buildBalanceTag(),
                     // Save Milk Entry Button
                     Tooltip(
                       message: T.t('Save entry'),
@@ -2734,7 +2733,7 @@ class _CustomerTile extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
+                              horizontal: 11,
                               vertical: 6,
                             ),
                             child: Row(
@@ -2970,48 +2969,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         backgroundColor: const Color(0xff1b4d36),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(
-            tooltip: T.t('Bill & Entries'),
-            onPressed: () => Get.to(
-              () => MonthlyEntriesScreen(
-                api: widget.api,
-                customer: _customer,
-              ),
-            ),
-            icon: const Icon(
-              LucideIcons.receiptText,
-              color: Colors.white,
-            ),
-          ),
-          IconButton(
-            tooltip: T.t('Send WhatsApp Bill'),
-            onPressed: () => SendWhatsAppBillSheet.show(
-              context,
-              api: widget.api,
-              customer: _customer,
-              initialMonthToDateBill: _billSummary != null
-                  ? double.tryParse('${_billSummary!['thisMonthBill']}')
-                  : double.tryParse('${_customer['thisMonthBill']}'),
-              initialPreviousDue: _billSummary != null
-                  ? double.tryParse('${_billSummary!['pastMonthsDue'] ?? _billSummary!['grossPastDue']}')
-                  : double.tryParse('${_customer['pastMonthsDue'] ?? _customer['grossPastDue']}'),
-              initialAdvanceCredit: _billSummary != null
-                  ? double.tryParse('${_billSummary!['advanceApplied'] ?? _billSummary!['grossPastAdvance'] ?? _billSummary!['netAdvance']}')
-                  : double.tryParse('${_customer['advanceApplied'] ?? _customer['grossPastAdvance'] ?? _customer['netAdvance']}'),
-              initialPaidAmount: _billSummary != null
-                  ? double.tryParse('${_billSummary!['thisMonthPaid']}')
-                  : double.tryParse('${_customer['thisMonthPaid']}'),
-            ),
-            icon: const Icon(
-              LucideIcons.messageCircle,
-              color: Color(0xff4ade80),
-            ),
-          ),
-          IconButton(
-            tooltip: T.t('Edit customer'),
-            onPressed: _editCustomer,
-            icon: const Icon(Icons.edit_outlined, color: Colors.white),
-          ),
           IconButton(
             tooltip: T.t('Delete customer'),
             onPressed: _deleteCustomer,
@@ -3818,14 +3775,12 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   late String language;
   String _reminderSubtitle = 'Daily at 02:00 PM & 10:00 PM';
-  String _geminiKey = '';
 
   @override
   void initState() {
     super.initState();
     language = Get.find<AppLanguageController>().language.value;
     _refreshReminderSummary();
-    _loadGeminiKey();
   }
 
   Future<void> _refreshReminderSummary() async {
@@ -3841,106 +3796,6 @@ class _SettingsPageState extends State<SettingsPage> {
         }
       });
     }
-  }
-
-  Future<void> _loadGeminiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _geminiKey = prefs.getString('gemini_api_key') ?? '';
-      });
-    }
-  }
-
-  Future<void> _showGeminiKeyDialog() async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentKey = prefs.getString('gemini_api_key') ?? '';
-    final ctrl = TextEditingController(text: currentKey);
-
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(LucideIcons.sparkles, color: Color(0xff1b4332)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                T.t('Google Gemini API Key'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              T.t('Used for AI milk card scanning (Customer OCR). You can get a free key from Google AI Studio (aistudio.google.com).'),
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: ctrl,
-              decoration: InputDecoration(
-                labelText: T.t('Gemini API Key'),
-                hintText: 'AIzaSy...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                suffixIcon: IconButton(
-                  icon: const Icon(LucideIcons.clipboardPaste, size: 20),
-                  onPressed: () async {
-                    final data = await Clipboard.getData(Clipboard.kTextPlain);
-                    if (data?.text != null) {
-                      ctrl.text = data!.text!.trim();
-                    }
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(T.t('Cancel')),
-          ),
-          if (currentKey.isNotEmpty)
-            TextButton(
-              onPressed: () async {
-                await prefs.remove('gemini_api_key');
-                if (ctx.mounted) Navigator.pop(ctx);
-                _loadGeminiKey();
-                Get.snackbar(T.t('Removed'), 'API Key cleared');
-              },
-              child: const Text('Clear', style: TextStyle(color: Colors.red)),
-            ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xff1b4332)),
-            onPressed: () async {
-              final newKey = ctrl.text.trim();
-              if (newKey.isNotEmpty) {
-                await prefs.setString('gemini_api_key', newKey);
-              } else {
-                await prefs.remove('gemini_api_key');
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-              _loadGeminiKey();
-              Get.snackbar(
-                T.t('Saved'),
-                'Gemini API Key updated successfully',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: const Color(0xffdcfce7),
-                colorText: const Color(0xff166534),
-              );
-            },
-            child: Text(T.t('Save')),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _confirmLogout() async {
@@ -4242,17 +4097,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     onSaved: _refreshReminderSummary,
                   );
                 },
-              ),
-              const Divider(height: 1, indent: 54, endIndent: 14, color: Color(0xfff1f5f9)),
-              _SettingsListTile(
-                icon: LucideIcons.sparkles,
-                iconBg: const Color(0xfff0fdf4),
-                iconColor: const Color(0xff2d7a55),
-                title: T.t('Google Gemini API Key'),
-                subtitle: _geminiKey.isNotEmpty
-                    ? 'API Key Configured • Tap to change'
-                    : 'Tap to configure free Gemini API key for milk card OCR',
-                onTap: _showGeminiKeyDialog,
               ),
             ],
           ),

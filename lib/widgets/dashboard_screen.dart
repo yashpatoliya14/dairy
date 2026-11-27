@@ -379,7 +379,7 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Quick Actions Bar
+              // Quick Actions Bar (Exactly 4 actions)
               Text(
                 T.t('Quick Actions'),
                 style: const TextStyle(
@@ -393,18 +393,9 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _buildActionTile(
-                      icon: LucideIcons.userPlus,
-                      label: T.t('Add customer'),
-                      color: const Color(0xff2d7a55),
-                      onTap: onOpenAddCustomer,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildActionTile(
                       icon: LucideIcons.images,
                       label: T.t('Bulk Add'),
-                      color: const Color(0xff16a34a),
+                      color: const Color(0xff2d7a55),
                       onTap: onOpenBulkAdd,
                     ),
                   ),
