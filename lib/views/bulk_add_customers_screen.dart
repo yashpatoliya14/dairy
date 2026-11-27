@@ -150,7 +150,7 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
         final Map<String, dynamic> c =
             item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item as Map);
 
-        final name = '${c['name'] ?? 'Customer #$startIdx'}'.trim();
+        final name = '${c['name'] ?? '${T.t("Customer")} #$startIdx'}'.trim();
         final phone = '${c['phoneNumber'] ?? ''}'.trim();
         final liters = '${c['liters'] ?? 1.0}'.trim();
         final price = '${c['price'] ?? 60.0}'.trim();
@@ -199,7 +199,7 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
       _drafts.add(
         BulkCustomerDraft(
           uniqueNumber: '$idx',
-          nameCtrl: TextEditingController(text: 'Customer #$idx'),
+          nameCtrl: TextEditingController(text: '${T.t("Customer")} #$idx'),
           phoneCtrl: TextEditingController(text: ''),
           litersCtrl: TextEditingController(text: '1.0'),
           priceCtrl: TextEditingController(text: '60.0'),
@@ -241,7 +241,7 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
       if (name.isEmpty) {
         Get.snackbar(
           T.t('Validation Error'),
-          'Customer #${i + 1} must have a name.',
+          '${T.t("Customer")} #${i + 1} ${T.t("must have a name")}.',
           snackPosition: SnackPosition.BOTTOM,
         );
         return;
@@ -249,6 +249,7 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
 
       payload.add({
         'name': name,
+        'uniqueNumber': draft.uniqueNumber,
         'phoneNumber': phone,
         'liters': liters,
         'price': price,
@@ -549,7 +550,7 @@ class _BulkAddCustomersScreenState extends State<BulkAddCustomersScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Customer #${draft.uniqueNumber}',
+                                    '${T.t("Customer")} #${draft.uniqueNumber}',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
