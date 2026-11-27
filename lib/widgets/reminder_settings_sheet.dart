@@ -29,6 +29,7 @@ class ReminderSettingsSheet extends StatefulWidget {
 class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
   List<ReminderSlot> _slots = [];
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -75,6 +76,17 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
   }
 
   void _addSlot() {
+    if (_slots.length >= NotificationService.maxReminderSlots) {
+      Get.snackbar(
+        T.t('Reminder Limit'),
+        T.t('Maximum 7 reminders can be added.'),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xfffef3c7),
+        colorText: const Color(0xff92400e),
+      );
+      return;
+    }
+
     setState(() {
       _slots.add(
         ReminderSlot(
@@ -92,7 +104,7 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
     if (_slots.length <= 1) {
       Get.snackbar(
         T.t('Reminder'),
-        'At least one reminder slot should remain.',
+        T.t('At least one reminder slot should remain.'),
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -103,22 +115,40 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
   }
 
   Future<void> _save() async {
-    await NotificationService.instance.saveSlots(_slots);
-    if (mounted) {
+    setState(() => _isSaving = true);
+    try {
+      final granted = await NotificationService.instance.requestPermissions();
+      await NotificationService.instance.saveSlots(_slots);
+      if (!mounted) return;
       Navigator.pop(context);
       widget.onSaved?.call();
-      Get.snackbar(
-        T.t('Reminders Saved'),
-        'Daily reminders have been updated successfully.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xffdcfce7),
-        colorText: const Color(0xff166534),
-      );
+      if (!granted) {
+        Get.snackbar(
+          T.t('Notification Permission Required'),
+          T.t('Please enable notifications in phone settings so reminders can alert you on time.'),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xfffef3c7),
+          colorText: const Color(0xff92400e),
+          duration: const Duration(seconds: 5),
+        );
+      } else {
+        Get.snackbar(
+          T.t('Reminders Saved'),
+          T.t('Daily reminders have been updated successfully.'),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xffdcfce7),
+          colorText: const Color(0xff166534),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final atLimit = _slots.length >= NotificationService.maxReminderSlots;
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -166,13 +196,44 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        T.t('Daily Reminder Settings'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xff0f172a),
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              T.t('Daily Reminder Settings'),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xff0f172a),
+                              ),
+                            ),
+                          ),
+                          if (!_isLoading) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: atLimit
+                                    ? const Color(0xfffef3c7)
+                                    : const Color(0xffdcefe3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${_slots.length}/${NotificationService.maxReminderSlots}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: atLimit
+                                      ? const Color(0xff92400e)
+                                      : const Color(0xff1b4332),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -208,6 +269,9 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                   separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final slot = _slots[index];
+                    final safeType = kReminderTypes.any((t) => t.id == slot.type)
+                        ? slot.type
+                        : kReminderTypes.first.id;
                     return Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -282,7 +346,7 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                                     color: Colors.redAccent,
                                   ),
                                   onPressed: () => _removeSlot(index),
-                                  tooltip: 'Delete',
+                                  tooltip: T.t('Delete'),
                                 ),
                               ],
                             ],
@@ -297,7 +361,7 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: slot.type,
+                                value: safeType,
                                 isExpanded: true,
                                 icon: const Icon(LucideIcons.chevronDown, size: 18),
                                 items: kReminderTypes.map((type) {
@@ -330,12 +394,18 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
               ),
               const SizedBox(height: 14),
               OutlinedButton.icon(
-                onPressed: _addSlot,
+                onPressed: atLimit ? null : _addSlot,
                 icon: const Icon(LucideIcons.plus, size: 18),
-                label: Text(T.t('+ Add Another Reminder')),
+                label: Text(
+                  atLimit
+                      ? T.t('Maximum 7 reminders limit reached')
+                      : T.t('Add Another Reminder'),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xff1b4332),
-                  side: const BorderSide(color: Color(0xff1b4332)),
+                  side: BorderSide(
+                    color: atLimit ? Colors.grey.shade300 : const Color(0xff1b4332),
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -344,7 +414,7 @@ class _ReminderSettingsSheetState extends State<ReminderSettingsSheet> {
               ),
               const SizedBox(height: 14),
               ElevatedButton(
-                onPressed: _save,
+                onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xff1b4332),
                   foregroundColor: Colors.white,

@@ -1560,6 +1560,9 @@ class _DashboardState extends State<Dashboard> {
               onOpenBulkAdd: () => Get.to(
                 () => BulkAddCustomersScreen(
                   api: widget.api,
+                  initialDefaultLiters: controller.defaultLiters.value,
+                  initialDefaultPrice: controller.defaultPrice.value,
+                  existingCustomers: controller.customers.toList(),
                   onSuccess: () async {
                     await controller.loadCustomers();
                     await controller.loadTodaySummary();

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -80,8 +81,8 @@ class ReminderSlot {
 
   factory ReminderSlot.fromJson(Map<String, dynamic> json) => ReminderSlot(
         id: json['id'] as String? ?? 'slot_${DateTime.now().millisecondsSinceEpoch}',
-        hour: json['hour'] as int? ?? 22,
-        minute: json['minute'] as int? ?? 0,
+        hour: (json['hour'] as num?)?.toInt().clamp(0, 23) ?? 22,
+        minute: (json['minute'] as num?)?.toInt().clamp(0, 59) ?? 0,
         type: json['type'] as String? ?? 'whatsapp_messages',
         isEnabled: json['isEnabled'] as bool? ?? true,
       );
@@ -114,10 +115,14 @@ class NotificationService {
   factory NotificationService() => instance;
   NotificationService._internal();
 
+  static const int maxReminderSlots = 7;
+
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  bool _tzInitialized = false;
+  Function(String?)? _onNotificationTap;
   static const String _prefKeySlots = 'daily_reminder_slots';
 
   static List<ReminderSlot> getDefaultSlots() => [
@@ -137,11 +142,85 @@ class NotificationService {
         ),
       ];
 
+  @visibleForTesting
+  static String resolveLocalTimeZoneName(DateTime sample) {
+    final locations = tz.timeZoneDatabase.locations;
+    final rawName = sample.timeZoneName.trim();
+    if (locations.containsKey(rawName)) {
+      return rawName;
+    }
+
+    final offsetMs = sample.timeZoneOffset.inMilliseconds;
+    // Fast-path India Standard Time (+05:30) where Android reports 'IST' or 'GMT+05:30'
+    if (offsetMs == 19800000 &&
+        (rawName.isEmpty ||
+            rawName == 'IST' ||
+            rawName.contains('05:30') ||
+            rawName.contains('Kolkata'))) {
+      if (locations.containsKey('Asia/Kolkata')) {
+        return 'Asia/Kolkata';
+      }
+    }
+
+    for (final entry in locations.entries) {
+      final loc = entry.value;
+      if (loc.currentTimeZone.offset == offsetMs &&
+          loc.currentTimeZone.abbreviation == rawName) {
+        return entry.key;
+      }
+    }
+
+    for (final entry in locations.entries) {
+      if (entry.value.currentTimeZone.offset == offsetMs) {
+        return entry.key;
+      }
+    }
+
+    return 'UTC';
+  }
+
+  @visibleForTesting
+  static void configureLocalTimeZone([DateTime? sample]) {
+    tz_data.initializeTimeZones();
+    final locationName = resolveLocalTimeZoneName(sample ?? DateTime.now());
+    tz.setLocalLocation(tz.getLocation(locationName));
+  }
+
+  @visibleForTesting
+  static tz.TZDateTime computeNextScheduledDate(
+    int hour,
+    int minute, {
+    tz.TZDateTime? now,
+  }) {
+    final current = now ?? tz.TZDateTime.now(tz.local);
+    var scheduledDate = tz.TZDateTime(
+      tz.local,
+      current.year,
+      current.month,
+      current.day,
+      hour,
+      minute,
+    );
+    if (!scheduledDate.isAfter(current)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+    return scheduledDate;
+  }
+
+  void _ensureTimeZoneConfigured() {
+    if (_tzInitialized) return;
+    configureLocalTimeZone();
+    _tzInitialized = true;
+  }
+
   Future<void> initialize({Function(String?)? onNotificationTap}) async {
+    if (onNotificationTap != null) {
+      _onNotificationTap = onNotificationTap;
+    }
     if (_initialized) return;
 
     try {
-      tz_data.initializeTimeZones();
+      _ensureTimeZoneConfigured();
 
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -163,9 +242,7 @@ class NotificationService {
         initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           developer.log('Notification tapped: ${response.payload}');
-          if (onNotificationTap != null) {
-            onNotificationTap(response.payload);
-          }
+          _onNotificationTap?.call(response.payload);
         },
       );
 
@@ -193,14 +270,24 @@ class NotificationService {
     }
   }
 
-  Future<void> requestPermissions() async {
+  Future<bool> requestPermissions() async {
     try {
       final androidImplementation = flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
-      await androidImplementation?.requestNotificationsPermission();
+      if (androidImplementation == null) return true;
+
+      final notifGranted =
+          await androidImplementation.requestNotificationsPermission() ?? true;
+      final canExact =
+          await androidImplementation.canScheduleExactNotifications() ?? false;
+      if (!canExact) {
+        await androidImplementation.requestExactAlarmsPermission();
+      }
+      return notifGranted;
     } catch (e) {
       developer.log('Request notifications permission error: $e');
+      return false;
     }
   }
 
@@ -212,22 +299,27 @@ class NotificationService {
         final List<dynamic> decoded = jsonDecode(jsonStr);
         final list = decoded
             .map((item) => ReminderSlot.fromJson(Map<String, dynamic>.from(item as Map)))
+            .take(maxReminderSlots)
             .toList();
         if (list.isNotEmpty) return list;
       }
     } catch (e) {
       developer.log('Error reading saved slots: $e');
     }
-    // Default to the 2 required daily slots: 2:00 PM and 10:00 PM
     return getDefaultSlots();
   }
 
   Future<void> saveSlots(List<ReminderSlot> slots) async {
     try {
+      final capped = slots.take(maxReminderSlots).toList();
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = jsonEncode(slots.map((s) => s.toJson()).toList());
+      final jsonStr = jsonEncode(capped.map((s) => s.toJson()).toList());
       await prefs.setString(_prefKeySlots, jsonStr);
-      await rescheduleAll(slots);
+      if (!_initialized) {
+        await initialize();
+      } else {
+        await rescheduleAll(capped);
+      }
     } catch (e) {
       developer.log('Error saving slots: $e');
     }
@@ -235,46 +327,42 @@ class NotificationService {
 
   Future<void> rescheduleAll([List<ReminderSlot>? customSlots]) async {
     try {
-      final slots = customSlots ?? await getSavedSlots();
+      _ensureTimeZoneConfigured();
+      final slots = (customSlots ?? await getSavedSlots()).take(maxReminderSlots);
 
-      // Cancel previous scheduled reminder IDs (1000 - 1050)
       for (int i = 0; i <= 50; i++) {
         await flutterLocalNotificationsPlugin.cancel(1000 + i);
       }
 
-      const AndroidNotificationDetails androidDetails =
-          AndroidNotificationDetails(
-        'dairy_daily_reminders',
-        'Daily Milk Reminders',
-        channelDescription:
-            'Daily scheduled reminders for WhatsApp messages and collection checks.',
-        importance: Importance.high,
-        priority: Priority.high,
-        playSound: true,
-        icon: '@mipmap/ic_launcher',
-      );
-
-      const NotificationDetails platformDetails =
-          NotificationDetails(android: androidDetails);
+      final androidImplementation = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      final canExact =
+          await androidImplementation?.canScheduleExactNotifications() ?? false;
+      final scheduleMode = canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
 
       int activeIndex = 0;
       for (final slot in slots) {
         if (!slot.isEnabled) continue;
 
-        final now = tz.TZDateTime.now(tz.local);
-        var scheduledDate = tz.TZDateTime(
-          tz.local,
-          now.year,
-          now.month,
-          now.day,
-          slot.hour,
-          slot.minute,
-        );
-        if (scheduledDate.isBefore(now)) {
-          scheduledDate = scheduledDate.add(const Duration(days: 1));
-        }
-
+        final scheduledDate = computeNextScheduledDate(slot.hour, slot.minute);
         final typeInfo = getReminderTypeInfo(slot.type);
+
+        final androidDetails = AndroidNotificationDetails(
+          'dairy_daily_reminders',
+          'Daily Milk Reminders',
+          channelDescription:
+              'Daily scheduled reminders for WhatsApp messages and collection checks.',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          styleInformation: BigTextStyleInformation(typeInfo.notificationBody),
+          icon: '@mipmap/ic_launcher',
+        );
+
+        final platformDetails = NotificationDetails(android: androidDetails);
 
         await flutterLocalNotificationsPlugin.zonedSchedule(
           1000 + activeIndex,
@@ -282,7 +370,7 @@ class NotificationService {
           typeInfo.notificationBody,
           scheduledDate,
           platformDetails,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: scheduleMode,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time,
@@ -290,7 +378,7 @@ class NotificationService {
         );
 
         developer.log(
-          'Daily reminder scheduled #${activeIndex + 1}: ${slot.formattedTime} - ${typeInfo.label}',
+          'Daily reminder scheduled #${activeIndex + 1} (${tz.local.name}, exact=$canExact): $scheduledDate - ${typeInfo.label}',
         );
         activeIndex++;
       }
@@ -302,8 +390,7 @@ class NotificationService {
   Future<void> showTestNotification([String type = 'whatsapp_messages']) async {
     try {
       final typeInfo = getReminderTypeInfo(type);
-      const AndroidNotificationDetails androidDetails =
-          AndroidNotificationDetails(
+      final androidDetails = AndroidNotificationDetails(
         'dairy_daily_reminders',
         'Daily Milk Reminders',
         channelDescription:
@@ -311,11 +398,11 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         playSound: true,
+        styleInformation: BigTextStyleInformation(typeInfo.notificationBody),
         icon: '@mipmap/ic_launcher',
       );
 
-      const NotificationDetails platformDetails =
-          NotificationDetails(android: androidDetails);
+      final platformDetails = NotificationDetails(android: androidDetails);
 
       await flutterLocalNotificationsPlugin.show(
         9999,

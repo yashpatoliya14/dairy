@@ -338,6 +338,7 @@ class ApiService {
       body: {'customers': customers},
       showLoader: true,
       loaderMessage: 'Adding customers in bulk...',
+      timeout: const Duration(seconds: 90),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
@@ -356,7 +357,7 @@ class ApiService {
       body: body,
       showLoader: true,
       loaderMessage: 'Analyzing card images...',
-      timeout: const Duration(seconds: 60),
+      timeout: const Duration(seconds: 120),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
