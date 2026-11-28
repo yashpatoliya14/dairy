@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import '../services/api_service.dart';
@@ -240,6 +241,8 @@ class MonthlyEntriesController extends GetxController {
     loading.value = true;
     error.value = '';
     try {
+      // Run customer profile refresh in background without stalling month display
+      unawaited(refreshCustomer());
       final results = await Future.wait([
         api.getMilkEntriesForMonth(
           customerId,
@@ -248,7 +251,6 @@ class MonthlyEntriesController extends GetxController {
         ),
         loadPayment(),
         loadBillSummary(),
-        refreshCustomer(),
       ]);
       final data = results[0] as Map<String, dynamic>;
       daysInMonth.value = data['daysInMonth'] as int? ?? 30;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,8 +70,12 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _prehydrateFromCache();
-    load();
+    _initAndLoad();
+  }
+
+  Future<void> _initAndLoad() async {
+    await _prehydrateFromCache();
+    await load();
   }
 
   Future<void> _prehydrateFromCache() async {
@@ -157,16 +162,14 @@ class DashboardController extends GetxController {
     }
     error.value = '';
 
-    // Check for updates
+    // Check for updates in background without stalling data loading
     if (Get.isRegistered<AppController>()) {
       final appCtrl = Get.find<AppController>();
-      final updateInfo =
-          await appCtrl.updateService.checkForUpdate(silent: true);
-      if (updateInfo != null && updateInfo.isUpdateAvailable) {
-        loading.value = false;
-        appCtrl.updateService.navigateToUpdateScreen(updateInfo);
-        return;
-      }
+      unawaited(appCtrl.updateService.checkForUpdate(silent: true).then((updateInfo) {
+        if (updateInfo != null && updateInfo.isUpdateAvailable) {
+          appCtrl.updateService.navigateToUpdateScreen(updateInfo);
+        }
+      }));
     }
 
     if (_isUpdatePending) {
@@ -359,10 +362,7 @@ class DashboardController extends GetxController {
         price: price,
         mode: mode,
       );
-      await Future.wait([
-        loadTodaySummary(),
-        loadCustomers(),
-      ]);
+      await loadTodaySummary();
       return true;
     } catch (_) {
       return false;

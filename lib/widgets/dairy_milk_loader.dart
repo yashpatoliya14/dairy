@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -41,9 +40,6 @@ class DairyMilkLoadingService {
   }
 
   static void _scheduleUpdate() {
-    if (_updateScheduled) return;
-    _updateScheduled = true;
-
     void applyUpdate() {
       _updateScheduled = false;
       final shouldBeLoading = _activeCount > 0;
@@ -59,8 +55,14 @@ class DairyMilkLoadingService {
       }
     }
 
-    final binding = WidgetsBinding.instance;
-    binding.addPostFrameCallback((_) => applyUpdate());
+    // Apply update immediately for instantaneous response, fallback to postFrame if needed
+    try {
+      applyUpdate();
+    } catch (_) {
+      if (_updateScheduled) return;
+      _updateScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => applyUpdate());
+    }
   }
 
   /// Convenience wrapper for async tasks with automatic loader lifecycle.
@@ -95,8 +97,8 @@ class DairyMilkOverlay extends StatelessWidget {
             return IgnorePointer(
               ignoring: !loading,
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 120),
-                curve: Curves.easeInOut,
+                duration: const Duration(milliseconds: 60),
+                curve: Curves.easeOut,
                 opacity: loading ? 1.0 : 0.0,
                 child: loading
                     ? ValueListenableBuilder<String?>(
@@ -128,21 +130,18 @@ class _CompactFloatingHud extends StatelessWidget {
       body: Stack(
         alignment: Alignment.center,
         children: [
-          // Soft dimming background with subtle blur
+          // Soft dimming background without GPU-heavy blur
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 3.5, sigmaY: 3.5),
-              child: Container(
-                color: const Color(0x2210261A),
-              ),
+            child: Container(
+              color: const Color(0x2E10261A),
             ),
           ),
           // Small centered floating badge
           Center(
             child: TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 140),
-              curve: Curves.easeOutBack,
-              tween: Tween<double>(begin: 0.88, end: 1.0),
+              duration: const Duration(milliseconds: 70),
+              curve: Curves.easeOutQuad,
+              tween: Tween<double>(begin: 0.92, end: 1.0),
               builder: (context, scale, child) {
                 return Transform.scale(
                   scale: scale,
@@ -282,7 +281,7 @@ class _DairyMilkLoaderState extends State<DairyMilkLoader>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 950),
+      duration: const Duration(milliseconds: 650),
     )..repeat();
   }
 
